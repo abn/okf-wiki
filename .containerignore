@@ -1,0 +1,8 @@
+# Files excluded from the container build context.
+.git
+.scratch
+bin
+mermaid/node_modules
+mermaid/mermaid-bundle.min.mjs
+docs
+*.md

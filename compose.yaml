@@ -1,0 +1,26 @@
+# Example: serve a local OKF bundle with the okf-wiki image.
+#
+#   podman compose up --build
+#   # then open http://127.0.0.1:8080/wiki/
+#
+# The image ships a theme, so this works with no theme setup at all. To use your
+# own, uncomment the mount and the OKF_WIKI_THEME line below, and point THEME at
+# a directory containing a theme.json. A theme is a bind mount and an
+# environment variable, never a rebuild; see docs/reference/themes.md.
+services:
+  wiki:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: ghcr.io/abn/okf-wiki:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount any OKF bundle at /content (auto-detected) or at any path.
+      - ./docs:/content:ro
+      # - ${THEME:-./themes/acme}:/theme:ro
+    environment:
+      OKF_WIKI_BRAND: "okf-wiki"
+      OKF_WIKI_BRAND_SUB: docs
+      OKF_WIKI_TITLE: Wiki
+      # OKF_WIKI_THEME: /theme

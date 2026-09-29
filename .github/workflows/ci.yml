@@ -1,0 +1,180 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: gofmt
+        run: |
+          files="$(gofmt -l cmd internal)"
+          if [ -n "$files" ]; then
+            echo "gofmt found unformatted files:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Unit tests
+        run: go test -race ./...
+
+      - name: Build binary
+        run: go build -trimpath -o bin/okf-wiki ./cmd/okf-wiki
+
+  vendor:
+    name: Mermaid bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mermaid/package-lock.json
+
+      - name: Build offline diagram bundle
+        run: |
+          make vendor
+          test -s mermaid/mermaid-bundle.min.mjs
+
+  container-build:
+    name: Container build (amd64)
+    runs-on: ubuntu-latest
+    needs: [go]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image with podman
+        run: make container/build IMAGE=okf-wiki:ci
+
+      - name: Smoke test the image
+        run: |
+          set -euo pipefail
+          podman run -d --name okf-wiki-ci -p 8080:8080 \
+            --security-opt label=disable \
+            -v "$PWD/docs:/content:ro" okf-wiki:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz >/dev/null; then
+              echo "healthz OK after ${i}s"
+              curl -fsS http://127.0.0.1:8080/wiki/ >/dev/null
+              echo "wiki page served"
+              podman rm -f okf-wiki-ci
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "image did not become healthy"
+          podman logs okf-wiki-ci || true
+          podman rm -f okf-wiki-ci || true
+          exit 1
+
+  render:
+    name: Rendered output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mermaid/package-lock.json
+
+      - name: Build the diagram bundle and render the docs
+        run: |
+          make vendor
+          make render OUT=.scratch/wiki
+
+      - name: Check the rendered output
+        run: |
+          set -euo pipefail
+          test -f .scratch/wiki/index.html
+          test -d .scratch/wiki/wiki
+          test -s .scratch/wiki/wiki/search-index.json
+          test -f .scratch/wiki/wiki/index.html
+          echo "render output looks complete"
+
+  action:
+    name: The action renders a relocated site
+    runs-on: ubuntu-latest
+    needs: [go]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Built rather than pulled, since the published tag may lag behind main.
+      - name: Build the image the action will run
+        run: make container/build IMAGE=ghcr.io/abn/okf-wiki:ci
+
+      # A nested base, so a project Pages path is exercised.
+      - name: Render through the action
+        id: okf
+        uses: ./action
+        with:
+          content: docs
+          out: _site
+          base: /nested/path
+          image: ghcr.io/abn/okf-wiki:ci
+
+      # The action's job is passing inputs through; the renderer's own tests
+      # cover the output.
+      - name: Check the action output
+        env:
+          SITE: ${{ steps.okf.outputs.site-dir }}
+          BASE: ${{ steps.okf.outputs.base }}
+        run: |
+          set -euo pipefail
+          test "$BASE" = "/nested/path"
+          test "$SITE" = "_site/nested/path"
+          test -f "$SITE/index.html"
+
+  lint:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: pre-commit/action@v3.0.1

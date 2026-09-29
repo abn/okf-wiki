@@ -1,0 +1,154 @@
+name: okf-wiki
+description: Render an OKF v0.2 bundle as a static, searchable wiki, and optionally publish it to GitHub Pages.
+author: okf-wiki
+
+branding:
+  icon: book-open
+  color: green
+
+inputs:
+  content:
+    description: OKF bundle directory, relative to the workspace.
+    required: false
+    default: docs
+  out:
+    description: Build output directory, relative to the workspace.
+    required: false
+    default: _site
+  theme:
+    description: Theme directory in this repository, relative to the workspace.
+    required: false
+    default: ""
+  theme-ref:
+    description: A shared theme as owner/repo@ref. Takes precedence over theme.
+    required: false
+    default: ""
+  image:
+    description: Container image to render with.
+    required: false
+    default: ghcr.io/abn/okf-wiki:latest
+  base:
+    description: >-
+      URL prefix the site is served under. "auto" reads the repository name: a
+      project Pages site under /<repo>, a user or org site at the root.
+    required: false
+    default: auto
+  brand:
+    description: Brand wordmark.
+    required: false
+    default: okf-wiki
+  brand-sub:
+    description: Brand subtitle label.
+    required: false
+    default: docs
+  title:
+    description: Document title suffix.
+    required: false
+    default: Wiki
+  sections:
+    description: Section order as comma-separated id:Title pairs.
+    required: false
+    default: ""
+  deploy:
+    description: "Publish to GitHub Pages. Needs pages: write and id-token: write."
+    required: false
+    default: "false"
+
+outputs:
+  site-dir:
+    description: Directory holding the rendered wiki, relative to the workspace.
+    value: ${{ steps.resolve.outputs.site }}
+  base:
+    description: The URL prefix the site was rendered under.
+    value: ${{ steps.resolve.outputs.base }}
+  deploy-url:
+    description: The published site URL, empty unless deploy ran.
+    value: ${{ steps.deploy.outputs.page_url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve
+      id: resolve
+      shell: bash
+      env:
+        BASE: ${{ inputs.base }}
+        OUT: ${{ inputs.out }}
+        THEME: ${{ inputs.theme }}
+        THEME_REF: ${{ inputs.theme-ref }}
+        REPOSITORY: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+
+        # A project Pages site is served under /<repo>; a user or org site is
+        # at the root. An explicit base passes through.
+        if [ "$BASE" = auto ]; then
+          case "$REPOSITORY" in
+            *.github.io) base=/ ;;
+            *) base=/${REPOSITORY##*/} ;;
+          esac
+        else
+          base=$BASE
+        fi
+
+        echo "base=$base"             >> "$GITHUB_OUTPUT"
+        echo "site=${OUT%/}${base%/}" >> "$GITHUB_OUTPUT"
+
+        if [ -n "$THEME_REF" ]; then
+          echo "theme=$GITHUB_WORKSPACE/.okf-wiki-theme" >> "$GITHUB_OUTPUT"
+          echo "repo=${THEME_REF%@*}" >> "$GITHUB_OUTPUT"
+          echo "rev=${THEME_REF##*@}"  >> "$GITHUB_OUTPUT"
+        else
+          echo "theme=$THEME" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Check out the shared theme
+      if: inputs.theme-ref != ''
+      uses: actions/checkout@v7
+      with:
+        repository: ${{ steps.resolve.outputs.repo }}
+        ref: ${{ steps.resolve.outputs.rev }}
+        path: .okf-wiki-theme
+
+    - name: Render
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        CONTENT: ${{ inputs.content }}
+        OUT: ${{ inputs.out }}
+        THEME: ${{ steps.resolve.outputs.theme }}
+        BRAND: ${{ inputs.brand }}
+        BRAND_SUB: ${{ inputs.brand-sub }}
+        TITLE: ${{ inputs.title }}
+        SECTIONS: ${{ inputs.sections }}
+        BASE: ${{ steps.resolve.outputs.base }}
+      run: |
+        set -euo pipefail
+
+        # No --vendor: the image's baked-in mermaid bundle is wanted.
+        args=(render --content "$CONTENT" --out "$OUT" --base "$BASE"
+              --brand "$BRAND" --brand-sub "$BRAND_SUB" --title "$TITLE")
+        [ -n "$SECTIONS" ] && args+=(--sections "$SECTIONS")
+        [ -n "$THEME" ] && args+=(--theme "$THEME")
+
+        # Root in the container is the runner user under rootless podman; the
+        # image's own uid cannot write the workspace.
+        podman run --rm --user 0:0 \
+          -v "$GITHUB_WORKSPACE:/work:z" -w /work \
+          "$IMAGE" "${args[@]}"
+
+    - name: Upload the Pages artifact
+      if: inputs.deploy == 'true'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        # The site directory, not the output directory. Pages serves the
+        # artifact root at the project path, so the artifact root has to BE the
+        # wiki root. Uploading the output directory instead would put the
+        # renderer's root redirect at the site root, where it points at itself,
+        # and leave the wiki one level below the URL.
+        path: ${{ steps.resolve.outputs.site }}
+
+    - name: Publish to GitHub Pages
+      id: deploy
+      if: inputs.deploy == 'true'
+      uses: actions/deploy-pages@v4

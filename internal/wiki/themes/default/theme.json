@@ -1,0 +1,16 @@
+{
+  "name": "paper",
+  "version": "1.0.0",
+  "description": "The default okf-wiki theme. A white ground, near-black ink, one green accent, pill controls, and a two-face split: Figtree for language, Inter for controls.",
+  "template": "template.html",
+  "assets": {
+    "tokens.css": { "mode": "replace" },
+    "fonts.css": { "mode": "replace" },
+    "wiki.css": { "mode": "replace" },
+    "fonts/": { "mode": "replace" },
+    "brand-mark.svg": { "mode": "replace" },
+    "favicon.svg": { "mode": "replace" },
+    "search.js": { "mode": "replace" },
+    "diagrams.js": { "mode": "replace" }
+  }
+}

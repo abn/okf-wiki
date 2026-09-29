@@ -1,0 +1,373 @@
+/* ============================================================================
+   paper — design tokens
+   ----------------------------------------------------------------------------
+   The default okf-wiki theme. A white ground, near-black ink, one green accent,
+   and a control set that is pill by default. Two decisions shape it:
+
+   1. The split is by function, not by size. Figtree carries anything meant to be
+      read as language; Inter carries anything meant to be operated. A reader
+      never meets a control face in a paragraph.
+   2. Comfort and legibility are kept on separate layers. The accent and the
+      softest surfaces carry the warmth; the reading surface stays neutral and
+      high-contrast. Softening the text along with the mood is the usual way a
+      friendly palette goes wrong, so the text here does not move.
+
+   Two documented accessibility failures in the design this is drawn from are
+   deliberately not reproduced, and the numbers are the reason:
+
+     - Its focus ring was #A3A3A3 on white, 2.52:1 against the 3:1 that SC 2.4.13
+       asks for. --focus-ring here is 10.86:1 on the page.
+     - Its success text was #218358 on its own #F4FBF6 tint, 4.49:1: missing
+       4.5 by 0.01, on the one status surface the design actually renders.
+       --accent-text is 5.32:1 on white and 5.06:1 on that same tint.
+
+   A third is a structural fix rather than a value swap. That design used one
+   #E5E5E5 hairline (1.26:1) for decorative card outlines and for control
+   boundaries, so a control's only boundary was nearly invisible. Here the
+   decorative rule and the control boundary are separate tokens, and only the
+   latter is held to 3:1.
+
+   Dark is a real second palette with a real elevation ladder, not this file
+   inverted. The design it comes from pins itself to light: surface.base,
+   surface.raised and surface.overlay are all #FFFFFF, so raising a surface never
+   moved its lightness and no dark ground could be built by flipping it. Here a
+   raised surface is lighter than its ground, which is what makes the dark side
+   work.
+
+   Every value below is paired to the surface it is read on, and the greys are
+   separated by role (decorative rule / control boundary / text / muted text)
+   rather than collected into one near-white scale.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ---- ground and surfaces ------------------------------------------------
+     Deliberately few. Cards reuse the page colour and are separated by a
+     hairline, because a card that is one step off the page reads as a band and
+     a card that is five steps off the page reads as a mistake. The two sunken
+     steps are for real recesses: the breadcrumb bar, and code and quote
+     surfaces inside prose. */
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #F7F7F8;
+  --color-surface-sunken-deep: #F1F1F3;
+  --color-bg-elevated: #FFFFFF;
+
+  /* ---- ink ----------------------------------------------------------------
+     Two greys, not three. text-muted and text-faint are 6.39:1 and 5.33:1, so
+     the faint step still clears 4.5:1 as text; the design it comes from uses
+     one value for secondary, muted and placeholder, which leaves no lever to
+     move any one of them. */
+  --color-text: #0A0A0A;          /* 19.80:1 on the page */
+  --color-heading: #0A0A0A;
+  --color-text-muted: #5F5F5F;    /*  6.39:1 */
+  --color-text-faint: #6B6B6B;    /*  5.33:1 */
+
+  /* ---- rules --------------------------------------------------------------
+     The split that fixes the shared-hairline failure. --color-line is a
+     decorative rule and is allowed to be quiet. --color-line-control is a
+     control's boundary and is held to 3:1, because it is the only thing
+     describing that control's extent. */
+  --color-line: #E5E5E5;           /*  1.26:1, decorative only */
+  --color-line-strong: #D4D4D4;    /*  1.48:1, decorative only */
+  --color-line-control: #8A8A8A;   /*  3.45:1, control boundary */
+
+  /* ---- accent -------------------------------------------------------------
+     The action fill is near-black and stays near-black in both grounds: the
+     control set is recognisable from its silhouette before any colour loads,
+     and a high-contrast neutral fill is what keeps it that way. The green
+     carries identity on the things that are links, focus and current state. */
+  --color-accent: #171717;         /* action fill, 17.93:1 on the page */
+  --color-on-accent: #FAFAFA;      /* 17.18:1 on the fill */
+  --color-accent-text: #217A4B;    /* 5.32:1 on the page, 5.06:1 on the tint */
+  --color-accent-soft: #F1F1F3;    /* hover wash */
+  --color-accent-ring: #C7E6D6;    /* hairline around a current item */
+  /* The current item in a list is a tinted fill plus a weight step plus colour,
+     never a neutral slab carrying coloured text. #217A4B on this is 4.76:1. */
+  --color-current-tint: #EAF5EE;
+
+  --focus-ring: #3D3D3D;            /* 10.86:1 on the page */
+  --focus-ring-offset: 2px;
+  --focus-ring-width: 2px;
+
+  /* ---- status ------------------------------------------------------------
+     A status green kept as a small family rather than one token, so a callout,
+     a chip and a rule each get a value lit for its own job. Every label here
+     clears 4.5:1 on its own tint. */
+  --status-success-tint: #F0F8F2;
+  --status-success-line: #CFE7D8;
+  --status-success-text: #166534;   /* 6.59:1 on its tint */
+  --status-info-tint: #EFF4FF;
+  --status-info-line: #D3E0FB;
+  --status-info-text: #1E40AF;      /* 7.91:1 on its tint */
+  --status-warn-tint: #FFF8E6;
+  --status-warn-line: #F5E3B8;
+  --status-warn-text: #7A4E00;      /* 6.79:1 on its tint */
+  --status-danger-tint: #FFF4ED;
+  --status-danger-line: #F7D9C6;
+  --status-danger-text: #8A3A1A;    /* 7.19:1 on its tint */
+  --status-neutral-tint: #F1F1F3;
+  --status-neutral-line: #DCDCE0;
+  --status-neutral-text: #3D3D3D;
+
+  /* ---- type ---------------------------------------------------------------
+     rem throughout, no authored px. Leading is paired with size and runs the
+     optical direction: 1.05 at display, 1.2 at h2, 1.5 at body. Tracking is
+     paired too, tightening as size grows, which is what stops a large heading
+     looking loose. */
+  --font-display: "Figtree", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --text-xs: 0.75rem;      /* 12 / 16 */
+  --text-sm: 0.875rem;     /* 14 / 20 */
+  --text-body: 1rem;       /* 16 */
+  --text-lg: 1.125rem;     /* 18 / 28 */
+  --text-h3: 1.25rem;      /* 20 */
+  --text-h2: 1.5rem;       /* 24 / 29 */
+  --text-h1: clamp(2.25rem, 1.5rem + 2.4vw, 3rem); /* 36 → 48 */
+
+  --lh-tight: 1.12;
+  --lh-snug: 1.25;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.6;
+
+  --ls-display: -0.03em;   /* paired with the display size */
+  --ls-tight: -0.02em;
+  --ls-snug: -0.01em;
+
+  --measure: 68ch;
+
+  /* ---- space --------------------------------------------------------------
+     A 4px base unit and multiples of it. No arbitrary values: every step below
+     is the base times a small integer. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---- radius -------------------------------------------------------------
+     Soft and generous by decision, but a small closed set: five steps and a
+     pill. The design this comes from observes ten distinct radii between 10 and
+     32px with several adjacent steps under 15% apart, which is drift around the
+     personality rather than the personality itself. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* ---- elevation ----------------------------------------------------------
+     Hairline first, shadow second. A raised surface does not change colour in
+     light mode, so the hairline is load-bearing; in dark mode it does, which is
+     what lets the dark ground keep a legible ladder. */
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.05), 0 0 1px rgba(10, 10, 10, 0.27);
+  --shadow-md: 0 4px 8px -2px rgba(10, 10, 10, 0.08), 0 2px 4px -2px rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(10, 10, 10, 0.1), 0 4px 6px -4px rgba(10, 10, 10, 0.1);
+
+  /* ---- motion -------------------------------------------------------------
+     One easing family with long tails, and every duration named. No linear, no
+     spring: a curve that arrives softly and never snaps is the whole point. */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 280ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-strong: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* ---- scrim and layers --------------------------------------------------- */
+  --color-scrim: rgba(10, 10, 10, 0.44);
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-header: 30;
+  --z-overlay: 40;
+  --z-skip-link: 50;
+  --z-lightbox: 60;
+
+  /* ---- code and selection -------------------------------------------------
+     The code surface is dark in both grounds, and that is a decision rather than
+     an omission. Syntax highlighting needs a known contrast regime, and
+     re-deriving an accessible palette for two grounds doubles the surface area
+     for a surface that is read as a picture of code, not as prose. */
+  --color-code-bg: #0C0C0D;
+  --color-code-fg: #E4E4E7;
+  --color-code-line: #2A2A2E;
+  --color-inline-code-bg: #F4F4F5;
+  --color-inline-code-fg: #1A1A1C;
+  --color-selection-bg: #C7E6D6;
+  --color-selection-fg: #0A0A0A;
+  --color-mark: #BFE8D2;
+  --color-mark-ink: #06301B;
+
+  /* ---- diagram palette ----------------------------------------------------
+     Read by diagrams.js, which is theme-agnostic. A theme that inherits the
+     default diagrams.js only has to redeclare these to recolour every diagram. */
+  --diagram-font: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --diagram-ground: #0C0C0D;
+  --diagram-surface: #17171A;
+  --diagram-surface-alt: #101012;
+  --diagram-ink: #EDEDEF;
+  --diagram-muted: #8A8A93;
+  --diagram-line: #3A3A40;
+  --diagram-accent: #5FD68C;
+  --diagram-accent-soft: #1E3A2A;
+  --diagram-accent-ink: #6EE7A8;
+  --diagram-accent-2: #86EFAC;
+  --diagram-accent-3: #A7F3C4;
+  --diagram-yellow: #F3C83D;
+  --diagram-cyan: #67E8F9;
+  --diagram-red: #FCA5A5;
+  --diagram-amber: #FCD34D;
+  --diagram-green: #86EFAC;
+  --diagram-blue: #93C5FD;
+  --diagram-violet: #C4B5FD;
+  --diagram-pink: #F9A8D4;
+
+  /* ---- lightbox -----------------------------------------------------------
+     The diagram viewer stages a diagram on a dark field in both grounds. It is
+     a different surface from the page, so it carries its own tokens rather than
+     borrowing the page's neutrals. */
+  --lb-bg: #101012;
+  --lb-bar: #17171A;
+  --lb-line: #2A2A2E;
+  --lb-line-strong: #3A3A40;
+  --lb-text: #EDEDEF;
+  --lb-muted: #A1A1AA;
+  --lb-faint: #7C7C85;
+  --lb-accent: #5FD68C;
+  --lb-accent-line: #2E5C41;
+  --lb-hint: #7C7C85;
+}
+
+/* ---- dark -----------------------------------------------------------------
+   A second palette rather than an inversion. Every step is chosen for the dark
+   ground: ink at 16.72:1, muted at 7.63:1, faint at 5.71:1, and a raised
+   surface that is genuinely lighter than the ground so elevation reads without
+   a shadow. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-bg: #0C0C0D;
+    --color-surface: #0C0C0D;
+    --color-surface-sunken: #101012;
+    --color-surface-sunken-deep: #08080A;
+    --color-bg-elevated: #17171A;
+
+    --color-text: #EDEDEF;
+    --color-heading: #FAFAFA;
+    --color-text-muted: #A1A1AA;
+    --color-text-faint: #8A8A93;
+
+    --color-line: #2A2A2E;
+    --color-line-strong: #3A3A40;
+    --color-line-control: #6B6B73;
+
+    --color-accent: #FAFAFA;
+    --color-on-accent: #0A0A0A;
+    --color-accent-text: #5FD68C;
+    --color-accent-soft: #1B1B1E;
+    --color-accent-ring: #2E5C41;
+    --color-current-tint: #16281D;
+
+    --focus-ring: #A1A1AA;
+
+    --status-success-tint: #10231A;
+    --status-success-line: #1E3A2A;
+    --status-success-text: #6EE7A8;
+    --status-info-tint: #101A2E;
+    --status-info-line: #1E2E4A;
+    --status-info-text: #93C5FD;
+    --status-warn-tint: #241C0C;
+    --status-warn-line: #3D3016;
+    --status-warn-text: #FCD34D;
+    --status-danger-tint: #2A1710;
+    --status-danger-line: #4A2418;
+    --status-danger-text: #FCA5A5;
+    --status-neutral-tint: #1B1B1E;
+    --status-neutral-line: #2A2A2E;
+    --status-neutral-text: #A1A1AA;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+
+    --color-scrim: rgba(0, 0, 0, 0.62);
+    --color-inline-code-bg: #1B1B1E;
+    --color-inline-code-fg: #EDEDEF;
+    --color-selection-bg: #2E5C41;
+    --color-selection-fg: #FAFAFA;
+    --color-mark: #2E5C41;
+    --color-mark-ink: #D6F5E3;
+  }
+}
+
+/* The explicit toggle, for readers who pinned a ground rather than following
+   the OS. Mirrors the block above; a pinned dark must beat prefers-color-scheme
+   in both directions. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #0C0C0D;
+  --color-surface: #0C0C0D;
+  --color-surface-sunken: #101012;
+  --color-surface-sunken-deep: #08080A;
+  --color-bg-elevated: #17171A;
+
+  --color-text: #EDEDEF;
+  --color-heading: #FAFAFA;
+  --color-text-muted: #A1A1AA;
+  --color-text-faint: #8A8A93;
+
+  --color-line: #2A2A2E;
+  --color-line-strong: #3A3A40;
+  --color-line-control: #6B6B73;
+
+  --color-accent: #FAFAFA;
+  --color-on-accent: #0A0A0A;
+  --color-accent-text: #5FD68C;
+  --color-accent-soft: #1B1B1E;
+  --color-accent-ring: #2E5C41;
+  --color-current-tint: #16281D;
+
+  --focus-ring: #A1A1AA;
+
+  --status-success-tint: #10231A;
+  --status-success-line: #1E3A2A;
+  --status-success-text: #6EE7A8;
+  --status-info-tint: #101A2E;
+  --status-info-line: #1E2E4A;
+  --status-info-text: #93C5FD;
+  --status-warn-tint: #241C0C;
+  --status-warn-line: #3D3016;
+  --status-warn-text: #FCD34D;
+  --status-danger-tint: #2A1710;
+  --status-danger-line: #4A2418;
+  --status-danger-text: #FCA5A5;
+  --status-neutral-tint: #1B1B1E;
+  --status-neutral-line: #2A2A2E;
+  --status-neutral-text: #A1A1AA;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+
+  --color-scrim: rgba(0, 0, 0, 0.62);
+  --color-inline-code-bg: #1B1B1E;
+  --color-inline-code-fg: #EDEDEF;
+  --color-selection-bg: #2E5C41;
+  --color-selection-fg: #FAFAFA;
+  --color-mark: #2E5C41;
+  --color-mark-ink: #D6F5E3;
+}

@@ -1,0 +1,54 @@
+/* ============================================================================
+   paper — self-hosted webfonts
+   ----------------------------------------------------------------------------
+   Three variable faces, latin subset only, served from the wiki directory so a
+   render stays fully offline.
+
+   The split is by function, not by size: Figtree carries anything meant to be
+   read as language (headings, prose, leads), Inter carries anything meant to be
+   operated (nav, buttons, chips, labels, search). A reader never sees a control
+   face in a paragraph, and never sees a prose face in a button.
+
+   JetBrains Mono is code only. It is not a third voice in the UI; it is the one
+   place a monospace face belongs in a documentation site.
+
+   Latin subset only. Google's css2 response splits each family into latin,
+   latin-ext, cyrillic, greek and vietnamese files; a documentation site in
+   English renders none of the others, and dropping them is the point of
+   self-hosting rather than a shortcut against it. If non-Latin text becomes a
+   real requirement, refetch the same css2 URL with those subsets and add the
+   unicode-ranges back.
+   ========================================================================== */
+
+/* ---- Figtree: display and prose ------------------------------------------ */
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url(fonts/figtree/figtree-latin.woff2) format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---- Inter: controls ------------------------------------------------------ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(fonts/inter/inter-latin.woff2) format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---- JetBrains Mono: code ------------------------------------------------ */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url(fonts/jetbrains-mono/jetbrains-mono-variable.woff2) format("woff2");
+}

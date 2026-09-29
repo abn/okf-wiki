@@ -1,0 +1,42 @@
+version: 2
+
+updates:
+  # Go modules: grouped, monthly.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  # GitHub Actions: grouped, monthly.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Mermaid / ELK build bundle: grouped, monthly.
+  - package-ecosystem: npm
+    directory: /mermaid
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      mermaid-bundle:
+        patterns: ["*"]
+
+  # Container base images: grouped, monthly.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      container-images:
+        patterns: ["*"]

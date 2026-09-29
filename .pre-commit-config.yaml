@@ -1,0 +1,32 @@
+---
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  - repo: local
+    hooks:
+      # One gate, not a copy of the Makefile: gofmt, go vet, and tests.
+      - id: make-check
+        name: make check
+        entry: make check
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: no-em-dash
+        name: no em-dashes
+        entry: bash -c 'if grep -rn "—" "$@" ; then echo "em-dash found in file above"; exit 1; fi' --
+        language: system
+        types: [markdown]

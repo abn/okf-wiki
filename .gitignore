@@ -1,0 +1,16 @@
+# Local scratch and generated state
+.scratch/
+bin/
+
+# Default output of the GitHub Action, which this repository's own Pages
+# workflow uses.
+_site/
+
+# Node vendor build
+mermaid/node_modules/
+mermaid/mermaid-bundle.min.mjs
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

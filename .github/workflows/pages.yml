@@ -1,0 +1,43 @@
+name: Publish wiki to Pages
+
+# This repository's own wiki, rendered by this repository's own action. The
+# default theme is used, which is the point of the exercise: the action runs the
+# published image, so the site is exactly what a consumer gets from a pull.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Render and deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.deploy-url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # ./action, not abn/okf-wiki/action@v1: a repository consuming its own
+      # action should not depend on a published ref of itself, and a moving tag
+      # would make the site change without this file changing.
+      #
+      # No theme input, so the render uses the theme embedded in the image.
+      # base is left on auto, which reads the repository name and puts a
+      # project Pages site under /okf-wiki.
+      - id: deploy
+        uses: ./action
+        with:
+          content: docs
+          image: ghcr.io/abn/okf-wiki:latest
+          deploy: true

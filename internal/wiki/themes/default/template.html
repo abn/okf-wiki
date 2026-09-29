@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{.Title}} · {{.BrandTitle}}</title>
+<meta name="description" content="{{.Description}}">
+{{.Slot "head"}}
+<link rel="icon" type="image/svg+xml" href="{{.Base}}favicon.svg">
+<link rel="stylesheet" href="{{.Base}}wiki.css?v={{.AssetVersion}}">
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  (function () {
+    try {
+      var t = localStorage.getItem('wiki-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="{{.Base}}">
+      <img class="brand-mark" src="{{.Base}}brand-mark.svg" width="26" height="26" alt="">
+      <span class="wordmark">{{.BrandName}}<span class="wordmark-dot">{{.BrandTail}}</span></span>
+      {{if .BrandSub}}<span class="brand-sub">{{.BrandSub}}</span>{{end}}
+    </a>
+    <div class="nav-cluster">
+      <nav class="top-nav" aria-label="Site">
+        <a href="{{.Base}}" class="active">Docs</a>
+      </nav>
+      <button type="button" class="icon-btn search-btn" id="searchBtn" aria-label="Search documentation" aria-keyshortcuts="Control+k Meta+k /">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span class="search-btn-text">Search</span>
+        <span class="search-btn-kbd"><kbd>⌘</kbd><kbd>K</kbd></span>
+      </button>
+      <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle light and dark theme">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="breadcrumb-bar">
+  <div class="wrap breadcrumb-inner">
+    <button class="menu-btn" id="menuBtn" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sideDrawer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      <span>Menu</span>
+    </button>
+    <nav class="breadcrumb" aria-label="Breadcrumb">{{.Breadcrumb}}</nav>
+    <button type="button" class="mobile-search-btn" id="mobileSearchBtn" aria-label="Search documentation">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <span>Search</span>
+    </button>
+  </div>
+</div>
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="layout wrap">
+  <aside class="sidebar" id="sideDrawer">{{.Nav}}</aside>
+  <main class="content" id="main">
+    <article class="prose">
+      <h1>{{.Title}}</h1>
+      {{if .Description}}<p class="page-lead">{{.Description}}</p>{{end}}
+      {{.Meta}}
+      {{.TOC}}
+      {{.Body}}
+    </article>
+  </main>
+</div>
+<script>
+  // Slide-out navigation drawer
+  var menuBtn = document.getElementById('menuBtn');
+  var drawer = document.getElementById('sideDrawer');
+  var backdrop = document.getElementById('drawerBackdrop');
+  function openDrawer() {
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    menuBtn.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+  menuBtn.addEventListener('click', function () {
+    if (drawer.classList.contains('open')) closeDrawer(); else openDrawer();
+  });
+  backdrop.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+  });
+  document.querySelectorAll('details.side-sec').forEach(function (details) {
+    details.addEventListener('toggle', function () {
+      if (details.open) {
+        document.querySelectorAll('details.side-sec').forEach(function (other) {
+          if (other !== details && other.open) other.open = false;
+        });
+      }
+    });
+  });
+
+  // Theme toggle
+  (function () {
+    var toggle = document.getElementById('themeToggle');
+    function current() {
+      var set = document.documentElement.getAttribute('data-theme');
+      if (set) return set;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    toggle.addEventListener('click', function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('wiki-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+<script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>
+<script type="module" src="{{.Base}}diagrams.js?v={{.AssetVersion}}"></script>
+<div class="search-modal-backdrop" id="searchBackdrop" aria-hidden="true">
+  <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search documentation">
+    <div class="search-modal-header">
+      <svg class="search-modal-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="searchInput" class="search-input" placeholder="Search..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button type="button" class="search-close-btn" id="searchCloseBtn" aria-label="Close search"><kbd class="kbd-esc">ESC</kbd></button>
+    </div>
+    <div class="search-modal-body" id="searchResults"></div>
+    <div class="search-modal-footer">
+      <div class="search-footer-hint"><kbd class="kbd-key">↑</kbd><kbd class="kbd-key">↓</kbd> <span>Navigate</span></div>
+      <div class="search-footer-hint"><kbd class="kbd-key">↵</kbd> <span>Select</span></div>
+      <div class="search-footer-hint"><kbd class="kbd-key">ESC</kbd> <span>Close</span></div>
+    </div>
+  </div>
+</div>
+<script src="{{.Base}}search.js?v={{.AssetVersion}}" defer></script>
+{{.Slot "bodyEnd"}}
+</body>
+</html>

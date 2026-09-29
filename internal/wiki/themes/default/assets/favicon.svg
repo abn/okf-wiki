@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="paper">
+  <!-- A 25% radius tile, the shape the design uses for its app tiles, holding a
+       line of text and the one accent it allows itself. -->
+  <rect x="0" y="0" width="64" height="64" rx="16" fill="#171717"></rect>
+  <rect x="14" y="26" width="26" height="7" rx="3.5" fill="#FAFAFA"></rect>
+  <rect x="14" y="38" width="18" height="6" rx="3" fill="#6B6B6B"></rect>
+  <circle cx="45" cy="41" r="7" fill="#5FD68C"></circle>
+</svg>
