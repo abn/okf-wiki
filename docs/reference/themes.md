@@ -93,7 +93,7 @@ These are the keys the default theme publishes, and the ones worth replacing:
 | `fonts/` | the font files themselves. |
 | `brand-mark.svg` `favicon.svg` | the header mark and the browser icon. |
 | `search.js` | the search client. Theme-agnostic; the default's works unchanged. |
-| `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. |
+| `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. The default declares a light set in `:root` and redeclares the whole set under both dark grounds, since one value cannot serve both; a theme that declares them once gets one palette in both. |
 
 A theme may add keys the default does not have. A key only the default declares
 cannot be removed except by dropping it.

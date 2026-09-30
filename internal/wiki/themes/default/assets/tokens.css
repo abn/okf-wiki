@@ -212,23 +212,27 @@
 
   /* ---- diagram palette ----------------------------------------------------
      Read by diagrams.js, which is theme-agnostic. A theme that inherits the
-     default diagrams.js only has to redeclare these to recolour every diagram. */
+     default diagrams.js only has to redeclare these to recolour every diagram.
+     These are the light-ground values, paired to the page the way the colour
+     tokens above are: ink at 19.80:1, muted at 6.39:1, accent text at 5.32:1,
+     the greens and ambers at the status-text ratios. The dark grounds below
+     redeclare the whole set, since a single value cannot serve both. */
   --diagram-font: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --diagram-ground: #0C0C0D;
-  --diagram-surface: #17171A;
-  --diagram-surface-alt: #101012;
-  --diagram-ink: #EDEDEF;
-  --diagram-muted: #8A8A93;
-  --diagram-line: #3A3A40;
-  --diagram-accent: #5FD68C;
-  --diagram-accent-soft: #1E3A2A;
-  --diagram-accent-ink: #6EE7A8;
+  --diagram-ground: #FFFFFF;
+  --diagram-surface: #F7F7F8;
+  --diagram-surface-alt: #F1F1F3;
+  --diagram-ink: #0A0A0A;
+  --diagram-muted: #5F5F5F;
+  --diagram-line: #D4D4D4;
+  --diagram-accent: #217A4B;
+  --diagram-accent-soft: #EAF5EE;
+  --diagram-accent-ink: #166534;
   --diagram-accent-2: #86EFAC;
   --diagram-accent-3: #A7F3C4;
   --diagram-yellow: #F3C83D;
   --diagram-cyan: #67E8F9;
-  --diagram-red: #FCA5A5;
-  --diagram-amber: #FCD34D;
+  --diagram-red: #8A3A1A;
+  --diagram-amber: #7A4E00;
   --diagram-green: #86EFAC;
   --diagram-blue: #93C5FD;
   --diagram-violet: #C4B5FD;
@@ -310,6 +314,29 @@
     --color-selection-fg: #FAFAFA;
     --color-mark: #2E5C41;
     --color-mark-ink: #D6F5E3;
+
+    /* ---- diagram palette, dark ground -------------------------------------
+       The light values in :root do not survive a dark page, so the whole set
+       is redeclared here. */
+    --diagram-ground: #0C0C0D;
+    --diagram-surface: #17171A;
+    --diagram-surface-alt: #101012;
+    --diagram-ink: #EDEDEF;
+    --diagram-muted: #8A8A93;
+    --diagram-line: #3A3A40;
+    --diagram-accent: #5FD68C;
+    --diagram-accent-soft: #1E3A2A;
+    --diagram-accent-ink: #6EE7A8;
+    --diagram-accent-2: #86EFAC;
+    --diagram-accent-3: #A7F3C4;
+    --diagram-yellow: #F3C83D;
+    --diagram-cyan: #67E8F9;
+    --diagram-red: #FCA5A5;
+    --diagram-amber: #FCD34D;
+    --diagram-green: #86EFAC;
+    --diagram-blue: #93C5FD;
+    --diagram-violet: #C4B5FD;
+    --diagram-pink: #F9A8D4;
   }
 }
 
@@ -370,4 +397,26 @@
   --color-selection-fg: #FAFAFA;
   --color-mark: #2E5C41;
   --color-mark-ink: #D6F5E3;
+
+  /* ---- diagram palette, dark ground ---------------------------------------
+     Mirrors the OS-following block above. */
+  --diagram-ground: #0C0C0D;
+  --diagram-surface: #17171A;
+  --diagram-surface-alt: #101012;
+  --diagram-ink: #EDEDEF;
+  --diagram-muted: #8A8A93;
+  --diagram-line: #3A3A40;
+  --diagram-accent: #5FD68C;
+  --diagram-accent-soft: #1E3A2A;
+  --diagram-accent-ink: #6EE7A8;
+  --diagram-accent-2: #86EFAC;
+  --diagram-accent-3: #A7F3C4;
+  --diagram-yellow: #F3C83D;
+  --diagram-cyan: #67E8F9;
+  --diagram-red: #FCA5A5;
+  --diagram-amber: #FCD34D;
+  --diagram-green: #86EFAC;
+  --diagram-blue: #93C5FD;
+  --diagram-violet: #C4B5FD;
+  --diagram-pink: #F9A8D4;
 }
