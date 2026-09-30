@@ -16,11 +16,19 @@ okf-wiki serve --content ./docs --out .scratch/wiki --addr 127.0.0.1:8080 --open
 
 # print the auto-detected content directory
 okf-wiki detect
+
+# the same two paths positionally, content then output
+okf-wiki render ./docs ./public
 ```
 
 `--content` is optional. When it is omitted, okf-wiki looks in `/content`,
 `/docs`, `/wiki-content`, the working directory, then the container's bind
 mounts, and uses the first directory that looks like an OKF bundle.
+
+`render` and `serve` also take the content directory and the output directory as
+positional arguments, in that order, and they may be mixed with flags in any
+order. A flag or an environment variable still wins: a positional argument fills
+in only what was not stated explicitly.
 
 ## Theming and placement
 

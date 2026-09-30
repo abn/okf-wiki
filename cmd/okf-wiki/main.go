@@ -50,10 +50,14 @@ func usage() {
 	fmt.Fprint(os.Stderr, `okf-wiki `+version+` - render and serve an OKF wiki
 
 usage:
-  okf-wiki serve  [flags]   render, then serve until interrupted
-  okf-wiki render [flags]   render only
+  okf-wiki serve  [CONTENT [OUT]] [flags]   render, then serve until interrupted
+  okf-wiki render [CONTENT [OUT]] [flags]   render only
   okf-wiki detect [flags]   print the auto-detected content directory
   okf-wiki version
+
+  render and serve accept the content directory and the output directory
+  positionally, in that order, and they may be mixed with flags in any order.
+  A flag or an environment variable still wins.
 
 flags (render):
   --content DIR    OKF bundle to render (auto-detected if omitted)
@@ -81,12 +85,7 @@ func runRender(args []string) {
 	fs := flag.NewFlagSet("render", flag.ExitOnError)
 	cfg := bindCommon(fs)
 	fs.Parse(reorderArgs(args, fs))
-	if fs.NArg() > 0 && cfg.Content == "" {
-		cfg.Content = fs.Arg(0)
-	}
-	if fs.NArg() > 1 && cfg.Out == "" {
-		cfg.Out = fs.Arg(1)
-	}
+	applyPositional(fs, cfg)
 	if err := doRender(*cfg); err != nil {
 		fatal(err)
 	}
@@ -98,12 +97,7 @@ func runServe(args []string) {
 	addr := fs.String("addr", env("OKF_WIKI_ADDR", "0.0.0.0:8080"), "listen address")
 	open := fs.Bool("open", envBool("OKF_WIKI_OPEN", false), "open a browser")
 	fs.Parse(reorderArgs(args, fs))
-	if fs.NArg() > 0 && cfg.Content == "" {
-		cfg.Content = fs.Arg(0)
-	}
-	if fs.NArg() > 1 && cfg.Out == "" {
-		cfg.Out = fs.Arg(1)
-	}
+	applyPositional(fs, cfg)
 	if err := doRender(*cfg); err != nil {
 		fatal(err)
 	}
@@ -175,6 +169,31 @@ func doRender(cfg wiki.Config) error {
 	fmt.Printf("okf-wiki: rendered %d pages from %s -> %s\n", total, cfg.Content, site)
 	fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)
 	return nil
+}
+
+// applyPositional fills Content and Out from the positional arguments, which
+// are accepted so the paths can be given without their flag names.
+//
+// Whether a value was stated explicitly is decided by fs.Visit, not by testing
+// the resolved value. The default for --out is a real path, so the old
+// `cfg.Out == ""` test could never be true and the second positional was
+// silently discarded while the command still reported success. An explicit
+// --out or OKF_WIKI_OUT still wins, which is the documented precedence.
+func applyPositional(fs *flag.FlagSet, cfg *wiki.Config) {
+	given := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	if _, ok := os.LookupEnv("OKF_WIKI_CONTENT"); ok {
+		given["content"] = true
+	}
+	if _, ok := os.LookupEnv("OKF_WIKI_OUT"); ok {
+		given["out"] = true
+	}
+	if fs.NArg() > 0 && !given["content"] {
+		cfg.Content = fs.Arg(0)
+	}
+	if fs.NArg() > 1 && !given["out"] {
+		cfg.Out = fs.Arg(1)
+	}
 }
 
 func env(key, def string) string {
