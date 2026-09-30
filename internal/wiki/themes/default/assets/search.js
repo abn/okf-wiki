@@ -8,7 +8,6 @@
   var lastActiveElement = null;
 
   var searchBtn = document.getElementById('searchBtn');
-  var mobileSearchBtn = document.getElementById('mobileSearchBtn');
   var backdrop = document.getElementById('searchBackdrop');
   var input = document.getElementById('searchInput');
   var closeBtn = document.getElementById('searchCloseBtn');
@@ -247,11 +246,6 @@
     searchBtn.addEventListener('click', openSearch);
     searchBtn.addEventListener('mouseenter', fetchIndex, { once: true });
     searchBtn.addEventListener('focus', fetchIndex, { once: true });
-  }
-  if (mobileSearchBtn) {
-    mobileSearchBtn.addEventListener('click', openSearch);
-    mobileSearchBtn.addEventListener('mouseenter', fetchIndex, { once: true });
-    mobileSearchBtn.addEventListener('focus', fetchIndex, { once: true });
   }
   if (closeBtn) closeBtn.addEventListener('click', closeSearch);
 

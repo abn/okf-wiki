@@ -111,7 +111,7 @@ these are hard requirements rather than style.
 | :--- | :--- | :--- |
 | `searchBtn` | `search.js` | the script throws on its first `addEventListener`, so search never initialises |
 | `searchInput` `searchResults` `searchBackdrop` | `search.js` | search returns early and does nothing |
-| `searchCloseBtn` `mobileSearchBtn` | `search.js` | the modal opens and cannot be dismissed or summoned |
+| `searchCloseBtn` | `search.js` | the modal opens and cannot be dismissed |
 | `menuBtn` `drawerBackdrop` `sideDrawer` | the drawer script in the template | the drawer script throws, so the mobile menu and Escape-to-close both die |
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
