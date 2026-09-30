@@ -19,4 +19,5 @@ auto-detects a mounted content directory.
 - [Usage](usage/index.md)
 - [Reference](reference/index.md)
 - [Contribution](contribution/index.md)
+- [Test bed](testbed/index.md)
 - [Change log](log.md)
