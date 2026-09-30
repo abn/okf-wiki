@@ -21,8 +21,14 @@ flowchart LR
 ```
 
 1. **Walk.** The content directory is read. Root Markdown files form one
-   section; each subdirectory is a section. Section order and titles come from
-   `--sections`, with any unlisted directory appended alphabetically.
+   section, and each subdirectory under the root is a section, in that order and
+   titles from `--sections`, with any unlisted directory appended
+   alphabetically. A directory inside a section is not a section of its own: its
+   pages belong to the section above and keep the path in their slug, so
+   `guide/setup/install.md` in a `guide` section is served at
+   `/wiki/guide/setup/install.html`. Markdown is collected at any depth. Files
+   and directories whose name begins with a dot are skipped, so a bundle that is
+   also a working tree does not render its own `.git`.
 2. **Parse.** Each file is split into frontmatter and body. The body is parsed
    with goldmark (CommonMark plus tables, task lists, footnotes). Heading ids
    are assigned from the heading text, made unique per page, and an on-page

@@ -195,7 +195,8 @@ func (r *Renderer) load(root string) error {
 	}
 	var present []string
 	for _, d := range entries {
-		if d.IsDir() {
+		// A dot-directory is not a section, the same as it is not content.
+		if d.IsDir() && !strings.HasPrefix(d.Name(), ".") {
 			present = append(present, d.Name())
 		}
 	}
@@ -250,13 +251,25 @@ func (r *Renderer) loadTopLevel(root, title string) error {
 	return nil
 }
 
+// loadSection collects every Markdown file under dir, at any depth. A nested
+// directory is not a section of its own: its pages belong to this section and
+// carry a slug with the path in it, so guide/setup/install.md under a "guide"
+// section is guide/guide/setup/install. The alternative, a one-level glob, drops
+// those pages silently while still rewriting links to them, which produces a
+// site full of dead links and a render that reports success.
 func (r *Renderer) loadSection(dir, id, title string) (Section, error) {
 	sec := Section{ID: id, Title: title}
-	files, _ := filepath.Glob(filepath.Join(dir, "*.md"))
-	sort.Strings(files)
+	files, err := markdownFiles(dir)
+	if err != nil {
+		return sec, err
+	}
 	for _, f := range files {
-		base := strings.TrimSuffix(filepath.Base(f), ".md")
-		p, err := r.parsePage(id, id+"/"+base, f)
+		rel, err := filepath.Rel(dir, f)
+		if err != nil {
+			return sec, err
+		}
+		slug := path.Join(id, filepath.ToSlash(strings.TrimSuffix(rel, ".md")))
+		p, err := r.parsePage(id, slug, f)
 		if err != nil {
 			return sec, err
 		}
@@ -490,6 +503,39 @@ func slugify(s string) string {
 		res = strings.ReplaceAll(res, "--", "-")
 	}
 	return strings.Trim(res, "-")
+}
+
+// markdownFiles lists the Markdown files under root, at any depth, as paths
+// relative to root. Dotfiles and dot-directories are skipped, for the same
+// reason copyBundleAssets skips them.
+func markdownFiles(root string) ([]string, error) {
+	var out []string
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if p != root && strings.HasPrefix(name, ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() || !strings.EqualFold(filepath.Ext(name), ".md") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		out = append(out, filepath.Join(root, rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 // copyBundleAssets copies every non-Markdown file in the bundle into the site,

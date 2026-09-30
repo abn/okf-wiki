@@ -859,3 +859,117 @@ func mustWrite(t *testing.T, path, body string) {
 		t.Fatal(err)
 	}
 }
+
+// TestNestedContentPagesRender walks a bundle with Markdown at three depths.
+// A one-level glob dropped the nested pages while still rewriting links to
+// them, so the site carried dead links and the render reported success.
+func TestNestedContentPagesRender(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide", "setup"))
+	mustMkdir(t, filepath.Join(dir, "guide", "deep", "deeper"))
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home",
+		"[setup](guide/setup/install.md)",
+		"[deeper](guide/deep/deeper/x.md)",
+		"[sibling](guide/intro.md)",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "guide", "intro.md"), "---\ntitle: Intro\n---\n# Intro\n")
+	mustWrite(t, filepath.Join(dir, "guide", "setup", "install.md"),
+		"---\ntitle: Install\n---\n# Install\n\n[up](../intro.md)\n")
+	mustWrite(t, filepath.Join(dir, "guide", "deep", "deeper", "x.md"),
+		"---\ntitle: X\n---\n# X\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+
+	want := []string{
+		"index.html",
+		"guide/intro.html",
+		"guide/setup/install.html",
+		"guide/deep/deeper/x.html",
+	}
+	for _, rel := range want {
+		if _, err := os.Stat(filepath.Join(site, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("page %s was not written: %v", rel, err)
+		}
+	}
+
+	// Every internal link on the home page must name a file that exists. The
+	// asset links carry a ?v= cache buster, which is not part of the path.
+	home, err := os.ReadFile(filepath.Join(site, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range regexp.MustCompile(`href="(/wiki/[^"#?]*)[^"]*"`).FindAllStringSubmatch(string(home), -1) {
+		if strings.HasSuffix(m[1], "/") {
+			continue
+		}
+		p := filepath.Join(out, filepath.FromSlash(strings.TrimPrefix(m[1], "/")))
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("home page links to %s, which was not written", m[1])
+		}
+	}
+
+	// A relative link from a nested page back up a level.
+	install, err := os.ReadFile(filepath.Join(site, "guide", "setup", "install.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(install), `href="/wiki/guide/intro.html"`) {
+		t.Errorf("nested page did not resolve the link up a level: %s", install)
+	}
+
+	// The nested pages belong to the guide section and are indexed.
+	var guide Section
+	for _, s := range r.Sections() {
+		if s.ID == "guide" {
+			guide = s
+		}
+	}
+	if len(guide.Pages) != 3 {
+		t.Errorf("guide section has %d pages, want 3", len(guide.Pages))
+	}
+	found := false
+	for _, e := range r.BuildSearchIndex() {
+		if strings.Contains(e.PageURL, "guide/setup/install.html") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the nested install page is missing from the search index")
+	}
+}
+
+// A dot-directory is not content, and must not become a page or an asset.
+func TestDotDirectoriesAreNotContent(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, ".hidden"))
+	mustWrite(t, filepath.Join(dir, ".hidden", "notes.md"), "---\ntitle: Secret\n---\n# Secret\n")
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	total := 0
+	for _, s := range r.Sections() {
+		total += len(s.Pages)
+	}
+	if total != 1 {
+		t.Errorf("rendered %d pages, want 1: a .hidden directory is not content", total)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "wiki", ".hidden")); err == nil {
+		t.Error(".hidden was copied into the site")
+	}
+}

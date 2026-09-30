@@ -22,6 +22,7 @@ Nothing here is documentation about the renderer itself. That is
 | [Code](code.md) | Highlighting across languages, and unknown languages |
 | [Diagrams](diagrams.md) | Mermaid flowcharts, sequence diagrams, state machines |
 | [Headings](headings.md) | Table of contents depth, repeated and colliding headings |
+| [First run](nested/setup/first-run.md) | A page two directories deep, and links out of it |
 
 ## How to use it
 

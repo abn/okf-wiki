@@ -51,3 +51,5 @@ deprecated, or restructured. It is deliberately separate from software releases.
 - `testbed/blocks.md` documents the three link kinds but carries no live link
   for the third. The escaping form only resolves with `--repo`, which this
   bundle is published without.
+- `testbed/nested/setup/first-run.md` is a page two directories deep, so nested
+  content and links that climb back out of it are visible in the bundle.
