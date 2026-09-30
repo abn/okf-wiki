@@ -143,7 +143,7 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 - Content layout: `.toc-aside` with `.toc-aside-title` and `.toc-list`,
   `.toc-btn` with `.toc-panel`, and `.prevnext` with `.prevnext-card`,
   `.prevnext-prev`, `.prevnext-next`, `.prevnext-dir` and `.prevnext-title`.
-- `.toc`, whose level-three entries carry `.l3`, and `.callout` with
+- `.toc`, `.heading-anchor`, and `.callout` with
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,
   `callout-caution`

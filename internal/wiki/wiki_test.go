@@ -1755,6 +1755,10 @@ func TestTOCAsidePlacement(t *testing.T) {
 			t.Errorf("rendered page does not contain %s", want)
 		}
 	}
+	// Level three is a link target but never a navigation entry.
+	if strings.Contains(html, `href="#third"`) {
+		t.Error("table of contents lists a level-three heading")
+	}
 	if strings.Contains(html, `<details class="toc"`) {
 		t.Error("rendered page still carries the in-body collapsible box")
 	}

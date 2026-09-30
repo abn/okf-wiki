@@ -50,11 +50,11 @@ type Page struct {
 	searchChunks []rawSearchChunk
 }
 
-// TOCEntry is a heading in the page body.
+// TOCEntry is a level-two heading in the page body. Deeper headings are link
+// targets but never navigation entries, so the level needs no recording.
 type TOCEntry struct {
-	ID    string
-	Level int
-	Text  string
+	ID   string
+	Text string
 }
 
 // Renderer renders an OKF bundle.
@@ -395,8 +395,11 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 			headingVal := headingText(n, src)
 			id := uniqueID(slugify(headingVal), usedIDs)
 			h.SetAttribute([]byte("id"), []byte(id))
-			if h.Level <= 3 {
-				p.TOC = append(p.TOC, TOCEntry{ID: id, Level: h.Level, Text: headingVal})
+			// The table of contents stops at level two. Deeper headings keep
+			// their ids as link targets but stay out of the navigation, which
+			// is what keeps it short on a deeply nested page.
+			if h.Level == 2 {
+				p.TOC = append(p.TOC, TOCEntry{ID: id, Text: headingVal})
 			}
 		}
 		return ast.WalkContinue, nil

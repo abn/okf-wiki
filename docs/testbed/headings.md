@@ -8,33 +8,30 @@ tags: [testbed, headings]
 # Headings
 
 Heading text becomes the anchor id, lowercased, with spaces and punctuation
-folded to hyphens. Ids are made unique within a page, and a table of contents is
-built from levels two and three, so it stays short on a page with deep nesting.
+folded to hyphens. Ids are made unique within a page. Every level-two heading
+grows a `#` permalink on hover, and the table of contents lists level two only,
+so it stays short on a page with deep nesting.
 
 ## Level two
 
-A level two heading is the usual case.
+A level two heading is the usual case. Hover it to see the permalink.
 
 ## Level three
 
-A level three heading is the deepest one the table of contents includes. It
-appears as an indented child, so a page can show its structure without the list
-growing without bound.
+A level three heading still gets an id and an anchor, so it can be linked
+directly, but it stays out of the table of contents.
 
 ### A level three heading
 
-This one is in the table of contents above.
+This one is linkable but not listed above.
 
 #### A level four heading
 
-This is level four. It still gets an id and an anchor, so it can be linked
-directly, but it stays out of the table of contents, which is why this heading
-is not listed above even though the sentence two lines up is.
+The same rule applies further down.
 
 ##### And level five
 
-Deeper still, and the same rule applies. Every heading is an anchor target; only
-the first two levels are navigation.
+Deeper still. Every heading is an anchor target; only level two is navigation.
 
 ## Repeated headings
 

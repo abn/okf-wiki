@@ -340,10 +340,12 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .tag-row-meta { color: var(--color-text-muted); font-size: var(--text-sm); }
 .tag-all { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
+/* Section headings sit one step below the title: 22px semibold with a full
+   48px of air above, so sections read as units rather than continuations. */
 .prose h2 {
-  font-family: var(--font-display); font-size: var(--text-h2); font-weight: var(--fw-bold);
+  font-family: var(--font-display); font-size: 1.375rem; font-weight: var(--fw-semibold);
   letter-spacing: var(--ls-snug); line-height: 1.2; color: var(--color-heading);
-  margin: 2.2em 0 0.55em; padding-bottom: var(--space-2);
+  margin: var(--space-12) 0 0.55em; padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-line);
   scroll-margin-top: 132px; text-wrap: balance;
 }
@@ -416,9 +418,18 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .toc > summary:hover { color: var(--color-accent-text); }
 .toc ul { list-style: none; margin: 0; padding: var(--space-1) var(--space-4) var(--space-3); }
 .toc li { margin: 1px 0; }
-.toc li.l3 { padding-left: var(--space-4); }
 .toc a { display: block; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted); padding: 4px 0; }
 .toc a:hover { color: var(--color-accent-text); }
+
+/* Section headings carry a # permalink, revealed on hover and focus. The
+   link is client-built, so without JS the headings are simply unlinked. */
+.prose h2 .heading-anchor {
+  color: var(--color-text-faint); text-decoration: none; font-weight: var(--fw-regular);
+  margin-left: var(--space-2); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.prose h2:hover .heading-anchor, .prose h2 .heading-anchor:focus-visible { opacity: 1; }
+.prose h2 .heading-anchor:hover { color: var(--color-accent-text); }
 
 /* --------------------------------------------- table of contents, relocated
    The same list serves the sidebar column on wide screens and the dropdown
@@ -426,7 +437,6 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
    introduces no duplicate ids. */
 .toc-list { list-style: none; margin: 0; padding: 0; }
 .toc-list li { margin: 1px 0; }
-.toc-list li.l3 { padding-left: var(--space-4); }
 .toc-list a { display: block; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted); padding: 4px 0; text-decoration: none; }
 .toc-list a:hover { color: var(--color-accent-text); }
 .toc-aside { position: sticky; top: 132px; max-height: calc(100vh - 156px); overflow-y: auto; }

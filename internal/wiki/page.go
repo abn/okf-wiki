@@ -176,11 +176,7 @@ func buildTOCList(p Page) string {
 	var b strings.Builder
 	b.WriteString(`<ul class="toc-list">`)
 	for _, e := range p.TOC {
-		cls := ""
-		if e.Level == 3 {
-			cls = ` class="l3"`
-		}
-		fmt.Fprintf(&b, `<li%s><a href="#%s">%s</a></li>`, cls, e.ID, template.HTMLEscapeString(e.Text))
+		fmt.Fprintf(&b, `<li><a href="#%s">%s</a></li>`, e.ID, template.HTMLEscapeString(e.Text))
 	}
 	b.WriteString(`</ul>`)
 	return b.String()

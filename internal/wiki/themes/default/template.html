@@ -148,10 +148,24 @@
           if (current) mark(current, true);
         });
       }, { rootMargin: '-20% 0px -70% 0px' });
-      document.querySelectorAll('article h2[id], article h3[id]').forEach(function (h) {
+      document.querySelectorAll('article h2[id]').forEach(function (h) {
         obs.observe(h);
       });
     }
+  })();
+
+  // Heading anchor links. Every section heading gets a # permalink, revealed
+  // on hover and focus. Built client-side so the renderer never rewrites
+  // heading content; without JS the headings are simply unlinked.
+  (function () {
+    document.querySelectorAll('article h2[id]').forEach(function (h) {
+      var a = document.createElement('a');
+      a.className = 'heading-anchor';
+      a.href = '#' + h.id;
+      a.setAttribute('aria-label', 'Link to this section');
+      a.textContent = '#';
+      h.appendChild(a);
+    });
   })();
 
   // Narrow breadcrumb: keep the ellipsis and the last two segments, drop the
