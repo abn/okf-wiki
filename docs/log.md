@@ -8,6 +8,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 * **Update**: Tag chips on every page now link to a tag page listing all pages
   carrying the tag, and `#tag` in the search modal searches tags rather than
   page text.
+* **Update**: `testbed/blocks.md` now carries a `sources` list, so numbered
+  citations, the generated Sources section and the scope-descriptor case are
+  visible on a page in this bundle rather than only in a fixture.
+* **Update**: Section headings are one step smaller with more air above, carry
+  a `#` permalink on hover, and the table of contents lists level two only.
 * **Creation**: Added a `testbed/` section that exercises the whole rendering
   surface on viewable pages: [callouts](testbed/callouts.md) at all five
   levels, [blocks](testbed/blocks.md) with tables, task lists and footnotes,

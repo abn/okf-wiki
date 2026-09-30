@@ -1,8 +1,17 @@
 ---
 type: Guide
 title: Blocks
-description: Tables, task lists, footnotes, and the three kinds of link a bundle can hold.
+description: Tables, task lists, footnotes, sources, and the three kinds of link a bundle can hold.
 tags: [testbed, blocks]
+sources:
+  - id: okf-spec
+    resource: https://github.com/GoogleCloudPlatform/knowledge-catalog
+    title: The OKF specification
+    author: team:knowledge-catalog
+    last_modified: 2026-06-30T00:00:00Z
+  - id: scope-example
+    resource: all bundles rendered by this tool
+    title: A scope descriptor, which is text rather than a destination
 ---
 
 # Blocks
@@ -33,12 +42,32 @@ character, so a theme restyles it by restyling that class.
 ## Footnotes
 
 A footnote reference[^1] sits inline, and the definition collects at the end of
-the page[^2].
+the page[^2]. These two are ordinary footnotes: their labels match no
+`sources[].id`, so they render exactly as goldmark writes them.
+
+## Citing a source
+
+A footnote whose label matches a `sources[].id` becomes a numbered citation to
+the Sources section at the end of this page. That is how a claim points at the
+material it came from.[^okf-spec]
+
+The number follows the entry's position in `sources`, not the order the claims
+appear, so a reference list reads the same however the prose is arranged. A
+repeated citation reuses its number,[^okf-spec] and an entry no claim cites is
+still listed, because the page declares it.
+
+An entry whose `resource` is a scope descriptor rather than a destination
+renders as text, since there is nothing to follow:[^scope-example] a page that
+listed every bundle this tool renders has no URL to point at. The same applies
+to a `last_modified` that is not a date: it is shown as written rather than
+dropped.
 
 [^1]: Footnotes come from the goldmark extension of the same name. The
     definition may wrap across lines.
 [^2]: Search chunks are built from the AST, so footnote text is indexed as part
     of the section it appears in.
+[^okf-spec]: The OKF specification
+[^scope-example]: A scope descriptor, which is text rather than a destination
 
 ## Links
 
