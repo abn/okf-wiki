@@ -11,7 +11,8 @@ import (
 // DetectContent finds an OKF bundle when --content was not supplied, which is
 // what makes `podman run -v $(pwd)/docs <image>` work without naming a container
 // path: podman mounts the host directory at its host path, and this walks the
-// bind mounts looking for a directory that contains markdown.
+// bind mounts looking for a directory that contains markdown. extra is prepended
+// to the search and is how a caller overrides the conventional paths.
 func DetectContent(extra []string) (string, error) {
 	var candidates []string
 	add := func(dirs ...string) { candidates = append(candidates, dirs...) }
@@ -41,7 +42,9 @@ func DetectContent(extra []string) (string, error) {
 }
 
 // isOKFBundle reports whether dir looks like an OKF bundle: it holds markdown
-// at its root or one level down.
+// at its root or one level down. The test is deliberately loose, so a directory
+// with a single Markdown file qualifies and a repository root can be picked
+// over a nested docs/ directory.
 func isOKFBundle(dir string) bool {
 	info, err := os.Stat(dir)
 	if err != nil || !info.IsDir() {

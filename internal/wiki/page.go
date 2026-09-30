@@ -36,11 +36,13 @@ type shellData struct {
 }
 
 // Slot returns a named template slot, or empty when the theme leaves it unset.
-// This is how a theme injects a stylesheet or a script without owning the whole
-// shell.
+// A theme uses this to inject a stylesheet or a script without owning the
+// whole shell.
 func (d shellData) Slot(name string) template.HTML { return d.Slots[name] }
 
-// RenderPage wraps a page body in the themed site shell.
+// RenderPage wraps a page body in the themed site shell. A template that fails
+// at execute time yields a page containing the error rather than a render
+// failure, so a broken theme ships error pages and a zero exit code.
 func (r *Renderer) RenderPage(p Page) string {
 	title := p.Title
 	if title == "" {
@@ -83,7 +85,6 @@ func (r *Renderer) RenderPage(p Page) string {
 	return b.String()
 }
 
-// slots exposes the theme's named fragments to the template.
 func (r *Renderer) slots() map[string]template.HTML {
 	out := map[string]template.HTML{}
 	for _, name := range r.theme.SlotNames() {
@@ -93,7 +94,7 @@ func (r *Renderer) slots() map[string]template.HTML {
 }
 
 // splitWordmark splits a trailing "." off the brand name so it can be painted in
-// the accent colour, matching the abn.is house mark.
+// the accent colour.
 func splitWordmark(name string) (string, string) {
 	if strings.HasSuffix(name, ".") {
 		return strings.TrimSuffix(name, "."), "."

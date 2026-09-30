@@ -65,8 +65,6 @@ type Theme struct {
 	Description string
 	Source      string // "embedded", or the directory an override was read from
 
-	// loaded holds what this layer contributes: per-key asset files, keys it
-	// drops, and the template and slot text it supplies.
 	loaded loadedLayer
 
 	files        []themeFile
@@ -74,13 +72,13 @@ type Theme struct {
 	slotText     map[string]string
 	tmpl         *template.Template
 
-	// assetVersion fingerprints the resolved bytes, so a re-render or a theme
-	// edit always busts the browser's cache.
+	// assetVersion is the ?v= query on every asset URL, so a re-render or a
+	// theme edit busts the browser cache.
 	assetVersion string
 }
 
-// loadedLayer is the un-resolved contribution of one theme directory: who it
-// says it is, plus the files, template and slots it supplies.
+// loadedLayer is the un-resolved contribution of one theme directory: the
+// identity it claims, plus the files, template and slots it supplies.
 type loadedLayer struct {
 	Name        string
 	Version     string
@@ -254,9 +252,10 @@ func readAsset(fsys fs.FS, root, key string) ([]themeFile, error) {
 	return out, nil
 }
 
-// under reports whether an output path belongs to an asset key. A key with a
-// trailing slash is a subtree and matches by prefix; a plain key matches itself
-// and any path below it, which is what replacing a directory needs.
+// under reports whether an output path belongs to an asset key, matching the
+// key itself and anything below it. A key that names a directory therefore
+// replaces that whole directory, which is what a subtree key means. A trailing
+// slash on the key makes no difference: path.Clean drops it.
 func under(p, key string) bool {
 	clean := path.Clean(key)
 	return p == clean || strings.HasPrefix(p, clean+"/")
@@ -326,8 +325,9 @@ func (t *Theme) compile(layers ...*loadedLayer) (*Theme, error) {
 
 	tmpl, err := template.New("shell").Parse(t.templateText)
 	if err != nil {
-		// A theme that does not parse is a configuration error, not a page
-		// error, so it fails the render rather than shipping a broken page.
+		// A template that does not parse is a configuration error, so it fails
+		// the render. A template that parses but fails at execute time is not
+		// caught here: RenderPage reports it in the page body instead.
 		return nil, fmt.Errorf("theme %s: parse template: %w", t.Source, err)
 	}
 	t.tmpl = tmpl
@@ -336,7 +336,9 @@ func (t *Theme) compile(layers ...*loadedLayer) (*Theme, error) {
 }
 
 // fingerprint hashes every resolved byte, the template, and the slots, so any
-// change to the effective theme produces a new asset version.
+// change to the effective theme produces a new asset version. Only the first
+// 10 hex characters are kept: the value is a cache-buster, not an integrity
+// check.
 func (t *Theme) fingerprint() string {
 	h := sha256.New()
 	for _, f := range t.files {
@@ -357,13 +359,12 @@ func (t *Theme) fingerprint() string {
 	return hex.EncodeToString(h.Sum(nil))[:10]
 }
 
-// AssetVersion returns the content hash used to cache-bust theme assets.
 func (t *Theme) AssetVersion() string { return t.assetVersion }
 
-// Template returns the parsed shell template.
 func (t *Theme) Template() *template.Template { return t.tmpl }
 
-// Slot returns a named template slot, or empty when the theme leaves it unset.
+// Slot returns a named slot's text, trimmed, or empty when unset. The text is
+// template.HTML because a slot is the theme's own markup, not page content.
 func (t *Theme) Slot(name string) template.HTML {
 	return template.HTML(strings.TrimSpace(t.slotText[name]))
 }

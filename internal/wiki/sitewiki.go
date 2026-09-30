@@ -39,7 +39,7 @@ type Page struct {
 	Status       string
 	Tags         []string
 	GeneratedAt  string
-	Body         string // rendered HTML (without the H1, which is the title)
+	Body         string // rendered HTML, H1 still present; RenderPage strips it
 	TOC          []TOCEntry
 	searchChunks []rawSearchChunk
 }
@@ -95,22 +95,19 @@ func New(cfg Config) (*Renderer, error) {
 	return r, nil
 }
 
-// Version returns the OKF specification version this renderer targets.
+// Version returns the OKF specification version, not the binary's own version.
 func (r *Renderer) Version() string { return "OKF v0.2" }
 
-// GeneratedAt returns the render date stamped onto every page.
+// GeneratedAt returns the render date, formatted 2006-01-02 in UTC.
 func (r *Renderer) GeneratedAt() string { return r.generatedAt }
 
-// AssetVersion returns the content hash used to cache-bust assets.
 func (r *Renderer) AssetVersion() string { return r.assetVersion }
 
-// Brand exposes the configured brand to templates.
 func (r *Renderer) Brand() Brand { return r.cfg.Brand }
 
-// Theme returns the resolved theme.
 func (r *Renderer) Theme() *Theme { return r.theme }
 
-// Sections returns the sections in rendering order.
+// Sections returns the sections in render order, with empty sections omitted.
 func (r *Renderer) Sections() []Section { return r.sections }
 
 // RenderAll renders every page into <out>/<base>/ and writes the resolved theme.
@@ -158,8 +155,7 @@ func (r *Renderer) RenderAll(out string) error {
 		return err
 	}
 
-	// Record the theme the output was rendered with, so a published site is
-	// self-describing and a later reader can tell which layer produced it.
+	// theme.json in the output records which layer produced the site.
 	manifest, err := r.theme.describe(r.cfg.base())
 	if err != nil {
 		return err
@@ -185,7 +181,9 @@ func (r *Renderer) RenderAll(out string) error {
 	return os.WriteFile(filepath.Join(out, "index.html"), []byte(redirect), 0o644)
 }
 
-// load walks the content tree, building sections and pages.
+// load builds sections from the directories directly under root, plus a
+// top-level section for the root Markdown files. It is one level deep, so a
+// page in a nested directory is dropped without a word.
 func (r *Renderer) load(root string) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -272,7 +270,8 @@ func (r *Renderer) loadSection(dir, id, title string) (Section, error) {
 	return sec, nil
 }
 
-// frontmatter holds the OKF v0.2 fields we render.
+// frontmatter holds the OKF v0.2 fields the renderer consumes. An unparsable
+// block is not an error: the page falls back to its first heading for a title.
 type frontmatter struct {
 	Title       string   `yaml:"title"`
 	Type        string   `yaml:"type"`
@@ -372,9 +371,10 @@ func splitFrontmatter(data []byte) (frontmatter, []byte) {
 }
 
 // linkPath resolves a markdown link from a page slug into a wiki URL. Links that
-// stay inside the bundle map to rendered HTML pages. Links that escape the
-// bundle map to /repo/ when a repository root was supplied (a read-only mount
-// the server exposes), otherwise they are left as relative links.
+// stay inside the bundle and end in .md map to rendered HTML pages. Anything
+// else, in-bundle or not, maps to /repo/, which only resolves when a
+// repository root was supplied; with none, a non-.md href should stay relative
+// rather than become a dead /repo/ URL.
 func (r *Renderer) linkPath(fromSlug, href string) string {
 	if strings.Contains(href, "://") || strings.HasPrefix(href, "#") ||
 		strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
@@ -474,7 +474,6 @@ func copyVendor(dir, dest string) error {
 	if err != nil || !info.IsDir() {
 		return nil
 	}
-	// Only copy the built bundle, never node_modules.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -499,8 +498,8 @@ func copyVendor(dir, dest string) error {
 	return nil
 }
 
-// isVendorArtifact reports whether a vendor file is a runtime artifact rather
-// than build source (package.json, entry.js, lockfiles).
+// isVendorArtifact reports whether a vendor file is a runtime artifact, so
+// build sources sharing the directory are not published.
 func isVendorArtifact(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".mjs", ".wasm", ".css", ".map":

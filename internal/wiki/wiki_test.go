@@ -384,7 +384,8 @@ func TestRenderAtNestedBaseWritesARootRedirect(t *testing.T) {
 	}
 }
 
-// docsDir returns this project's own docs bundle, skipping when it is absent.
+// docsDir returns this project's own docs bundle. The suite runs from
+// internal/wiki, so the bundle is two levels up.
 func docsDir(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -433,10 +434,8 @@ func TestParseSectionsAndOrder(t *testing.T) {
 
 func TestDetectContent(t *testing.T) {
 	dir := t.TempDir()
-	if !isOKFBundle(dir) {
-		// empty dir is not a bundle
-	} else {
-		t.Fatalf("empty dir should not be an OKF bundle")
+	if isOKFBundle(dir) {
+		t.Fatal("empty dir should not be an OKF bundle")
 	}
 	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte("# x\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -453,8 +452,8 @@ func TestDetectContent(t *testing.T) {
 	}
 }
 
-// TestRenderBundledDocs renders this project's own docs/ bundle and asserts the
-// core outputs exist and are well formed.
+// TestRenderBundledDocs renders this project's own docs/ bundle, the widest
+// content the renderer will see in practice.
 func TestRenderBundledDocs(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {

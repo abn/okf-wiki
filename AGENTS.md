@@ -14,7 +14,8 @@ serves it, as a binary or a container. The design lives in
 - The committed `docs/` bundle is public. No hostnames, absolute home paths,
   tokens, or internal identifiers.
 - Prose reads as human-written. No em-dashes, no marketing filler, no comments
-  that restate the code.
+  that restate the code. Full comment rules in
+  [`.agents/rules/comments.md`](.agents/rules/comments.md).
 - A behaviour change moves the docs with it: update the relevant page and add a
   line to [`docs/log.md`](docs/log.md).
 - The `docs/` bundle is the single source of truth. Never hand-edit rendered
@@ -47,3 +48,11 @@ a bundle and confirm the pages, search index, and diagrams are produced.
 ## Contributor guide
 
 See [`docs/contribution/index.md`](docs/contribution/index.md).
+
+## Agent rules
+
+- [`.agents/rules/comments.md`](.agents/rules/comments.md): what a comment may
+  say, and what it must never say.
+- [`.agents/rules/repository-conventions.md`](.agents/rules/repository-conventions.md):
+  the public docs bundle, generated output, offline diagrams, and scope
+  discipline.

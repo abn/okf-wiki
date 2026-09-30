@@ -1,14 +1,17 @@
 /* ============================================================================
-   Homelab Wiki — diagram runtime + lightbox
+   okf-wiki: diagram runtime and lightbox
    ----------------------------------------------------------------------------
    Two jobs, one module:
-     1. Render `pre.mermaid` blocks with mermaid (CDN, ESM), at natural size so
-        a wide topology chart is legible and pans instead of being squashed to
-        an illegible sliver.
-     2. Open a full-screen pan/zoom viewer when a diagram is clicked, ported
-        from the abn.is mermaid lightbox (scroll = zoom, drag = pan, pinch on
-        touch, +/-/0/esc keys, focus trap). Dependency-free.
-   If mermaid cannot be loaded the raw source stays in place — legible, not
+     1. Render `pre.mermaid` blocks with mermaid, at natural size so a wide
+        topology chart is legible and pans instead of being squashed to an
+        illegible sliver. The vendored bundle under BASE vendor/ is tried
+        first so a container renders offline; the CDN is a fallback that only
+        runs when the bundle is missing, and a render without --vendor or
+        OKF_WIKI_VENDOR resolves is therefore not offline.
+     2. Open a full-screen pan/zoom viewer when a diagram is clicked (scroll =
+        zoom, drag = pan, pinch on touch, +/-/0/esc keys, focus trap).
+        Dependency-free.
+   If mermaid cannot be loaded the raw source stays in place: legible, not
    broken.
    ========================================================================== */
 (function () {

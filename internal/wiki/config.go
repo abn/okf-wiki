@@ -13,9 +13,8 @@ const DefaultBase = "/wiki/"
 
 // Brand holds the presentation identity of the rendered wiki.
 type Brand struct {
-	// Name is the wordmark, e.g. "abn." A trailing "." is split out and handed
-	// to the template as BrandTail, which a theme may paint in its accent. The
-	// split is mechanical; how the tail looks is the theme's business.
+	// Name is the wordmark. A trailing "." is split out and handed to the
+	// template as BrandTail, which a theme may paint in its accent.
 	Name string
 	// Sub is the small label beside the wordmark, e.g. "wiki".
 	Sub string
@@ -100,6 +99,8 @@ func parseSections(s string) []sectionSpec {
 }
 
 // titleCase turns a directory name (hyphens/underscores) into a display title.
+// It upper-cases by byte, so a section whose name starts outside ASCII has its
+// first character replaced rather than capitalised.
 func titleCase(s string) string {
 	s = strings.NewReplacer("-", " ", "_", " ").Replace(s)
 	words := strings.Fields(s)
@@ -114,7 +115,8 @@ func titleCase(s string) string {
 
 // orderedSectionIDs merges the configured order with any directories present in
 // the bundle, so an unlisted section always renders. The top-level section (id
-// "") is always first, since the bundle root holds index.md and log.md.
+// "") is always first and is not configurable: parseSections discards an empty
+// id, so a configured top title never reaches this point.
 func orderedSectionIDs(configured []sectionSpec, present []string) []sectionSpec {
 	topTitle := "Overview"
 	for _, s := range configured {
@@ -172,7 +174,9 @@ type resolvedSlot struct {
 	Bytes int `json:"bytes"`
 }
 
-// describe renders the resolved manifest for the output directory.
+// describe renders the resolved manifest for the output directory. A theme
+// read from disk is reported as "override", never by its path, so the manifest
+// does not leak a host directory into a published site.
 func (t *Theme) describe(base string) ([]byte, error) {
 	assets := map[string]themeAsset{}
 	for _, f := range t.files {

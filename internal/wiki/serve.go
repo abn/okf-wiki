@@ -22,7 +22,9 @@ type ServeOptions struct {
 }
 
 // Serve serves the rendered wiki until the process is interrupted. It blocks;
-// the caller should treat a returned error as fatal.
+// the caller should treat a returned error as fatal. Registering a pattern of
+// "" panics inside http.ServeMux, so a base of "/" must not take the
+// TrimSuffix branch below.
 func Serve(opts ServeOptions) error {
 	addr := opts.Addr
 	if addr == "" {
@@ -128,6 +130,8 @@ func openBrowser(url string) error {
 }
 
 // Shutdown is a convenience wrapper for callers that manage the server handle.
+// Nothing in this repository calls it: Serve blocks on srv.Serve and the
+// process ends on a signal, so there is no in-flight drain.
 func Shutdown(srv *http.Server) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

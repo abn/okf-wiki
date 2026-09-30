@@ -7,12 +7,14 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// SearchEntry represents an indexed document or section for client-side search.
+// SearchEntry is one search hit: a heading-anchored chunk of a page, or the
+// page itself when it produced no chunks. Title is the heading and Doc the
+// enclosing page, which differ whenever a hit is anchored mid-page.
 type SearchEntry struct {
 	URL     string `json:"u"` // deep link anchor or page url
 	PageURL string `json:"p"` // page url
 	Title   string `json:"t"` // heading title or page title
-	Doc     string `json:"d"` // page title
+	Doc     string `json:"d"` // enclosing page title
 	Section string `json:"s"` // section category (e.g. Architecture)
 	Content string `json:"c"` // extracted plain text
 }
@@ -24,6 +26,9 @@ type rawSearchChunk struct {
 	Text    string
 }
 
+// extractSearchChunks splits a page into one text chunk per heading, anchored
+// to that heading's id. The H1 is skipped, so content under it joins the first
+// real heading's chunk. pageTitle is unused.
 func extractSearchChunks(doc ast.Node, src []byte, pageTitle string) []rawSearchChunk {
 	var chunks []rawSearchChunk
 	currentHeading := ""
@@ -96,7 +101,8 @@ func cleanSearchText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// BuildSearchIndex builds a flat list of search entries across all sections and pages.
+// BuildSearchIndex flattens every page into one entry per heading-anchored
+// chunk.
 func (r *Renderer) BuildSearchIndex() []SearchEntry {
 	var index []SearchEntry
 	for _, s := range r.sections {
