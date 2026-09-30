@@ -136,7 +136,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,
   `callout-caution`
-- `pre.mermaid`, and `pre.code` around a Chroma-highlighted block
+- `pre.mermaid`, `pre.code` around an unhighlighted block, and `pre.code.chroma`
+  around a Chroma-highlighted one, each with a `language-*` class on the inner
+  `code` element
 
 ### Classes the clients write
 

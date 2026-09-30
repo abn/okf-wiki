@@ -17,12 +17,24 @@ A level two heading is the usual case.
 
 ## Level three
 
-A level three heading appears in the table of contents as an indented child.
+A level three heading is the deepest one the table of contents includes. It
+appears as an indented child, so a page can show its structure without the list
+growing without bound.
 
-### Level four
+### A level three heading
 
-A level four heading gets an id and an anchor, but stays out of the table of
-contents, which is why this sentence is not listed above.
+This one is in the table of contents above.
+
+#### A level four heading
+
+This is level four. It still gets an id and an anchor, so it can be linked
+directly, but it stays out of the table of contents, which is why this heading
+is not listed above even though the sentence two lines up is.
+
+##### And level five
+
+Deeper still, and the same rule applies. Every heading is an anchor target; only
+the first two levels are navigation.
 
 ## Repeated headings
 

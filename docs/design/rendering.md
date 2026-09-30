@@ -34,18 +34,22 @@ flowchart LR
    also a working tree does not render its own `.git`.
 2. **Parse.** Each file is split into frontmatter and body. The body is parsed
    with goldmark (CommonMark plus tables, task lists, footnotes). Heading ids
-   are assigned from the heading text, made unique per page, and an on-page
-   table of contents is collected from levels two and three.
-3. **Transform.** Fenced code is highlighted with Chroma (a fixed dark theme).
-   GitHub alert blockquotes (`> [!NOTE]`) become callout cards. Mermaid fences
-   pass through as `<pre class="mermaid">` for the browser to render.
+   are assigned from the heading text and made unique within the page. An on-page
+   table of contents collects levels two and three, so an `###` heading appears
+   and an `####` does not, though every heading still gets an id.
+3. **Transform.** Fenced code is highlighted with Chroma into `pre.code.chroma`,
+   with a `language-*` class naming the language. A fence with no language is
+   escaped into `pre.code` and left unhighlighted. GitHub alert blockquotes
+   (`> [!NOTE]`) become callout cards. Mermaid fences pass through as
+   `<pre class="mermaid">` for the browser to render.
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
-5. **Emit.** Pages are written under the base path, followed by the bundle's own
-   non-Markdown files, the resolved theme's assets (stylesheet, fonts, tokens,
-   the search and diagram clients, favicon), the Mermaid vendor bundle when the
-   bundle has a diagram, and a `theme.json` recording which theme produced the
-   output.
+5. **Emit.** In order: the pages, the bundle's own non-Markdown files, the
+   resolved theme's assets (stylesheet, fonts, tokens, the search and diagram
+   clients, favicon), the Mermaid vendor bundle when the bundle has a diagram,
+   `search-index.json`, and a `theme.json` recording which theme produced the
+   output. The output directory is emptied first, so a page removed from the
+   bundle does not linger.
 
 ## Themes
 
@@ -71,7 +75,7 @@ there is nothing that could serve it.
 ## Caching
 
 Every page links its stylesheet and scripts with a content-hash `?v=` query, and
-the server sends `Cache-Control: no-cache`. A re-render therefore always reaches
-the browser, which matters while authoring. The hash covers the resolved theme's
-bytes, so an override that changes a stylesheet busts the cache even though the
-file name is the same.
+the server sends `Cache-Control: no-cache, must-revalidate`. A re-render
+therefore always reaches the browser, which matters while authoring. The hash
+covers the resolved theme's bytes, so an override that changes a stylesheet
+busts the cache even though the file name is the same.
