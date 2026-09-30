@@ -42,6 +42,16 @@ flowchart LR
    escaped into `pre.code` and left unhighlighted. GitHub alert blockquotes
    (`> [!NOTE]`) become callout cards. Mermaid fences pass through as
    `<pre class="mermaid">` for the browser to render.
+
+   The browser draws each diagram into a card: a toolbar naming the type with
+   a copy and an expand affordance, then the drawing in a scroll area. Every
+   type renders at one size, at natural width, so a wide diagram scrolls
+   sideways rather than shrinking its labels; the card caps the height at
+   560px so a tall one scrolls instead of taking the page. Full screen opens
+   a wide diagram at its natural size and closes on Escape or a click on the
+   field around it. A diagram that will not parse becomes a red card carrying
+   the parser's message and the source, so the mistake is readable where it
+   is written rather than an empty block.
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
    Tags are collected into `tags.json`, a catalogue of display name, tag page

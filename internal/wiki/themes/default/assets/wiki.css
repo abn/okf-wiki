@@ -577,27 +577,79 @@ pre.mermaid {
 /* Inline diagrams fit the reading column. The lightbox clone (outside
    pre.mermaid) is set to natural size for detail. */
 pre.mermaid svg { max-width: 100% !important; height: auto; display: block; margin: 0 auto; }
-pre.mermaid-fallback { color: var(--color-danger-text); text-align: left; white-space: pre-wrap; }
+pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white-space: pre-wrap; }
 
-/* The frame and its expand affordance. The button stays fixed over the diagram
-   while the diagram pans horizontally inside its own scroll area. */
-.mermaid-frame { position: relative; margin: 1.4em 0; }
-.mermaid-frame pre.mermaid { margin: 0; }
-pre.mermaid.mermaid-rendered { cursor: zoom-in; }
-.mermaid-expand {
-  position: absolute; top: var(--space-3); right: var(--space-3); z-index: 2;
-  display: inline-flex; align-items: center; gap: var(--space-1);
-  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-  background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
-  border: 1px solid var(--color-line); border-radius: var(--radius-pill);
-  padding: 5px var(--space-3); cursor: pointer; backdrop-filter: blur(6px);
-  opacity: 0;
-  transition: opacity var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+/* ---------------------------------------------------------- diagram cards
+   A diagram is a card: a toolbar naming the type and carrying the copy and
+   expand affordances, then the drawing in a scroll area. Diagrams render at
+   natural width, so a wide one scrolls sideways rather than shrinking its
+   labels, and the card caps the height so a tall one scrolls rather than
+   taking the page. */
+.mermaid-frame {
+  position: relative; margin: var(--space-6) 0;
+  border: 1px solid var(--color-line); border-radius: var(--radius-lg);
+  background: var(--color-surface); overflow: hidden;
 }
-.mermaid-frame:hover .mermaid-expand, .mermaid-expand:focus-visible { opacity: 1; }
-@media (pointer: coarse) { .mermaid-expand { opacity: 1; min-height: 44px; } }
-.mermaid-expand:hover { color: var(--color-accent-text); border-color: var(--color-accent-ring); }
+.mermaid-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-ui); font-size: var(--text-xs);
+}
+.mermaid-type { color: var(--color-text-muted); font-weight: var(--fw-medium); }
+.mermaid-actions { display: inline-flex; align-items: center; gap: var(--space-1); }
+.mermaid-copy, .mermaid-expand {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--color-text-muted); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.mermaid-copy:hover, .mermaid-expand:hover {
+  color: var(--color-accent-text); border-color: var(--color-accent-ring);
+  background: var(--color-bg-elevated);
+}
+/* Copy feedback without text: the button takes the accent ring on success
+   and the danger ring on failure. */
+.mermaid-actions[data-copy="ok"] .mermaid-copy { color: var(--color-accent-text); border-color: var(--color-accent-ring); }
+.mermaid-actions[data-copy="fail"] .mermaid-copy { color: var(--status-danger-text); border-color: var(--status-danger-text); }
+/* The drawing's scroll area. Height is capped so a tall diagram stays a card;
+   width scrolls at natural size so a wide diagram keeps its labels legible. */
+.mermaid-frame pre.mermaid { margin: 0; max-height: 560px; overflow: auto; }
+.mermaid-frame pre.mermaid svg { display: block; }
+/* One type size across every diagram type. Mermaid's sequence renderer writes
+   its own font size inline from a snapshot of its defaults, so neither
+   themeVariables nor the sequence config block reaches it and its message,
+   note and actor text render a step larger than every other type. Pinned here
+   rather than in the renderer, which cannot win against the inline style. */
+.mermaid-frame .messageText, .mermaid-frame .noteText, .mermaid-frame .actor,
+.mermaid-frame .loopText, .mermaid-frame .sequenceNumber,
+.mermaid-frame .labelText, .mermaid-frame .actor-man {
+  font-size: 14px !important;
+}
+pre.mermaid.mermaid-rendered { cursor: zoom-in; }
+.mermaid-frame pre.mermaid[hidden] { display: none; }
+
+/* A diagram that will not parse: a red card carrying the parser's message and
+   the source, rather than an empty box. */
+.mermaid-error { border-top: 0; padding: var(--space-4); }
+.mermaid-error-head {
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-semibold);
+  color: var(--status-danger-text); margin: 0 0 var(--space-1);
+}
+.mermaid-error-detail {
+  font-family: var(--font-code); font-size: var(--text-xs);
+  color: var(--color-text-muted); margin: 0 0 var(--space-3); overflow-wrap: anywhere;
+}
+.mermaid-error-source {
+  margin: 0; padding: var(--space-3); overflow: auto;
+  background: var(--color-surface-sunken); border-radius: var(--radius-md);
+  border: 1px solid var(--status-danger-line);
+  font-family: var(--font-code); font-size: var(--text-xs); color: var(--color-text);
+}
+.mermaid-frame:has(.mermaid-error) { border-color: var(--status-danger-line); background: var(--status-danger-tint); }
+.mermaid-frame:has(.mermaid-error) .mermaid-toolbar { background: transparent; }
 
 /* ------------------------------------------------- full-screen diagram view
    The viewer stages a diagram on a dark field in both grounds. It is a
@@ -758,6 +810,9 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .toc-panel { right: var(--space-4); }
   .brand-sub { display: none; }
   .search-modal-backdrop { padding-top: 6vh; }
+  /* Diagram cards run edge to edge on a phone: the reading column's padding
+     is dead space around a drawing that wants the width. */
+  .mermaid-frame { margin-left: calc(var(--space-4) * -1); margin-right: calc(var(--space-4) * -1); border-radius: 0; border-left: 0; border-right: 0; }
   .prevnext { grid-template-columns: 1fr; }
   .prevnext-next { text-align: left; }
   .prevnext > :only-child.prevnext-next { grid-column: 1; }

@@ -13,6 +13,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
   visible on a page in this bundle rather than only in a fixture.
 * **Update**: Section headings are one step smaller with more air above, carry
   a `#` permalink on hover, and the table of contents lists level two only.
+* **Update**: Diagrams render in cards with a type label, copy and expand
+  affordances, at one size and natural width, and a diagram that will not
+  parse shows its source and the parser message instead of a blank block.
 * **Creation**: Added a `testbed/` section that exercises the whole rendering
   surface on viewable pages: [callouts](testbed/callouts.md) at all five
   levels, [blocks](testbed/blocks.md) with tables, task lists and footnotes,

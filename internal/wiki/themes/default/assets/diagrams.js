@@ -84,9 +84,7 @@
       suppressErrorRendering: true,
       securityLevel: 'strict',
       theme: 'base',
-      // Inline diagrams fit the reading column (useMaxWidth). The lightbox
-      // re-renders the clone at natural size for detail.
-      useMaxWidth: true,
+
       themeVariables: {
         darkMode: dark,
         fontFamily: p.font,
@@ -174,6 +172,25 @@
 
     if (useElk) { cfg.layout = 'elk'; cfg.elk = { mergeEdges: true }; }
 
+    // Each renderer reads useMaxWidth from its own config block, not from the
+    // top level, so every type has to be told. Natural width is what lets a
+    // wide diagram scroll sideways in its card instead of shrinking its
+    // labels to fit the column.
+    var TYPES = ['flowchart', 'state', 'sequence', 'class', 'er', 'gantt',
+      'gitGraph', 'journey', 'mindmap', 'pie', 'quadrantChart', 'timeline',
+      'xyChart', 'block', 'requirement', 'c4', 'packet', 'kanban', 'radar',
+      'sankey', 'treemap', 'venn', 'architecture', 'ishikawa', 'treeView',
+      'usecase', 'swimlane', 'cynefin', 'eventmodeling', 'agentflow'];
+    TYPES.forEach(function (t) {
+      cfg[t] = Object.assign({}, cfg[t], { useMaxWidth: false });
+    });
+
+    // The sequence diagram's font sizes are not settable from here. Its
+    // renderer reads them through an accessor bound to a snapshot of its own
+    // defaults, so getConfig() reports the values below while the SVG still
+    // carries the default 16px inline. stylesheet.css pins those classes
+    // instead; a config key here would only look like it worked.
+
     // Categorical scales for pie, quadrant and git diagrams. Ordered so
     // adjacent slices stay distinguishable, and every entry is a palette
     // member rather than a new value.
@@ -244,19 +261,13 @@
           decorate(el);
         } catch (err2) {
           console.warn('Mermaid rendering failed:', err2 && err2.message ? err2.message : err2);
-          // A failed run empties the element, so put the source back: the
-          // fallback shows the text rather than a blank block.
-          el.textContent = el.__mmdSource;
-          el.removeAttribute('data-processed');
-          el.classList.add('mermaid-fallback');
+          showFailure(el, err2);
         }
       }
     } else {
       failed.forEach(function (f) {
         console.warn('Mermaid rendering failed:', f.err && f.err.message ? f.err.message : f.err);
-        f.el.textContent = f.el.__mmdSource;
-        f.el.removeAttribute('data-processed');
-        f.el.classList.add('mermaid-fallback');
+        showFailure(f.el, f.err);
       });
     }
     initLightbox();
@@ -264,28 +275,150 @@
 
   // Wrap a rendered diagram so an "Expand" affordance can sit over it, fixed
   // above the diagram's own horizontal scroll.
+  // A diagram that will not parse becomes a card carrying the source and the
+  // parser's own message, so the mistake is readable where it is written. A
+  // failed run empties the element, so the source is restored first.
+  function showFailure(pre, err) {
+    pre.textContent = pre.__mmdSource;
+    pre.removeAttribute('data-processed');
+    pre.classList.add('mermaid-fallback');
+
+    var msg = err && err.message ? String(err.message) : 'Mermaid could not render this diagram.';
+    // The parser reports the offending text after a colon; keep the whole
+    // message, since the useful part varies by diagram type.
+    var frame = wrapFrame(pre);
+    var bar = document.createElement('div');
+    bar.className = 'mermaid-toolbar';
+    var kind = document.createElement('span');
+    kind.className = 'mermaid-type';
+    kind.textContent = 'Diagram';
+    bar.appendChild(kind);
+    frame.appendChild(bar);
+
+    var card = document.createElement('div');
+    card.className = 'mermaid-error';
+    card.setAttribute('role', 'alert');
+
+    var head = document.createElement('p');
+    head.className = 'mermaid-error-head';
+    head.textContent = 'This diagram did not render';
+    var detail = document.createElement('p');
+    detail.className = 'mermaid-error-detail';
+    detail.textContent = msg;
+    card.appendChild(head);
+    card.appendChild(detail);
+
+    // The source keeps its own element, so a reader can select and copy it.
+    var src = document.createElement('pre');
+    src.className = 'mermaid-error-source';
+    src.textContent = pre.__mmdSource;
+    card.appendChild(src);
+
+    pre.hidden = true;
+    frame.appendChild(card);
+  }
+
+  // Mermaid's own aria-roledescription, mapped to the names a reader knows.
+  // An unmapped type falls through as written rather than as "diagram".
+  var TYPE_NAMES = {
+    'flowchart-v2': 'Flowchart',
+    'sequence': 'Sequence diagram',
+    'stateDiagram': 'State diagram',
+    'classDiagram': 'Class diagram',
+    'er': 'Entity relationship',
+    'gantt': 'Gantt chart',
+    'pie': 'Pie chart',
+    'gitGraph': 'Git graph',
+    'journey': 'User journey',
+    'mindmap': 'Mind map',
+    'quadrantChart': 'Quadrant chart',
+    'timeline': 'Timeline',
+    'xychart': 'XY chart',
+    'block': 'Block diagram',
+    'requirement': 'Requirement diagram',
+    'c4': 'C4 diagram'
+  };
+
+  function diagramType(pre) {
+    var svg = pre.querySelector('svg');
+    var role = svg ? svg.getAttribute('aria-roledescription') : '';
+    if (!role) return 'Diagram';
+    return TYPE_NAMES[role] || role;
+  }
+
+  function iconButton(cls, label, path, onClick) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" aria-hidden="true">' + path + '</svg>';
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      onClick();
+    });
+    return b;
+  }
+
+  // The card a diagram lives in. Shared by a rendered diagram and a failed
+  // one, so an error gets the same frame, toolbar and width as a drawing.
+  function wrapFrame(pre) {
+    var existing = pre.closest('.mermaid-frame');
+    if (existing) return existing;
+    var frame = document.createElement('div');
+    frame.className = 'mermaid-frame';
+    pre.parentNode.insertBefore(frame, pre);
+    frame.appendChild(pre);
+    return frame;
+  }
+
   function decorate(pre) {
     if (pre.dataset.decorated) return;
     pre.dataset.decorated = '1';
     pre.classList.add('mermaid-rendered');
 
-    var frame = document.createElement('div');
-    frame.className = 'mermaid-frame';
-    pre.parentNode.insertBefore(frame, pre);
-    frame.appendChild(pre);
+    var frame = wrapFrame(pre);
 
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'mermaid-expand';
-    btn.setAttribute('aria-label', 'Open diagram in full screen');
-    btn.innerHTML =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
-      '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg><span>Expand</span>';
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      openLightbox(pre);
-    });
-    frame.appendChild(btn);
+    var bar = document.createElement('div');
+    bar.className = 'mermaid-toolbar';
+    var kind = document.createElement('span');
+    kind.className = 'mermaid-type';
+    kind.textContent = diagramType(pre);
+    bar.appendChild(kind);
+
+    var actions = document.createElement('span');
+    actions.className = 'mermaid-actions';
+    actions.appendChild(iconButton('mermaid-copy', 'Copy diagram source',
+      '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
+      '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+      function () { copySource(pre, actions); }));
+    actions.appendChild(iconButton('mermaid-expand', 'Open diagram in full screen',
+      '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+      function () { openLightbox(pre); }));
+    bar.appendChild(actions);
+    frame.appendChild(bar);
+  }
+
+  // Copy the fence body, not the rendered text: the source is what a reader
+  // wants to paste elsewhere. Feedback is the button's own title, so no text
+  // appears in the toolbar.
+  function copySource(pre, actions) {
+    var src = pre.__mmdSource || pre.textContent;
+    var done = function (ok) {
+      var label = ok ? 'Copied' : 'Copy failed';
+      actions.setAttribute('data-copy', ok ? 'ok' : 'fail');
+      actions.setAttribute('aria-label', label);
+      setTimeout(function () {
+        actions.removeAttribute('data-copy');
+        actions.setAttribute('aria-label', '');
+      }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(src).then(function () { done(true); }, function () { done(false); });
+      return;
+    }
+    done(false);
   }
 
   /* ------------------------------------------------------------- lightbox */
@@ -328,7 +461,10 @@
     var sh = lb.stage.clientHeight || (window.innerHeight - 68);
     var cw = nat.w || 1, ch = nat.h || 1;
     var fit = Math.min((sw / cw) * 0.9, (sh / ch) * 0.86);
-    var scale = Math.min(fit, 1.25);
+    // Never shrink below natural size: a wide diagram opens at full size and
+    // pans, rather than being scaled down to fit. A diagram smaller than the
+    // stage still zooms up a little, which is the case the viewer is for.
+    var scale = fit >= 1 ? Math.min(fit, 1.25) : 1;
     state = { scale: scale, tx: (sw - cw * scale) / 2, ty: (sh - ch * scale) / 2, fit: scale };
     lbApply();
   }
@@ -367,6 +503,16 @@
     lb.pct.onclick = function () { lbFit(); };
     el.querySelector('[data-act="close"]').onclick = function () { closeLightbox(); };
     el.addEventListener('pointerdown', function (e) { if (e.target === el) closeLightbox(); });
+    // Clicking the field around the diagram closes too, which is what "click
+    // outside" means once the viewer fills the screen. A drag to pan is not a
+    // click, so the pointer has to stay put between down and up.
+    var downAt = null;
+    stage.addEventListener('pointerdown', function (e) { downAt = { x: e.clientX, y: e.clientY }; });
+    stage.addEventListener('click', function (e) {
+      if (e.target !== stage || !downAt) return;
+      if (Math.abs(e.clientX - downAt.x) > 4 || Math.abs(e.clientY - downAt.y) > 4) return;
+      closeLightbox();
+    });
 
     stage.addEventListener('wheel', function (e) {
       e.preventDefault();

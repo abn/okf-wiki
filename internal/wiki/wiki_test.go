@@ -1998,3 +1998,70 @@ func TestSourceMetaRendering(t *testing.T) {
 		})
 	}
 }
+
+// TestDiagramCardContract guards the pieces the diagram card needs, since the
+// behaviour itself is client-side and cannot be asserted from Go. Each of
+// these was a real defect: diagrams shrank to fit, sequence text rendered a
+// step larger, and a failed diagram left a blank block.
+func TestDiagramCardContract(t *testing.T) {
+	js, err := os.ReadFile(filepath.Join(docsRoot(t), "internal", "wiki",
+		"themes", "default", "assets", "diagrams.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := string(js)
+	// Every renderer reads useMaxWidth from its own config block, so a type
+	// missing from the list silently shrinks to the column.
+	for _, want := range []string{"TYPES.forEach", "useMaxWidth: false", "'flowchart'", "'sequence'", "'state'"} {
+		if !strings.Contains(client, want) {
+			t.Errorf("diagrams.js does not contain %q", want)
+		}
+	}
+	// The failure card, and the frame that gives it the card shape.
+	for _, want := range []string{"mermaid-error", "mermaid-error-detail", "mermaid-error-source", "wrapFrame"} {
+		if !strings.Contains(client, want) {
+			t.Errorf("diagrams.js does not contain %q", want)
+		}
+	}
+	// The toolbar carries a type label and two glyph buttons, no text.
+	for _, want := range []string{"mermaid-toolbar", "mermaid-type", "mermaid-copy", "mermaid-expand"} {
+		if !strings.Contains(client, want) {
+			t.Errorf("diagrams.js does not contain %q", want)
+		}
+	}
+	// The lightbox must not shrink a wide diagram below its natural size.
+	if !strings.Contains(client, "fit >= 1 ? Math.min(fit, 1.25) : 1") {
+		t.Error("lightbox fit can scale a wide diagram below natural size")
+	}
+	// Clicking outside must close, and a drag must not.
+	if !strings.Contains(client, "downAt") {
+		t.Error("lightbox has no drag guard on the outside-click close")
+	}
+
+	css, err := os.ReadFile(filepath.Join(docsRoot(t), "internal", "wiki",
+		"themes", "default", "assets", "wiki.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sheet := string(css)
+	for _, want := range []string{
+		".mermaid-frame {",
+		".mermaid-toolbar {",
+		".mermaid-error {",
+		"max-height: 560px",
+	} {
+		if !strings.Contains(sheet, want) {
+			t.Errorf("wiki.css does not contain %q", want)
+		}
+	}
+	// Mermaid writes the sequence font size inline from a snapshot of its own
+	// defaults, so only an important stylesheet rule can pin it.
+	if !strings.Contains(sheet, ".mermaid-frame .messageText") ||
+		!strings.Contains(sheet, "font-size: 14px !important") {
+		t.Error("wiki.css does not pin the sequence diagram font size")
+	}
+	// The failure card must read as a card, not a stray block.
+	if !strings.Contains(sheet, "var(--status-danger-tint)") {
+		t.Error("failure card carries no danger tint")
+	}
+}
