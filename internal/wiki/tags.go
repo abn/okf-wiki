@@ -238,6 +238,13 @@ func (r *Renderer) tagRow(b *strings.Builder, p Page, sec, base, self string, no
 	b.WriteString("</p>\n</div>\n")
 }
 
+// tagLink renders a tag link for page heads: raw text, no pill. The page head
+// already carries the type pill, so tags read as trailing metadata.
+func tagLink(base, slug, display string) string {
+	return fmt.Sprintf(`<a class="tag-link" href="%stags/%s.html"><span class="tag-hash">#</span>%s</a>`,
+		base, slug, template.HTMLEscapeString(display))
+}
+
 // tagChip renders one tag link for tag contexts: often-with, row meta lines,
 // and the full catalogue. The hash is its own span so themes can mute it
 // without muting the name, and the count shows only when nonzero, which is

@@ -182,11 +182,10 @@ func (r *Renderer) buildMeta(p Page) string {
 		}
 		slug := slugify(name)
 		if slug == "" {
-			chips = append(chips, fmt.Sprintf(`<span class="chip">%s</span>`, template.HTMLEscapeString(name)))
+			chips = append(chips, fmt.Sprintf(`<span class="tag-link">#%s</span>`, template.HTMLEscapeString(name)))
 			continue
 		}
-		chips = append(chips, fmt.Sprintf(`<a class="chip" href="%stags/%s.html">%s</a>`,
-			r.cfg.base(), slug, template.HTMLEscapeString(name)))
+		chips = append(chips, tagLink(r.cfg.base(), slug, name))
 	}
 	if len(chips) == 0 {
 		return ""

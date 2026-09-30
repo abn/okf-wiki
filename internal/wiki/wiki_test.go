@@ -1347,10 +1347,10 @@ func TestTagPagesRender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/alpha.html">alpha</a>`) {
+	if !strings.Contains(string(home), `<a class="tag-link" href="/wiki/tags/alpha.html"><span class="tag-hash">#</span>alpha</a>`) {
 		t.Error("home page has no link chip for tag alpha")
 	}
-	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/shared.html">shared</a>`) {
+	if !strings.Contains(string(home), `<a class="tag-link" href="/wiki/tags/shared.html"><span class="tag-hash">#</span>shared</a>`) {
 		t.Error("home page has no link chip for tag shared")
 	}
 	if !strings.Contains(string(home), `<span class="chip chip-type">Overview</span>`) {
@@ -1503,10 +1503,10 @@ func TestTagSlugWithoutURLForm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(home), `<span class="chip">!!!</span>`) {
+	if !strings.Contains(string(home), `<span class="tag-link">#!!!</span>`) {
 		t.Error("unsluggable tag should render as a plain span")
 	}
-	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/ok.html">ok</a>`) {
+	if !strings.Contains(string(home), `<a class="tag-link" href="/wiki/tags/ok.html"><span class="tag-hash">#</span>ok</a>`) {
 		t.Error("sluggable tag should render as a link")
 	}
 }
