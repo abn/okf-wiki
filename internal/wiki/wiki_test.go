@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -651,4 +652,94 @@ func TestServeAtRootBaseDoesNotPanic(t *testing.T) {
 	// Must not panic. A panic in a handler test fails the test rather than
 	// crashing the run, so recover is not needed here.
 	handler(ServeOptions{OutDir: dir, Base: "/"})
+}
+
+// TestHeadingIDsAreUnique covers the collision that counting repeats of one base
+// slug cannot see. "Setup", "Setup" and "Setup 2" all interact: the second
+// repeat is handed setup-2, which is exactly what the literal "Setup 2"
+// slugifies to.
+func TestHeadingIDsAreUnique(t *testing.T) {
+	dir := t.TempDir()
+	body := strings.Join([]string{
+		"---",
+		"title: Duplicates",
+		"---",
+		"# Duplicates",
+		"## Setup",
+		"## Setup",
+		"## Setup",
+		"## Setup 2",
+		"## Setup 2",
+		"## Setup",
+		"### Setup",
+		"## !!!",
+		"## ???",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(dir, "index.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			page = p
+		}
+	}
+	html := r.RenderPage(page)
+
+	ids := regexp.MustCompile(`<h[1-6] id="([^"]*)"`).FindAllStringSubmatch(html, -1)
+	// Seven headings slugify to setup-ish bases and two to nothing, so the H1
+	// is the only heading that does not appear here.
+	if len(ids) != 9 {
+		t.Fatalf("found %d heading ids, want 9: %v", len(ids), ids)
+	}
+	seen := map[string]bool{}
+	for _, m := range ids {
+		if seen[m[1]] {
+			t.Errorf("duplicate heading id %q", m[1])
+		}
+		seen[m[1]] = true
+	}
+	// Every id is distinct, and the numbering is the one uniqueID produces:
+	// a suffixed candidate is itself uniquified, so "Setup 2" after two repeats
+	// of "Setup" becomes setup-2-2 rather than colliding with setup-2.
+	want := []string{
+		"setup", "setup-2", "setup-3", "setup-2-2", "setup-2-3",
+		"setup-4", "setup-5", "section", "section-2",
+	}
+	for _, w := range want {
+		if !seen[w] {
+			t.Errorf("missing expected heading id %q; got %v", w, seen)
+		}
+	}
+
+	// Every table of contents entry must point at an id that exists.
+	for _, m := range regexp.MustCompile(`<a href="#([^"]*)"`).FindAllStringSubmatch(html, -1) {
+		if !seen[m[1]] {
+			t.Errorf("table of contents links to #%s, which is not a heading id", m[1])
+		}
+	}
+}
+
+// uniqueID is the unit of behaviour behind the above: the candidate has to be
+// checked against every id already taken, not against a count of one base slug.
+func TestUniqueID(t *testing.T) {
+	taken := map[string]bool{}
+	// Bases as slugify produces them: "Setup" -> setup, "Setup 2" -> setup-2.
+	seq := []string{"setup", "setup", "setup-2", "setup-2", "setup", ""}
+	var got []string
+	for _, base := range seq {
+		got = append(got, uniqueID(base, taken))
+	}
+	// setup-2 is taken by the second call, so the literal setup-2 base has to
+	// step past it rather than land on it.
+	want := []string{"setup", "setup-2", "setup-2-2", "setup-2-3", "setup-3", "section"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("call %d = %q, want %q", i, got[i], want[i])
+		}
+	}
 }

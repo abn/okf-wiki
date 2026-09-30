@@ -45,9 +45,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
   exists so a theme author can see the whole rendering surface in one place, and
   so a rendering change has a visible regression target rather than only a unit
   test.
-- `testbed/headings.md` deliberately repeats headings and mixes a numbered
-  heading with a plain one, so an anchor collision is visible on a page in this
-  bundle rather than only in a fixture.
+- `testbed/headings.md` deliberately repeats headings and mixes numbered
+  headings with plain ones, so an anchor collision stays visible on a page in
+  this bundle rather than only in a fixture. Its ids are now unique.
 - `testbed/blocks.md` documents the three link kinds but carries no live link
   for the third. The escaping form only resolves with `--repo`, which this
   bundle is published without.

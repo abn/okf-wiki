@@ -8,8 +8,8 @@ tags: [testbed, headings]
 # Headings
 
 Heading text becomes the anchor id, lowercased, with spaces and punctuation
-folded to hyphens. The table of contents is built from levels two and three, so
-it stays short on a page with deep nesting.
+folded to hyphens. Ids are made unique within a page, and a table of contents is
+built from levels two and three, so it stays short on a page with deep nesting.
 
 ## Level two
 
@@ -45,8 +45,16 @@ has already emitted, not counting repeats of one base slug.
 
 ## Setup
 
+The first "Setup" takes the bare id.
+
 ## Setup 2
 
 ## Setup
 
-A third "Setup", to confirm the sequence stays unique end to end.
+A third "Setup". Its id has to step past both `setup-2` and `setup-2-2`, so
+the sequence is not simply setup, setup-2, setup-3.
+
+## Setup 2
+
+A second "Setup 2" has the same base slug as the first, so it takes its own
+suffix.

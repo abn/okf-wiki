@@ -25,8 +25,8 @@ flowchart LR
    `--sections`, with any unlisted directory appended alphabetically.
 2. **Parse.** Each file is split into frontmatter and body. The body is parsed
    with goldmark (CommonMark plus tables, task lists, footnotes). Heading ids
-   are assigned from the heading text, and an on-page table of contents is
-   collected from levels two and three.
+   are assigned from the heading text, made unique per page, and an on-page
+   table of contents is collected from levels two and three.
 3. **Transform.** Fenced code is highlighted with Chroma (a fixed dark theme).
    GitHub alert blockquotes (`> [!NOTE]`) become callout cards. Mermaid fences
    pass through as `<pre class="mermaid">` for the browser to render.

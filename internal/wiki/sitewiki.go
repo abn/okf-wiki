@@ -304,7 +304,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 
 	doc := r.md.Parser().Parse(text.NewReader(body))
 	src := body
-	usedIDs := map[string]int{}
+	usedIDs := map[string]bool{}
 	var h1 string
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -323,16 +323,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		if isHeading(n) && !isH1(n) {
 			h := n.(*ast.Heading)
 			headingVal := headingText(n, src)
-			id := slugify(headingVal)
-			if id == "" {
-				id = "section"
-			}
-			if count, ok := usedIDs[id]; ok {
-				usedIDs[id] = count + 1
-				id = fmt.Sprintf("%s-%d", id, count+1)
-			} else {
-				usedIDs[id] = 1
-			}
+			id := uniqueID(slugify(headingVal), usedIDs)
 			h.SetAttribute([]byte("id"), []byte(id))
 			if h.Level <= 3 {
 				p.TOC = append(p.TOC, TOCEntry{ID: id, Level: h.Level, Text: headingVal})
@@ -445,6 +436,28 @@ func collectText(n ast.Node, src []byte, b *strings.Builder) {
 			collectText(c, src, b)
 		}
 	}
+}
+
+// uniqueID returns a heading id not yet present in taken, and records it.
+//
+// The obvious approach, counting repeats of one base slug, is not enough.
+// "Setup", "Setup", "Setup" and "Setup 2" slugify to setup, setup, setup and
+// setup-2, and the second repeat is already numbered setup-2, so the literal
+// "Setup 2" heading collides with it. Every candidate has to be checked against
+// the ids already emitted, including the suffixed ones, so the sequence is
+// setup, setup-2, setup-3, setup-2-2.
+func uniqueID(base string, taken map[string]bool) string {
+	id := base
+	if id == "" {
+		// A heading of only punctuation or an emoji slugs to nothing.
+		id = "section"
+	}
+	candidate := id
+	for n := 2; taken[candidate]; n++ {
+		candidate = fmt.Sprintf("%s-%d", id, n)
+	}
+	taken[candidate] = true
+	return candidate
 }
 
 func slugify(s string) string {
