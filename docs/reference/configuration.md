@@ -28,10 +28,17 @@ Resolution order is flag, then environment variable, then default.
 under `--out`, so a rendered directory can be served by any static file server
 unchanged. It must not contain `.` or `..` segments.
 
+A base of `/` is the whole site: the pages are written at the top of `--out`
+with no wiki subdirectory, and there is no root redirect, because the wiki's own
+`index.html` already occupies that path. This is the base the GitHub Action
+computes for a user or organisation Pages site, so it is a normal configuration
+rather than an edge case.
+
 ## Endpoints
 
 - `/wiki/` and `/wiki/<slug>.html`: the rendered wiki, under `--base`.
 - `/repo/<path>`: read-only repository mount, when `--repo` is set. Dotfiles are
   refused.
 - `/healthz`: liveness probe.
-- `/`: redirects to `--base`.
+- `/`: redirects to `--base`, unless `--base` is `/`, where it is the wiki
+  itself.

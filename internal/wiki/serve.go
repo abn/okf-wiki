@@ -21,21 +21,27 @@ type ServeOptions struct {
 	Open     bool   // open the default browser on startup
 }
 
-// Serve serves the rendered wiki until the process is interrupted. It blocks;
-// the caller should treat a returned error as fatal. Registering a pattern of
-// "" panics inside http.ServeMux, so a base of "/" must not take the
-// TrimSuffix branch below.
-func Serve(opts ServeOptions) error {
-	addr := opts.Addr
-	if addr == "" {
-		addr = "0.0.0.0:8080"
-	}
+// handler builds the route table. It is separate from Serve so the routes can
+// be exercised without binding a port.
+func handler(opts ServeOptions) http.Handler {
 	base := Config{Base: opts.Base}.base()
 
 	mux := http.NewServeMux()
 	site := noCache(http.FileServer(http.Dir(opts.OutDir)))
 	mux.Handle(base, site)
-	mux.Handle(strings.TrimSuffix(base, "/"), http.RedirectHandler(base, http.StatusMovedPermanently))
+	// A base of "/" is the whole site, so there is no prefix to redirect and
+	// nothing left for a catch-all: TrimSuffix would give "", which ServeMux
+	// rejects as a pattern, and "/" is already taken by the site above.
+	if trimmed := strings.TrimSuffix(base, "/"); trimmed != "" {
+		mux.Handle(trimmed, http.RedirectHandler(base, http.StatusMovedPermanently))
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, base, http.StatusFound)
+				return
+			}
+			site.ServeHTTP(w, r)
+		})
+	}
 	mux.Handle("/index.html", site)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -44,13 +50,17 @@ func Serve(opts ServeOptions) error {
 	if opts.RepoRoot != "" {
 		mux.Handle("/repo/", http.StripPrefix("/repo/", repoFileServer(opts.RepoRoot)))
 	}
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, base, http.StatusFound)
-			return
-		}
-		site.ServeHTTP(w, r)
-	})
+	return mux
+}
+
+// Serve serves the rendered wiki until the process is interrupted. It blocks;
+// the caller should treat a returned error as fatal.
+func Serve(opts ServeOptions) error {
+	addr := opts.Addr
+	if addr == "" {
+		addr = "0.0.0.0:8080"
+	}
+	mux := handler(opts)
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -60,7 +70,7 @@ func Serve(opts ServeOptions) error {
 	if host, port, err := net.SplitHostPort(display); err == nil && (host == "::" || host == "0.0.0.0") {
 		display = "localhost:" + port
 	}
-	url := "http://" + display + base
+	url := "http://" + display + Config{Base: opts.Base}.base()
 	fmt.Printf("okf-wiki: serving %s at %s\n", opts.OutDir, url)
 	fmt.Println("okf-wiki: press Ctrl-C to stop")
 

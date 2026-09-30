@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -535,4 +536,119 @@ func TestRepoFileServerBlocksDotfiles(t *testing.T) {
 	if code := get("/.git/config"); code != http.StatusNotFound {
 		t.Errorf("GET /.git/config = %d, want 404", code)
 	}
+}
+
+// TestServeRoutesAcrossBases builds the real route table for each base. A base
+// of "/" used to panic: TrimSuffix gave "", which ServeMux rejects as a
+// pattern, and the catch-all then tried to claim "/" a second time.
+func TestServeRoutesAcrossBases(t *testing.T) {
+	dir := t.TempDir()
+	// The rendered layout: the file server is rooted at the output directory and
+	// the base is mounted inside it, so the page sits at <out>/<base>/index.html.
+	for _, site := range []string{"wiki", "a/b", "c", ""} {
+		if err := os.MkdirAll(filepath.Join(dir, site), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, site, "index.html"), []byte("<h1>hi</h1>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name string
+		base string
+		want []string // paths that must be served from the site
+	}{
+		{name: "default", base: "", want: []string{"/wiki/", "/wiki/index.html"}},
+		{name: "root", base: "/", want: []string{"/", "/index.html"}},
+		{name: "nested", base: "/a/b", want: []string{"/a/b/", "/a/b/index.html"}},
+		{name: "no-leading-slash", base: "c", want: []string{"/c/", "/c/index.html"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := handler(ServeOptions{OutDir: dir, Base: tc.base})
+			srv := httptest.NewServer(h)
+			defer srv.Close()
+
+			for _, p := range tc.want {
+				resp, err := http.Get(srv.URL + p)
+				if err != nil {
+					t.Fatalf("GET %s: %v", p, err)
+				}
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if resp.StatusCode != http.StatusOK {
+					t.Errorf("GET %s = %d, want 200", p, resp.StatusCode)
+				}
+				if !strings.Contains(string(body), "<h1>hi</h1>") {
+					t.Errorf("GET %s did not serve the page", p)
+				}
+				if got := resp.Header.Get("Cache-Control"); !strings.Contains(got, "no-cache") {
+					t.Errorf("GET %s Cache-Control = %q, want no-cache", p, got)
+				}
+			}
+
+			// The prefix without its trailing slash redirects onto the base.
+			prefix := Config{Base: tc.base}.base()
+			trimmed := strings.TrimSuffix(prefix, "/")
+			if trimmed != "" {
+				client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+					return http.ErrUseLastResponse
+				}}
+				resp, err := client.Get(srv.URL + trimmed)
+				if err != nil {
+					t.Fatalf("GET %s: %v", trimmed, err)
+				}
+				resp.Body.Close()
+				if resp.StatusCode != http.StatusMovedPermanently {
+					t.Errorf("GET %s = %d, want 301", trimmed, resp.StatusCode)
+				}
+				if loc := resp.Header.Get("Location"); loc != prefix {
+					t.Errorf("GET %s Location = %q, want %q", trimmed, loc, prefix)
+				}
+			}
+
+			// The root lands on the base for a prefixed site, and is the site
+			// itself when the base is "/".
+			client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			}}
+			resp, err := client.Get(srv.URL + "/")
+			if err != nil {
+				t.Fatalf("GET /: %v", err)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if trimmed == "" {
+				if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "<h1>hi</h1>") {
+					t.Errorf("base %q: GET / = %d, want the site itself", tc.base, resp.StatusCode)
+				}
+			} else if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != prefix {
+				t.Errorf("base %q: GET / = %d Location %q, want 302 to %q",
+					tc.base, resp.StatusCode, resp.Header.Get("Location"), prefix)
+			}
+
+			resp, err = http.Get(srv.URL + "/healthz")
+			if err != nil {
+				t.Fatalf("GET /healthz: %v", err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("GET /healthz = %d, want 200", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// A base of "/" is the one a user or org Pages site is served under, so the
+// container's default configuration has to build a mux without panicking.
+func TestServeAtRootBaseDoesNotPanic(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>root</h1>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Must not panic. A panic in a handler test fails the test rather than
+	// crashing the run, so recover is not needed here.
+	handler(ServeOptions{OutDir: dir, Base: "/"})
 }
