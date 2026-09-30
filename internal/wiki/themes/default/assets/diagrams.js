@@ -36,9 +36,10 @@
 
   // The diagram palette is read from the theme's own custom properties rather
   // than hardcoded here, so a theme recolours every diagram by declaring
-  // --diagram-* in tokens.css and nothing else. The fallbacks are the values
-  // tokens.css ships, so a theme that declares none of them still renders the
-  // default palette rather than an undefined one.
+  // --diagram-* in tokens.css and nothing else. A theme that wants both
+  // grounds declares them per ground, the way the default does; the
+  // fallbacks are the dark values, so a theme that declares none of them
+  // still renders rather than an undefined one.
   function token(name, fallback) {
     var v = getComputedStyle(document.documentElement).getPropertyValue(name);
     v = (v || '').trim();
@@ -137,6 +138,9 @@
 
         stateBkg: p.surface,
         stateBorder: p.accent,
+        // Mermaid paints the state name in the node fill when this is unset,
+        // so without it every state box is empty in both grounds.
+        stateLabelColor: p.ink,
         compositeBackground: p.surfaceAlt,
         compositeBorder: p.line,
         labelBackgroundColor: p.ground,
