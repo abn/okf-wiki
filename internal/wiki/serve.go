@@ -15,12 +15,33 @@ import (
 	"time"
 )
 
+// DefaultAddr is the address serve binds when none is given: loopback only.
+//
+// A wiki is a documentation site with no authentication, so the safe default is
+// one only this machine can reach. A container, or a deliberate LAN share, sets
+// OKF_WIKI_ADDR or --addr; the shipped image already sets it to 0.0.0.0:8080.
+const DefaultAddr = "127.0.0.1:8080"
+
+// loopback reports whether addr binds only to this machine, so a non-loopback
+// bind can be called out on startup rather than discovered later.
+func loopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true // unparseable, so not worth claiming anything about it
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 // ServeOptions configures the wiki server.
 type ServeOptions struct {
 	OutDir   string // rendered site root (contains wiki/)
 	Base     string // URL prefix the wiki is mounted at (default "/wiki/")
 	RepoRoot string // repository root, exposed read-only at /repo/ (optional)
-	Addr     string // host:port, defaults to 0.0.0.0:8080
+	Addr     string // host:port, defaults to DefaultAddr
 	Open     bool   // open the default browser on startup
 }
 
@@ -61,7 +82,7 @@ func handler(opts ServeOptions) http.Handler {
 func Serve(opts ServeOptions) error {
 	addr := opts.Addr
 	if addr == "" {
-		addr = "0.0.0.0:8080"
+		addr = DefaultAddr
 	}
 	mux := handler(opts)
 
@@ -73,11 +94,10 @@ func Serve(opts ServeOptions) error {
 	if host, port, err := net.SplitHostPort(display); err == nil && (host == "::" || host == "0.0.0.0") {
 		display = "localhost:" + port
 	}
-	url := "http://" + display + Config{Base: opts.Base}.base()
-	fmt.Printf("okf-wiki: serving %s at %s\n", opts.OutDir, url)
-	fmt.Println("okf-wiki: press Ctrl-C to stop")
+	fmt.Print(announce(opts, addr, display))
 
 	if opts.Open {
+		url := wikiURL(opts, display)
 		go func() {
 			time.Sleep(250 * time.Millisecond)
 			if err := openBrowser(url); err != nil {
@@ -178,6 +198,25 @@ func openBrowser(url string) error {
 	}
 	args = append(args, url)
 	return exec.Command(cmd, args...).Start()
+}
+
+// wikiURL is the address to open, given the resolved listener.
+func wikiURL(opts ServeOptions, display string) string {
+	return "http://" + display + Config{Base: opts.Base}.base()
+}
+
+// announce is what the server says once it is listening. The address line names
+// the resolved listener, and a bind that is not loopback is called out, because
+// the wiki has no authentication and that is not something to discover later.
+func announce(opts ServeOptions, addr, display string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "okf-wiki: serving %s at %s\n", opts.OutDir, wikiURL(opts, display))
+	if !loopback(addr) {
+		fmt.Fprintf(&b, "okf-wiki: %s is not loopback, so this wiki and any /repo/ "+
+			"mount are reachable from other machines; it has no authentication\n", addr)
+	}
+	b.WriteString("okf-wiki: press Ctrl-C to stop\n")
+	return b.String()
 }
 
 // Shutdown is a convenience wrapper for callers that manage the server handle.

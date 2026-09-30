@@ -21,7 +21,7 @@ Resolution order is flag, then environment variable, then default.
 | `--brand-sub` | `OKF_WIKI_BRAND_SUB` | `docs` | Subtitle label |
 | `--title` | `OKF_WIKI_TITLE` | `Wiki` | Document title suffix |
 | `--sections` | `OKF_WIKI_SECTIONS` | empty | Section order, `id:Title` pairs |
-| `--addr` | `OKF_WIKI_ADDR` | `0.0.0.0:8080` | Listen address (serve only) |
+| `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
 
 `--base` is both the URL prefix and the directory the pages are written into
@@ -54,3 +54,16 @@ closes it and the process exits.
 A `ReadHeaderTimeout` of ten seconds, a generous `WriteTimeout` and an
 `IdleTimeout` are set, so a stalled client cannot hold a connection open
 indefinitely.
+
+## Reach
+
+`--addr` defaults to `127.0.0.1:8080`, so a local `serve` is reachable only from
+the machine it runs on. The wiki has no authentication and `--repo` can mount a
+repository at `/repo/`, so binding every interface is a decision rather than a
+default. Set `--addr 0.0.0.0:8080` when you mean to publish it; the server says
+on startup when the bind is not loopback.
+
+The container sets `OKF_WIKI_ADDR=0.0.0.0:8080`, because a container that only
+listened on its own loopback would be unreachable from the host or from outside
+a pod network. That is the intended arrangement for the image, and it is why the
+default and the image differ.

@@ -182,3 +182,59 @@ func waitForHealth(t *testing.T, addr string) {
 	}
 	t.Fatal("the server did not become healthy")
 }
+
+// The default bind is loopback. A wiki has no authentication, so the default
+// must not put the bundle and any /repo/ mount on the network.
+func TestServeDefaultAddrIsLoopback(t *testing.T) {
+	if got := DefaultAddr; !loopback(got) {
+		t.Errorf("DefaultAddr = %q, want a loopback address", got)
+	}
+}
+
+func TestLoopbackDetection(t *testing.T) {
+	tests := []struct {
+		addr string
+		want bool
+	}{
+		{"127.0.0.1:8080", true},
+		{"127.0.0.5:8080", true},
+		{"localhost:8080", true},
+		{"[::1]:8080", true},
+		{"0.0.0.0:8080", false},
+		{"[::]:8080", false},
+		{"192.168.1.10:8080", false},
+		{"10.0.0.4:9000", false},
+		{"example.invalid:8080", false},
+		{"", true}, // nothing to claim
+		{"not an address", true},
+	}
+	for _, tc := range tests {
+		if got := loopback(tc.addr); got != tc.want {
+			t.Errorf("loopback(%q) = %v, want %v", tc.addr, got, tc.want)
+		}
+	}
+}
+
+// A non-loopback bind is a deliberate choice, so the startup banner states it
+// rather than leaving it to be discovered by someone else on the network.
+func TestAnnounceWarnsOnANonLoopbackBind(t *testing.T) {
+	opts := ServeOptions{OutDir: "/tmp/out", Base: "/wiki/"}
+
+	loop := announce(opts, "127.0.0.1:8080", "127.0.0.1:8080")
+	if !strings.Contains(loop, "http://127.0.0.1:8080/wiki/") {
+		t.Errorf("banner does not name the address it is serving: %q", loop)
+	}
+	if strings.Contains(loop, "not loopback") {
+		t.Errorf("loopback bind warned anyway: %q", loop)
+	}
+
+	for _, addr := range []string{"0.0.0.0:8080", "192.168.1.10:8080", "[::]:8080"} {
+		got := announce(opts, addr, "localhost:8080")
+		if !strings.Contains(got, "not loopback") {
+			t.Errorf("bind %s did not warn: %q", addr, got)
+		}
+		if !strings.Contains(got, "no authentication") {
+			t.Errorf("bind %s warning does not say the wiki is unauthenticated: %q", addr, got)
+		}
+	}
+}

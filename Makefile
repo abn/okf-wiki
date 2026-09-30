@@ -35,8 +35,13 @@ vendor: ## Build the offline mermaid+ELK bundle (needs node/npm)
 
 ##@ Development
 
-run: vendor ## Render $(CONTENT) and serve on 0.0.0.0:$(PORT), opening a browser
-	go run ./cmd/okf-wiki serve --content $(CONTENT) --out $(OUT) --addr 0.0.0.0:$(PORT) --open \
+# ADDR is loopback by default: the wiki has no authentication, so a local dev
+# server should not be reachable from the network unless that is asked for.
+# ADDR=0.0.0.0 make run publishes it to the LAN.
+ADDR   ?= 127.0.0.1:$(PORT)
+
+run: vendor ## Render $(CONTENT) and serve on $(ADDR), opening a browser
+	go run ./cmd/okf-wiki serve --content $(CONTENT) --out $(OUT) --addr $(ADDR) --open \
 	  $(BRANDING)
 
 render: ## Render $(CONTENT) into $(OUT)

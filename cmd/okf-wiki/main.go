@@ -64,7 +64,8 @@ flags (render):
   --out DIR        output directory (default: .scratch/wiki)
   --base PATH      URL prefix the wiki is served under (default "/wiki/")
   --repo DIR       repository root exposed read-only at /repo/ (optional)
-  --vendor DIR     directory holding the mermaid bundle (optional)
+  --vendor DIR     directory holding the mermaid bundle (required if the
+                   bundle has a diagram, or the render is not offline)
   --theme DIR      theme directory layered over the embedded default (optional)
   --brand STR      brand wordmark (default "okf-wiki")
   --brand-sub STR  brand subtitle (default "docs")
@@ -72,7 +73,7 @@ flags (render):
   --sections LIST  section order as id:Title pairs, comma-separated
 
 flags (serve adds):
-  --addr HOST:PORT listen address (default 0.0.0.0:8080)
+  --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)
   --open           open a browser (default false; off in containers)
 
 serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
@@ -98,7 +99,7 @@ func runRender(args []string) {
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	cfg := bindCommon(fs)
-	addr := fs.String("addr", env("OKF_WIKI_ADDR", "0.0.0.0:8080"), "listen address")
+	addr := fs.String("addr", env("OKF_WIKI_ADDR", wiki.DefaultAddr), "listen address")
 	open := fs.Bool("open", envBool("OKF_WIKI_OPEN", false), "open a browser")
 	fs.Parse(reorderArgs(args, fs))
 	applyPositional(fs, cfg)
