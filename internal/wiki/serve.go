@@ -6,9 +6,12 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -83,12 +86,50 @@ func Serve(opts ServeOptions) error {
 		}()
 	}
 
-	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	err = srv.Serve(ln)
-	if err != nil && err != http.ErrServerClosed {
-		return err
+	srv := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		// A dev server on loopback serves a handful of large assets, so these
+		// are generous. They exist so a stalled or slow client cannot hold a
+		// connection open indefinitely.
+		WriteTimeout: 5 * time.Minute,
+		IdleTimeout:  2 * time.Minute,
 	}
-	return nil
+
+	// Drain on a signal rather than dying where we stand. The container's stop
+	// path is SIGTERM, and on the default disposition the process is gone
+	// immediately, so a response part way through a body is truncated.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return serveUntil(ctx, srv, ln)
+}
+
+// serveUntil serves on ln until ctx is done, then drains. Draining rather than
+// closing is the point: Close drops in-flight connections, Shutdown waits for
+// them. It is separated from Serve so the shutdown path can be tested without a
+// process to signal.
+func serveUntil(ctx context.Context, srv *http.Server, ln net.Listener) error {
+	done := make(chan error, 1)
+	go func() { done <- srv.Serve(ln) }()
+
+	select {
+	case err := <-done:
+		if err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		fmt.Println("okf-wiki: shutting down")
+		if err := Shutdown(srv); err != nil {
+			// A shutdown that times out still has to be bounded, or a wedged
+			// connection holds the process open forever.
+			_ = srv.Close()
+			return fmt.Errorf("shutdown: %w", err)
+		}
+		// Serve always returns once Shutdown completes.
+		<-done
+		return nil
+	}
 }
 
 func init() {
@@ -140,8 +181,6 @@ func openBrowser(url string) error {
 }
 
 // Shutdown is a convenience wrapper for callers that manage the server handle.
-// Nothing in this repository calls it: Serve blocks on srv.Serve and the
-// process ends on a signal, so there is no in-flight drain.
 func Shutdown(srv *http.Server) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

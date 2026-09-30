@@ -72,8 +72,12 @@ flags (render):
   --sections LIST  section order as id:Title pairs, comma-separated
 
 flags (serve adds):
-  --addr HOST:PORT loopback/ingress address (default 0.0.0.0:8080)
+  --addr HOST:PORT listen address (default 0.0.0.0:8080)
   --open           open a browser (default false; off in containers)
+
+serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
+what a container stop sends. A request part way through a body is finished
+rather than cut.
 
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,

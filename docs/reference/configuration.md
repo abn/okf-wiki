@@ -42,3 +42,15 @@ rather than an edge case.
 - `/healthz`: liveness probe.
 - `/`: redirects to `--base`, unless `--base` is `/`, where it is the wiki
   itself.
+
+## Shutdown
+
+`serve` handles `SIGINT` and `SIGTERM` and drains before exiting, so a request
+in flight finishes rather than being cut mid-body. That is the container's stop
+path, and a truncated page body is worse than a slightly slower stop. The drain
+is bounded: if a connection does not close within three seconds the server
+closes it and the process exits.
+
+A `ReadHeaderTimeout` of ten seconds, a generous `WriteTimeout` and an
+`IdleTimeout` are set, so a stalled client cannot hold a connection open
+indefinitely.
