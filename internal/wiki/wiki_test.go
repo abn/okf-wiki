@@ -1780,3 +1780,221 @@ func TestTOCAsidePlacement(t *testing.T) {
 		}
 	}
 }
+
+// TestSourceFootnotes covers the sources family: a footnote whose label
+// matches a sources[].id becomes a numbered link to the generated section,
+// the section lists title, host, author and date, and an unmatched footnote
+// keeps goldmark's own rendering.
+func TestSourceFootnotes(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---",
+		"title: Home",
+		"sources:",
+		"  - id: spec",
+		"    resource: https://example.invalid/okf/spec",
+		"    title: The OKF specification",
+		"    author: team:docs",
+		"    last_modified: 2026-05-30T00:00:00Z",
+		"  - id: scope",
+		"    resource: all queries in project X",
+		"    title: A scope descriptor",
+		"  - id: uncited",
+		"    resource: https://example.invalid/never",
+		"    title: Declared but never cited",
+		"---",
+		"# Home",
+		"",
+		"A claim attributed to the spec.[^spec]",
+		"",
+		"Cited twice.[^spec] And a plain footnote.[^plain]",
+		"",
+		"[^spec]: The OKF specification",
+		"[^plain]: An ordinary footnote.",
+		"",
+	}, "\n"))
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(body)
+
+	// Matched citation becomes a numbered ref to the section, reused on repeat.
+	if !strings.Contains(html, `<a href="#sources" class="source-ref">[1]</a>`) {
+		t.Error("matched footnote did not become a source ref")
+	}
+	if strings.Count(html, `class="source-ref"`) != 2 {
+		t.Errorf("want 2 source refs, got %d", strings.Count(html, `class="source-ref"`))
+	}
+	// The section, its heading id, and the table of contents entry. The list
+	// starts at 1: goldmark's default start is 0.
+	if !strings.Contains(html, `<h2 id="sources">Sources`) {
+		t.Error("Sources section missing")
+	}
+	if strings.Contains(html, `<ol start="0">`) {
+		t.Error("Sources list is numbered from zero")
+	}
+	if !strings.Contains(html, `href="#sources"`) {
+		t.Error("table of contents does not list Sources")
+	}
+	// Entry: title linked to the resource, then host, author and date.
+	if !strings.Contains(html, `href="https://example.invalid/okf/spec"`) ||
+		!strings.Contains(html, "The OKF specification") {
+		t.Error("source entry does not link its title to the resource")
+	}
+	for _, want := range []string{"example.invalid", "team:docs", "30 May 2026"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("source entry missing %s", want)
+		}
+	}
+	// A scope descriptor has no href, so it renders as text.
+	if !strings.Contains(html, "A scope descriptor") {
+		t.Error("scope descriptor entry missing")
+	}
+	if strings.Contains(html, `href="all queries`) {
+		t.Error("scope descriptor should not be linked")
+	}
+	// Every declared entry is listed, not only the cited ones, so a reader
+	// sees the whole reference list the page declares.
+	if !strings.Contains(html, "Declared but never cited") {
+		t.Error("uncited source entry is missing from the list")
+	}
+	if strings.Contains(html, "Declared but never cited</a>") == false {
+		t.Error("uncited entry should still link its resource")
+	}
+	// The unmatched footnote keeps goldmark's rendering and its definition.
+	if !strings.Contains(html, `class="footnote-ref"`) || !strings.Contains(html, "An ordinary footnote.") {
+		t.Error("unmatched footnote should render as a footnote")
+	}
+	// The matched definition is gone, so no dangling footnote text.
+	if strings.Contains(html, "The OKF specification</a>:") {
+		t.Error("matched footnote definition still renders")
+	}
+}
+
+// TestSourceFootnotesAbsent covers pages without sources: no section, no
+// refs, and footnotes exactly as goldmark renders them.
+func TestSourceFootnotesAbsent(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home", "",
+		"A note.[^n]", "", "[^n]: The note body.", "",
+	}, "\n"))
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(body)
+	if strings.Contains(html, `id="sources"`) {
+		t.Error("page without sources grew a Sources section")
+	}
+	if strings.Contains(html, "source-ref") {
+		t.Error("page without sources grew a source ref")
+	}
+	if !strings.Contains(html, "The note body.") {
+		t.Error("ordinary footnote should still render")
+	}
+}
+
+// TestSourceSectionIDCollision covers a page that already uses the id
+// sources, so the generated section and its refs must move together.
+func TestSourceSectionIDCollision(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "sources:",
+		"  - id: s", "    resource: https://example.invalid/x",
+		"---",
+		"# Home", "",
+		"## Sources", "",
+		"An authored section with the same name.",
+		"",
+		"Cited.[^s]",
+		"",
+		"[^s]: The OKF specification",
+		"",
+	}, "\n"))
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(body)
+	if !strings.Contains(html, `<h2 id="sources-2">Sources`) {
+		t.Error("generated Sources section did not step past the authored id")
+	}
+	if !strings.Contains(html, `<a href="#sources-2" class="source-ref">[1]</a>`) {
+		t.Error("source ref does not point at the uniquified section")
+	}
+}
+
+// TestSourceMetaRendering covers the signals: host only for absolute URLs,
+// absent signals omitted rather than blank, an unparsable date shown raw.
+func TestSourceMetaRendering(t *testing.T) {
+	tests := []struct {
+		name string
+		src  Source
+		want []string
+		not  []string
+	}{
+		{
+			name: "absolute url with every signal",
+			src: Source{Resource: "https://wiki.example/p", Author: "team:a",
+				LastModified: "2026-04-02T00:00:00Z"},
+			want: []string{"wiki.example", "team:a", "2 Apr 2026"},
+		},
+		{
+			name: "bundle path has no host",
+			src:  Source{Resource: "../reference/themes.md", Title: "Themes"},
+			not:  []string{"·"},
+		},
+		{
+			name: "unparsable date shown raw",
+			src:  Source{Resource: "https://e.invalid", LastModified: "sometime last year"},
+			want: []string{"e.invalid", "sometime last year"},
+		},
+		{
+			name: "scope descriptor has no host",
+			src:  Source{Resource: "all queries in project X", Title: "Scope"},
+			not:  []string{"·"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sourceMeta(&tc.src)
+			joined := strings.Join(got, " · ")
+			for _, w := range tc.want {
+				if !strings.Contains(joined, w) {
+					t.Errorf("meta %q missing %q", joined, w)
+				}
+			}
+			for _, n := range tc.not {
+				if strings.Contains(joined, n) {
+					t.Errorf("meta %q should carry no separators, got %q", joined, n)
+				}
+			}
+		})
+	}
+}

@@ -431,6 +431,17 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .prose h2:hover .heading-anchor, .prose h2 .heading-anchor:focus-visible { opacity: 1; }
 .prose h2 .heading-anchor:hover { color: var(--color-accent-text); }
 
+/* A citation that resolves to a sources entry reads as a superscript
+   reference number, so it sits in the line without breaking it. */
+.prose .source-ref {
+  font-size: 0.75em; vertical-align: super; text-decoration: none;
+  padding: 0 0.1em;
+}
+/* The Sources list is a reference list, not prose: the signals after each
+   entry are quieter than the title. */
+.prose h2 + ol { padding-left: 1.4em; }
+.prose h2 + ol li { margin-bottom: 0.5em; }
+
 /* --------------------------------------------- table of contents, relocated
    The same list serves the sidebar column on wide screens and the dropdown
    panel below it. Both link to the same anchors, so rendering it twice

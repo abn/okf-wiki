@@ -44,6 +44,7 @@ type Page struct {
 	Status       string
 	Tags         []string
 	StaleAfter   string
+	Sources      []Source
 	GeneratedAt  string
 	Body         string // rendered HTML, H1 still present; RenderPage strips it
 	TOC          []TOCEntry
@@ -342,6 +343,7 @@ type frontmatter struct {
 	Status      string   `yaml:"status"`
 	Tags        []string `yaml:"tags"`
 	StaleAfter  string   `yaml:"stale_after"`
+	Sources     []Source `yaml:"sources"`
 	Generated   struct {
 		By string `yaml:"by"`
 		At string `yaml:"at"`
@@ -363,6 +365,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		Status:      fm.Status,
 		Tags:        fm.Tags,
 		StaleAfter:  fm.StaleAfter,
+		Sources:     fm.Sources,
 		GeneratedAt: fm.Generated.At,
 		Title:       fm.Title,
 	}
@@ -411,6 +414,9 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	if p.Title == "" {
 		p.Title = slug
 	}
+	// Sources rewrite footnotes and append a section, so they run after the
+	// heading walk that assigned ids and before anything reads the tree.
+	r.applySources(doc, &p, usedIDs)
 	p.searchChunks = extractSearchChunks(doc, src)
 
 	var buf bytes.Buffer
