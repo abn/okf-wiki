@@ -40,10 +40,11 @@ type shellData struct {
 // whole shell.
 func (d shellData) Slot(name string) template.HTML { return d.Slots[name] }
 
-// RenderPage wraps a page body in the themed site shell. A template that fails
-// at execute time yields a page containing the error rather than a render
-// failure, so a broken theme ships error pages and a zero exit code.
-func (r *Renderer) RenderPage(p Page) string {
+// RenderPage wraps a page body in the themed site shell. A template that parses
+// but then fails against the data, on a field that does not exist or a method
+// that panics, is a configuration error like a template that does not parse, so
+// it fails the render rather than shipping a page whose body is the error text.
+func (r *Renderer) RenderPage(p Page) (string, error) {
 	title := p.Title
 	if title == "" {
 		title = p.Slug
@@ -80,9 +81,9 @@ func (r *Renderer) RenderPage(p Page) string {
 
 	var b strings.Builder
 	if err := r.theme.Template().Execute(&b, data); err != nil {
-		return fmt.Sprintf("<!DOCTYPE html><html><body><pre>render error: %v</pre></body></html>", err)
+		return "", fmt.Errorf("render %s: theme %s: %w", p.Slug, r.theme.Source, err)
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 func (r *Renderer) slots() map[string]template.HTML {

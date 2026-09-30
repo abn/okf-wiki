@@ -74,6 +74,13 @@ shipping a broken page. So is a `replace` naming a file that is not in the
 directory, a `mode` that is not one of the three above, and a template that does
 not parse.
 
+A template that parses but then fails against the page data is the same class of
+error and fails the render too. Referring to a field that does not exist, or to a
+method that panics on what it is given, is a mistake in the template rather than
+in the content, and the error names the page and the theme so it can be found.
+Parsing alone is not enough to prove a template works: a template is only fully
+exercised when a page is rendered through it, which is what the render does.
+
 ## The asset contract
 
 These are the keys the default theme publishes, and the ones worth replacing:

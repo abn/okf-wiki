@@ -135,7 +135,13 @@ func (r *Renderer) RenderAll(out string) error {
 			if err := os.MkdirAll(dst, 0o755); err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(site, rel), []byte(r.RenderPage(p)), 0o644); err != nil {
+			// Render before writing, so a theme that fails against the data
+			// leaves no half-written page behind.
+			body, err := r.RenderPage(p)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(site, rel), []byte(body), 0o644); err != nil {
 				return err
 			}
 		}

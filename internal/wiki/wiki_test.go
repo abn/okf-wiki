@@ -222,7 +222,10 @@ func TestThemeTemplateAndSlots(t *testing.T) {
 	}
 	// Rendering must go through the theme's template, not a compiled-in one.
 	r := &Renderer{cfg: Config{Brand: Brand{Name: "x"}}, theme: th, assetVersion: th.AssetVersion()}
-	out := r.RenderPage(Page{Slug: "index", Title: "Hello"})
+	out, err := r.RenderPage(Page{Slug: "index", Title: "Hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{"Hello", "SENTINEL", "/wiki/"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered page missing %q:\n%s", want, out)
@@ -688,7 +691,10 @@ func TestHeadingIDsAreUnique(t *testing.T) {
 			page = p
 		}
 	}
-	html := r.RenderPage(page)
+	html, err := r.RenderPage(page)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ids := regexp.MustCompile(`<h[1-6] id="([^"]*)"`).FindAllStringSubmatch(html, -1)
 	// Seven headings slugify to setup-ish bases and two to nothing, so the H1
@@ -1040,5 +1046,62 @@ func TestNonASCIISectionNameRenders(t *testing.T) {
 	}
 	if !strings.Contains(html, `href="/wiki/über/index.html"`) {
 		t.Errorf("the link to the section did not keep the character: %s", html)
+	}
+}
+
+// A theme that parses but fails against the data used to write a page whose
+// body was the error text, and the render still reported success. A broken
+// theme shipped a site of error pages, and the Pages workflow published it.
+func TestThemeExecuteFailureFailsTheRender(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+
+	// Parses cleanly, but Nope is not a field of shellData.
+	dir2 := writeTheme(t,
+		`{"name":"broken","version":"1","template":"t.html"}`,
+		map[string]string{"t.html": "<html><body>{{ .Nope.Missing }}</body></html>"})
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}, ThemeDir: dir2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	err = r.RenderAll(out)
+	if err == nil {
+		t.Fatal("RenderAll succeeded with a theme that cannot execute")
+	}
+	if !strings.Contains(err.Error(), "Nope") {
+		t.Errorf("error does not name the offending field: %v", err)
+	}
+	// The page must not exist: a failed render leaves no page to be served.
+	page := filepath.Join(out, "wiki", "index.html")
+	if _, statErr := os.Stat(page); statErr == nil {
+		body, _ := os.ReadFile(page)
+		if strings.Contains(string(body), "render error") {
+			t.Error("the error was written into the page instead of returned")
+		}
+	}
+}
+
+// The error names the page and the theme, so a failure in a large bundle points
+// at the thing to fix.
+func TestRenderPageErrorNamesPageAndTheme(t *testing.T) {
+	over := writeTheme(t,
+		`{"name":"bad","version":"1","template":"t.html"}`,
+		map[string]string{"t.html": "{{ .Nope.Missing }}"})
+	th, err := ResolveTheme(over)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Renderer{cfg: Config{Brand: Brand{Name: "x"}}, theme: th, assetVersion: th.AssetVersion()}
+
+	_, err = r.RenderPage(Page{Slug: "guide/setup", Title: "Hello"})
+	if err == nil {
+		t.Fatal("RenderPage succeeded with a template that cannot execute")
+	}
+	for _, want := range []string{"guide/setup", th.Source, "Nope"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
 	}
 }
