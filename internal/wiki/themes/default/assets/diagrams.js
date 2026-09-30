@@ -244,12 +244,18 @@
           decorate(el);
         } catch (err2) {
           console.warn('Mermaid rendering failed:', err2 && err2.message ? err2.message : err2);
+          // A failed run empties the element, so put the source back: the
+          // fallback shows the text rather than a blank block.
+          el.textContent = el.__mmdSource;
+          el.removeAttribute('data-processed');
           el.classList.add('mermaid-fallback');
         }
       }
     } else {
       failed.forEach(function (f) {
         console.warn('Mermaid rendering failed:', f.err && f.err.message ? f.err.message : f.err);
+        f.el.textContent = f.el.__mmdSource;
+        f.el.removeAttribute('data-processed');
         f.el.classList.add('mermaid-fallback');
       });
     }
