@@ -1,10 +1,3 @@
----
-type: Guide
-title: Contribution
-description: How to work on okf-wiki, and the rules that keep the wiki public-ready.
-tags: [contribution]
----
-
 # Contribution
 
 ## Working agreement

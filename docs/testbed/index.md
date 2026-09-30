@@ -1,10 +1,3 @@
----
-type: Index
-title: Test bed
-description: Every construct the renderer supports, on one set of pages, so a theme author or contributor can see the whole surface at once.
-tags: [testbed]
----
-
 # Test bed
 
 These pages exercise every construct the renderer supports. They exist for two

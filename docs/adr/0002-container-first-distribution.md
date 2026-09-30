@@ -3,7 +3,7 @@ type: Decision
 title: The action ships a container reference, not a binary
 description: Why the GitHub Action renders through the published image instead of downloading a release binary.
 tags: [adr, decision, distribution]
-status: accepted
+status: stable
 ---
 
 # 0002 The action ships a container reference, not a binary

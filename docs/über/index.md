@@ -1,10 +1,3 @@
----
-type: Guide
-title: Über
-description: A section whose directory name starts outside ASCII, which is how the test bed proves section titles survive a non-ASCII name.
-tags: [testbed, unicode]
----
-
 # Über
 
 This section's directory is `docs/über`. The name begins with a multi-byte

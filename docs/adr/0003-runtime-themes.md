@@ -3,7 +3,7 @@ type: Decision
 title: Themes are runtime directories, not a compiled-in skin
 description: Why okf-wiki resolves a theme from a directory at render time instead of embedding the brand in the binary.
 tags: [adr, decision, theme]
-status: accepted
+status: stable
 ---
 
 # 0003 Themes are runtime directories

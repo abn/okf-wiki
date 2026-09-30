@@ -3,7 +3,7 @@ type: Decision
 title: A standalone Go renderer, not the TypeScript package
 description: Why okf-wiki is a self-contained Go binary rather than a reuse of the abn.is wiki-render package.
 tags: [adr, decision]
-status: accepted
+status: stable
 ---
 
 # 0001 Standalone Go renderer

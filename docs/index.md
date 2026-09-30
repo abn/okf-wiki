@@ -1,9 +1,5 @@
 ---
 okf_version: "0.2"
-type: Index
-title: okf-wiki
-description: Render and serve an Open Knowledge Format v0.2 bundle as a branded, searchable static wiki, directly or as a container.
-tags: [index, okf-wiki]
 ---
 
 # okf-wiki
