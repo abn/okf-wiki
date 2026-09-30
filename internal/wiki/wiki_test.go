@@ -1602,3 +1602,177 @@ func TestBundledDocsTags(t *testing.T) {
 		t.Error("tag testbed missing from our own catalogue")
 	}
 }
+
+// TestPageNeighbors covers the previous/next cards: middle pages link both
+// ways, ends link one way, a lone page links nowhere, and an unknown slug
+// links nowhere rather than somewhere wrong.
+func TestPageNeighbors(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "guide", "a.md"), "---\ntitle: Aye\n---\n# Aye\n")
+	mustWrite(t, filepath.Join(dir, "guide", "b.md"), "---\ntitle: Bee\n---\n# Bee\n")
+	mustWrite(t, filepath.Join(dir, "guide", "c.md"), "---\ntitle: Cee\n---\n# Cee\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prev, next := r.pageNeighbors("guide", "guide/b")
+	if prev == nil || prev.Title != "Aye" || prev.URL != "/wiki/guide/a.html" {
+		t.Errorf("prev of guide/b = %+v, want Aye at /wiki/guide/a.html", prev)
+	}
+	if next == nil || next.Title != "Cee" || next.URL != "/wiki/guide/c.html" {
+		t.Errorf("next of guide/b = %+v, want Cee at /wiki/guide/c.html", next)
+	}
+
+	prev, next = r.pageNeighbors("guide", "guide/a")
+	if prev != nil {
+		t.Errorf("first page should have no prev, got %+v", prev)
+	}
+	if next == nil || next.Title != "Bee" {
+		t.Errorf("first page should link next Bee, got %+v", next)
+	}
+
+	prev, next = r.pageNeighbors("guide", "guide/c")
+	if next != nil {
+		t.Errorf("last page should have no next, got %+v", next)
+	}
+
+	prev, next = r.pageNeighbors("", "index")
+	if prev != nil || next != nil {
+		t.Errorf("lone top-level page should link nowhere, got %+v / %+v", prev, next)
+	}
+
+	prev, next = r.pageNeighbors("guide", "guide/missing")
+	if prev != nil || next != nil {
+		t.Errorf("unknown slug should link nowhere, got %+v / %+v", prev, next)
+	}
+}
+
+// TestPrevNextHTML covers the card markup: both cards in order, a lone next
+// holding the right column, and nothing at all for a lone page.
+func TestPrevNextHTML(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "guide", "a.md"), "---\ntitle: Aye\n---\n# Aye\n")
+	mustWrite(t, filepath.Join(dir, "guide", "b.md"), "---\ntitle: Bee\n---\n# Bee\n")
+	mustWrite(t, filepath.Join(dir, "guide", "c.md"), "---\ntitle: Cee\n---\n# Cee\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var mid Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			if p.Slug == "guide/b" {
+				mid = p
+			}
+		}
+	}
+	html := r.prevNextHTML(mid)
+	for _, want := range []string{
+		`<nav class="prevnext"`,
+		`class="prevnext-card prevnext-prev" href="/wiki/guide/a.html"`,
+		`class="prevnext-card prevnext-next" href="/wiki/guide/c.html"`,
+		`<span class="prevnext-dir">Previous</span>`,
+		`<span class="prevnext-title">Aye</span>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("prevnext markup does not contain %s", want)
+		}
+	}
+	if strings.Index(html, "prevnext-prev") > strings.Index(html, "prevnext-next") {
+		t.Error("previous card must come before the next card")
+	}
+
+	// A lone next keeps the right column; the grid rule places it there.
+	var first Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			if p.Slug == "guide/a" {
+				first = p
+			}
+		}
+	}
+	single := r.prevNextHTML(first)
+	if !strings.Contains(single, "prevnext-next") || strings.Contains(single, "prevnext-prev") {
+		t.Errorf("first page should render only a next card: %s", single)
+	}
+}
+
+// TestPrevNextAbsentAlone covers a section of one: no neighbors, no nav.
+func TestPrevNextAbsentAlone(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var home Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			home = p
+		}
+	}
+	if got := r.prevNextHTML(home); got != "" {
+		t.Errorf("lone page should render no nav, got %s", got)
+	}
+}
+
+// TestTOCAsidePlacement covers the relocated table of contents: the sidebar
+// column and the dropdown panel carry the list, the body carries no
+// collapsible box, and pages without headings carry none of it.
+func TestTOCAsidePlacement(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home", "## Second", "### Third", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "flat.md"), "---\ntitle: Flat\n---\n# Flat\n\nNo headings here.\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(home)
+	for _, want := range []string{
+		`<aside class="toc-aside"`,
+		`<ul class="toc-list">`,
+		`id="tocBtn"`,
+		`id="tocPanel" hidden`,
+		`href="#second"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("rendered page does not contain %s", want)
+		}
+	}
+	if strings.Contains(html, `<details class="toc"`) {
+		t.Error("rendered page still carries the in-body collapsible box")
+	}
+
+	flat, err := os.ReadFile(filepath.Join(out, "wiki", "flat.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Element markup, not hook names: the template's inline script mentions
+	// the ids on every page regardless.
+	for _, want := range []string{
+		`<aside class="toc-aside"`,
+		`id="tocBtn"`,
+		`id="tocPanel"`,
+		`<ul class="toc-list">`,
+	} {
+		if strings.Contains(string(flat), want) {
+			t.Errorf("headingless page should carry no TOC markup, found %s", want)
+		}
+	}
+}

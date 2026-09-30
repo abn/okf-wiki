@@ -35,8 +35,15 @@ type shellData struct {
 	Nav        template.HTML
 	Meta       template.HTML
 	TOC        template.HTML
-	Body       template.HTML
-	QuickJSON  template.JS
+	// TOCList is the same entries as TOC as a bare list, for the sidebar
+	// column and the dropdown panel. TOC keeps the details element for
+	// themes that place it in the body.
+	TOCList template.HTML
+	// PrevNext is the previous/next cards for the section, empty when the
+	// page stands alone in it.
+	PrevNext  template.HTML
+	Body      template.HTML
+	QuickJSON template.JS
 	// Slots holds the theme's named fragments, reachable as {{.Slot "name"}}.
 	Slots map[string]template.HTML
 }
@@ -82,6 +89,8 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Nav:          template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		Meta:         template.HTML(r.buildMeta(p)),
 		TOC:          template.HTML(buildTOC(p)),
+		TOCList:      template.HTML(buildTOCList(p)),
+		PrevNext:     template.HTML(r.prevNextHTML(p)),
 		Body:         template.HTML(stripLeadingH1(p.Body, title)),
 		QuickJSON:    template.JS(r.quickLinksJSON()),
 		Slots:        r.slots(),
@@ -150,11 +159,22 @@ func (r *Renderer) quickLinksJSON() string {
 }
 
 func buildTOC(p Page) string {
+	list := buildTOCList(p)
+	if list == "" {
+		return ""
+	}
+	return `<details class="toc" aria-label="On this page"><summary>On this page</summary>` + list + `</details>`
+}
+
+// buildTOCList renders the heading entries as a bare list, shared by the
+// sidebar column and the dropdown panel. Both link to the same anchors, so
+// rendering it twice introduces no duplicate ids.
+func buildTOCList(p Page) string {
 	if len(p.TOC) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(`<details class="toc" aria-label="On this page"><summary>On this page</summary><ul>`)
+	b.WriteString(`<ul class="toc-list">`)
 	for _, e := range p.TOC {
 		cls := ""
 		if e.Level == 3 {
@@ -162,7 +182,66 @@ func buildTOC(p Page) string {
 		}
 		fmt.Fprintf(&b, `<li%s><a href="#%s">%s</a></li>`, cls, e.ID, template.HTMLEscapeString(e.Text))
 	}
-	b.WriteString(`</ul></details>`)
+	b.WriteString(`</ul>`)
+	return b.String()
+}
+
+// PageLink is one neighbor in the previous/next cards: a title and the URL
+// it points at.
+type PageLink struct {
+	Title string
+	URL   string
+}
+
+// pageNeighbors finds the pages around slug in its section, in sidebar order.
+// Either side is nil at the ends, and both are nil when the page stands
+// alone or is not found.
+func (r *Renderer) pageNeighbors(section, slug string) (prev, next *PageLink) {
+	link := func(p Page) *PageLink {
+		title := p.Title
+		if title == "" {
+			title = p.Slug
+		}
+		return &PageLink{Title: title, URL: r.cfg.base() + p.Slug + ".html"}
+	}
+	for _, s := range r.sections {
+		if s.ID != section {
+			continue
+		}
+		for i, p := range s.Pages {
+			if p.Slug != slug {
+				continue
+			}
+			if i > 0 {
+				prev = link(s.Pages[i-1])
+			}
+			if i+1 < len(s.Pages) {
+				next = link(s.Pages[i+1])
+			}
+			return prev, next
+		}
+	}
+	return nil, nil
+}
+
+// prevNextHTML renders the previous/next cards for a page. Empty when the
+// page has no neighbor on either side.
+func (r *Renderer) prevNextHTML(p Page) string {
+	prev, next := r.pageNeighbors(p.Section, p.Slug)
+	if prev == nil && next == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(`<nav class="prevnext" aria-label="More in this section">`)
+	if prev != nil {
+		fmt.Fprintf(&b, `<a class="prevnext-card prevnext-prev" href="%s"><span class="prevnext-dir">Previous</span><span class="prevnext-title">%s</span></a>`,
+			prev.URL, template.HTMLEscapeString(prev.Title))
+	}
+	if next != nil {
+		fmt.Fprintf(&b, `<a class="prevnext-card prevnext-next" href="%s"><span class="prevnext-dir">Next</span><span class="prevnext-title">%s</span></a>`,
+			next.URL, template.HTMLEscapeString(next.Title))
+	}
+	b.WriteString(`</nav>`)
 	return b.String()
 }
 

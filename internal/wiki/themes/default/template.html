@@ -49,6 +49,8 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
     </button>
     <nav class="breadcrumb" aria-label="Breadcrumb">{{.Breadcrumb}}</nav>
+    {{if .TOCList}}<button class="toc-btn" id="tocBtn" aria-expanded="false" aria-controls="tocPanel">On this page<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="toc-panel" id="tocPanel" hidden>{{.TOCList}}</div>{{end}}
   </div>
 </div>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
@@ -60,10 +62,11 @@
       <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
       {{if .Description}}<p class="page-lead">{{.Description}}</p>{{end}}
       {{.Meta}}
-      {{.TOC}}
       {{.Body}}
     </article>
+    {{.PrevNext}}
   </main>
+  {{if .TOCList}}<aside class="toc-aside" aria-label="On this page"><p class="toc-aside-title">On this page</p>{{.TOCList}}</aside>{{end}}
 </div>
 <script>
   // Slide-out navigation drawer
@@ -98,6 +101,95 @@
       }
     });
   });
+
+  // Table-of-contents dropdown and scroll-spy. Below the wide breakpoint the
+  // sidebar column is gone, so the button in the breadcrumb bar opens the
+  // same list as a panel, and the section in view highlights in both.
+  (function () {
+    var btn = document.getElementById('tocBtn');
+    var panel = document.getElementById('tocPanel');
+    if (btn && panel) {
+      function closeToc() {
+        panel.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+      }
+      btn.addEventListener('click', function () {
+        var open = panel.hidden;
+        panel.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+      });
+      panel.addEventListener('click', function (e) {
+        if (e.target.closest('a')) closeToc();
+      });
+      document.addEventListener('click', function (e) {
+        if (!panel.hidden && !e.target.closest('#tocPanel,#tocBtn')) closeToc();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeToc();
+      });
+    }
+    var links = Array.prototype.slice.call(
+      document.querySelectorAll('.toc-aside a[href^="#"], #tocPanel a[href^="#"]'));
+    if (links.length && 'IntersectionObserver' in window) {
+      var byId = {};
+      links.forEach(function (a) {
+        var id = a.getAttribute('href').slice(1);
+        (byId[id] = byId[id] || []).push(a);
+      });
+      var current = null;
+      function mark(list, on) {
+        list.forEach(function (a) { a.classList.toggle('active', on); });
+      }
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          if (current) mark(current, false);
+          current = byId[en.target.id] || null;
+          if (current) mark(current, true);
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+      document.querySelectorAll('article h2[id], article h3[id]').forEach(function (h) {
+        obs.observe(h);
+      });
+    }
+  })();
+
+  // Narrow breadcrumb: keep the ellipsis and the last two segments, drop the
+  // rest until the viewport widens again. Nodes move rather than rebuild, so
+  // no listener is lost in either direction.
+  (function () {
+    var crumbs = document.querySelector('.breadcrumb');
+    if (!crumbs) return;
+    var mq = window.matchMedia('(max-width: 860px)');
+    var ell = null;
+    function fit() {
+      if (!mq.matches) {
+        if (ell && ell.parentNode === crumbs) {
+          Array.prototype.slice.call(crumbs.children).forEach(function (k) {
+            k.removeAttribute('hidden');
+          });
+          ell.remove();
+        }
+        return;
+      }
+      // Already collapsed: the ellipsis is the first child, and recounting
+      // would hide it along with the leading segments.
+      if (ell && ell.parentNode === crumbs) return;
+      var kids = Array.prototype.slice.call(crumbs.children);
+      if (kids.length <= 4) return;
+      if (!ell) {
+        ell = document.createElement('span');
+        ell.className = 'crumb-ellipsis';
+        ell.setAttribute('aria-hidden', 'true');
+        ell.textContent = '…';
+      }
+      kids.slice(0, -4).forEach(function (k) { k.setAttribute('hidden', true); });
+      crumbs.insertBefore(ell, crumbs.firstChild);
+    }
+    if (mq.addEventListener) mq.addEventListener('change', fit);
+    else if (mq.addListener) mq.addListener(fit);
+    fit();
+  })();
 
   // Theme toggle
   (function () {
