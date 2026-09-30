@@ -153,8 +153,13 @@ func (r *Renderer) RenderAll(out string) error {
 	if err := copyBundleAssets(r.cfg.Content, site); err != nil {
 		return err
 	}
-	if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor")); err != nil {
-		return err
+	// Only a bundle that actually has a diagram needs the runtime. A missing
+	// vendor directory is an error in that case, since the browser would
+	// otherwise fetch mermaid from a public CDN and the render is not offline.
+	if r.hasMermaid() {
+		if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor")); err != nil {
+			return err
+		}
 	}
 
 	index, err := r.SearchIndexJSON()
@@ -511,6 +516,20 @@ func slugify(s string) string {
 	return strings.Trim(res, "-")
 }
 
+// hasMermaid reports whether any page has a diagram in it. The renderer writes
+// a mermaid fence through unchanged, as a pre.mermaid block, so the rendered
+// body is what to look at.
+func (r *Renderer) hasMermaid() bool {
+	for _, s := range r.sections {
+		for _, p := range s.Pages {
+			if strings.Contains(p.Body, `<pre class="mermaid">`) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // markdownFiles lists the Markdown files under root, at any depth, as paths
 // relative to root. Dotfiles and dot-directories are skipped, for the same
 // reason copyBundleAssets skips them.
@@ -581,13 +600,23 @@ func copyBundleAssets(root, dest string) error {
 }
 
 // copyVendor copies the mermaid bundle directory into the output, if present.
+// It reports a missing directory rather than returning quietly, because the
+// runtime falls back to a public CDN in that case and a silent return made an
+// offline render look fine while it was not. A bundle with no diagram does not
+// need the runtime, so the caller only asks for it when there is one.
 func copyVendor(dir, dest string) error {
 	if dir == "" {
 		return nil
 	}
 	info, err := os.Stat(dir)
-	if err != nil || !info.IsDir() {
-		return nil
+	if err != nil {
+		return fmt.Errorf("vendor dir %s: no diagram runtime to copy, so the "+
+			"browser would fall back to a public CDN and this render is not "+
+			"offline: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("vendor dir %s: not a directory, so no diagram runtime "+
+			"is copied and this render is not offline", dir)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

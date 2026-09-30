@@ -43,8 +43,9 @@ flowchart LR
    to `search-index.json`, which the client search modal loads on first use.
 5. **Emit.** Pages are written under the base path, followed by the bundle's own
    non-Markdown files, the resolved theme's assets (stylesheet, fonts, tokens,
-   the search and diagram clients, favicon), the optional Mermaid vendor bundle,
-   and a `theme.json` recording which theme produced the output.
+   the search and diagram clients, favicon), the Mermaid vendor bundle when the
+   bundle has a diagram, and a `theme.json` recording which theme produced the
+   output.
 
 ## Themes
 

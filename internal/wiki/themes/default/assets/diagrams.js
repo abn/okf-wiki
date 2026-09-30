@@ -21,8 +21,11 @@
   var BASE = window.__WIKI_BASE || '/wiki/';
   // Offline bundle (mermaid + ELK, vendored into the image at build time).
   var LOCAL_BUNDLE = BASE + 'vendor/mermaid-bundle.min.mjs';
-  var CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  var ELK_CDN = 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk/dist/mermaid-layout-elk.esm.min.mjs';
+  // Exact versions, not major ranges: this is a fallback for a build where the
+  // vendor step was skipped, and a moving tag would mean the diagram a page
+  // shows can change without the page changing. Pinned in mermaid/package.json.
+  var CDN = 'https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.esm.min.mjs';
+  var ELK_CDN = 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@1.0.0/dist/mermaid-layout-elk.esm.min.mjs';
 
   function isDark() {
     var t = document.documentElement.getAttribute('data-theme');

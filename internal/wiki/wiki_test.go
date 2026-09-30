@@ -1105,3 +1105,147 @@ func TestRenderPageErrorNamesPageAndTheme(t *testing.T) {
 		}
 	}
 }
+
+// The CDN fallback is only reached when the vendor bundle is missing, which is
+// exactly when a build was skipped and the reader is the one paying for it. Its
+// versions have to be the ones the vendored bundle is built from, or the same
+// page can draw a diagram one way offline and another way online.
+func TestDiagramCDNFallbackMatchesTheVendoredVersions(t *testing.T) {
+	root := docsRoot(t)
+	pkg, err := os.ReadFile(filepath.Join(root, "mermaid", "package.json"))
+	if err != nil {
+		t.Skipf("no vendored bundle in this checkout: %v", err)
+	}
+	var m struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(pkg, &m); err != nil {
+		t.Fatal(err)
+	}
+	js, err := os.ReadFile(filepath.Join(root, "internal", "wiki", "themes", "default",
+		"assets", "diagrams.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := string(js)
+
+	for _, dep := range []string{"mermaid", "@mermaid-js/layout-elk"} {
+		version, ok := m.DevDependencies[dep]
+		if !ok {
+			t.Errorf("%s is not pinned in package.json", dep)
+			continue
+		}
+		if !strings.Contains(client, "@"+version+"/") {
+			t.Errorf("diagrams.js does not reference %s@%s; the CDN fallback and the "+
+				"vendored bundle have drifted apart", dep, version)
+		}
+	}
+	// A major range is exactly what this guards against.
+	if strings.Contains(client, "mermaid@11/") || strings.Contains(client, "layout-elk/dist") {
+		t.Error("diagrams.js still uses a moving version range")
+	}
+}
+
+func docsRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+// A bundle with a diagram and no vendor directory produced a site that looked
+// fine and was not offline: the runtime fell back to a public CDN, so the
+// reader's browser reached the internet. The failure was silent, because a
+// missing vendor directory was not an error.
+func TestMissingVendorRuntimeIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\n```mermaid\nflowchart LR\n  A --> B\n```\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"},
+		VendorDir: filepath.Join(t.TempDir(), "absent")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.RenderAll(t.TempDir())
+	if err == nil {
+		t.Fatal("RenderAll succeeded with a diagram and no vendor runtime")
+	}
+	msg := err.Error()
+	for _, want := range []string{"vendor", "CDN", "offline"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error does not mention %q: %v", want, err)
+		}
+	}
+}
+
+// A bundle with no diagram needs no runtime, so a missing vendor directory is
+// not its problem and must not fail the render.
+func TestMissingVendorRuntimeIsFineWithoutDiagrams(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n\nNo diagram here.\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"},
+		VendorDir: filepath.Join(t.TempDir(), "absent")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatalf("a bundle with no diagram should not need the vendor runtime: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "wiki", "index.html")); err != nil {
+		t.Errorf("the page was not written: %v", err)
+	}
+}
+
+// A vendor path that is a file rather than a directory is the same mistake, and
+// has to be reported the same way.
+func TestVendorPathThatIsAFileIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\n```mermaid\nflowchart LR\n  A --> B\n```\n")
+	vendor := filepath.Join(t.TempDir(), "notadir")
+	mustWrite(t, vendor, "oops")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}, VendorDir: vendor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(t.TempDir()); err == nil {
+		t.Fatal("RenderAll succeeded with a vendor path that is a file")
+	}
+}
+
+// Our own bundle has diagrams, so its render must carry the runtime. This is the
+// check CI would otherwise only notice by reading a screenshot.
+func TestBundledDocsRenderCarriesTheVendorRuntime(t *testing.T) {
+	if !hasMermaidBundle(t) {
+		t.Skip("no vendored bundle built in this checkout")
+	}
+	r, err := New(Config{Content: docsDir(t), Base: "/wiki/", Brand: Brand{Name: "okf-wiki"},
+		VendorDir: filepath.Join(docsRoot(t), "mermaid")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	bundle := filepath.Join(out, "wiki", "vendor", "mermaid-bundle.min.mjs")
+	st, err := os.Stat(bundle)
+	if err != nil {
+		t.Fatalf("the diagram runtime was not copied: %v", err)
+	}
+	if st.Size() == 0 {
+		t.Error("the copied diagram runtime is empty")
+	}
+}
+
+func hasMermaidBundle(t *testing.T) bool {
+	t.Helper()
+	st, err := os.Stat(filepath.Join(docsRoot(t), "mermaid", "mermaid-bundle.min.mjs"))
+	return err == nil && st.Size() > 0
+}

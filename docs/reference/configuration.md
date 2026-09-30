@@ -15,7 +15,7 @@ Resolution order is flag, then environment variable, then default.
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--repo` | `OKF_WIKI_REPO` | empty | Repository root served at `/repo/` |
-| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid bundle |
+| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid bundle. Required when the bundle has a diagram |
 | `--theme` | `OKF_WIKI_THEME` | empty | Theme directory layered over the embedded default |
 | `--brand` | `OKF_WIKI_BRAND` | `okf-wiki` | Wordmark |
 | `--brand-sub` | `OKF_WIKI_BRAND_SUB` | `docs` | Subtitle label |
