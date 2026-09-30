@@ -5,6 +5,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-09-30
 
+* **Update**: Tag chips on every page now link to a tag page listing all pages
+  carrying the tag, and `#tag` in the search modal searches tags rather than
+  page text.
 * **Creation**: Added a `testbed/` section that exercises the whole rendering
   surface on viewable pages: [callouts](testbed/callouts.md) at all five
   levels, [blocks](testbed/blocks.md) with tables, task lists and footnotes,

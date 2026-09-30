@@ -32,13 +32,18 @@ type Section struct {
 
 // Page is one rendered document.
 type Page struct {
-	Section      string
-	Slug         string // relative path without extension, e.g. hosts/example
-	Title        string
+	Section string
+	Slug    string // relative path without extension, e.g. hosts/example
+	Title   string
+	Kicker  string
+	// TitleHTML is trusted H1 markup, set only by synthetic pages the
+	// renderer builds itself. Frontmatter titles stay plain strings.
+	TitleHTML    string
 	Type         string
 	Description  string
 	Status       string
 	Tags         []string
+	StaleAfter   string
 	GeneratedAt  string
 	Body         string // rendered HTML, H1 still present; RenderPage strips it
 	TOC          []TOCEntry
@@ -123,12 +128,14 @@ func (r *Renderer) RenderAll(out string) error {
 	if err := os.MkdirAll(site, 0o755); err != nil {
 		return err
 	}
+	occupied := map[string]bool{}
 	for _, s := range r.sections {
 		for _, p := range s.Pages {
 			rel := p.Slug + ".html"
 			if p.Slug == s.ID {
 				rel = s.ID + "/index.html"
 			}
+			occupied[rel] = true
 			dst := filepath.Join(site, filepath.Dir(rel))
 			if err := os.MkdirAll(dst, 0o755); err != nil {
 				return err
@@ -142,6 +149,28 @@ func (r *Renderer) RenderAll(out string) error {
 			if err := os.WriteFile(filepath.Join(site, rel), []byte(body), 0o644); err != nil {
 				return err
 			}
+		}
+	}
+
+	// Tag pages live under tags/, a namespace no section may already occupy.
+	// Overwriting a real page there would trade it for a listing silently,
+	// so a collision fails the render and names both claimants.
+	listings := r.tagListings()
+	for _, t := range listings {
+		rel := filepath.Join("tags", t.Slug+".html")
+		if occupied[rel] {
+			return fmt.Errorf("tag %q collides with a page at %s", t.Display, rel)
+		}
+		occupied[rel] = true
+		if err := os.MkdirAll(filepath.Join(site, "tags"), 0o755); err != nil {
+			return err
+		}
+		body, err := r.RenderTagPage(t, listings)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(site, rel), []byte(body), 0o644); err != nil {
+			return err
 		}
 	}
 
@@ -165,6 +194,14 @@ func (r *Renderer) RenderAll(out string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(site, "search-index.json"), index, 0o644); err != nil {
+		return err
+	}
+
+	tags, err := r.TagsJSON()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(site, "tags.json"), tags, 0o644); err != nil {
 		return err
 	}
 
@@ -304,6 +341,7 @@ type frontmatter struct {
 	Description string   `yaml:"description"`
 	Status      string   `yaml:"status"`
 	Tags        []string `yaml:"tags"`
+	StaleAfter  string   `yaml:"stale_after"`
 	Generated   struct {
 		By string `yaml:"by"`
 		At string `yaml:"at"`
@@ -324,6 +362,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		Description: fm.Description,
 		Status:      fm.Status,
 		Tags:        fm.Tags,
+		StaleAfter:  fm.StaleAfter,
 		GeneratedAt: fm.Generated.At,
 		Title:       fm.Title,
 	}

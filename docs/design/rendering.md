@@ -44,12 +44,15 @@ flowchart LR
    `<pre class="mermaid">` for the browser to render.
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
-5. **Emit.** In order: the pages, the bundle's own non-Markdown files, the
-   resolved theme's assets (stylesheet, fonts, tokens, the search and diagram
-   clients, favicon), the Mermaid vendor bundle when the bundle has a diagram,
-   `search-index.json`, and a `theme.json` recording which theme produced the
-   output. The output directory is emptied first, so a page removed from the
-   bundle does not linger.
+   Tags are collected into `tags.json`, a catalogue of display name, tag page
+   URL and page count, which the modal fetches only for hash-prefixed queries.
+5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
+   bundle's own non-Markdown files, the resolved theme's assets (stylesheet,
+   fonts, tokens, the search and diagram clients, favicon), the Mermaid vendor
+   bundle when the bundle has a diagram, `search-index.json`, `tags.json`, and
+   a `theme.json` recording which theme produced the output. The output
+   directory is emptied first, so a page removed from the bundle does not
+   linger.
 
 ## Themes
 
@@ -71,6 +74,23 @@ A link that escapes the bundle (for example `../../roles/x.yml`) becomes a
 `/repo/...` link when `--repo` is set, served from a read-only mount of the
 repository root. Without `--repo` the original relative link is kept, since
 there is nothing that could serve it.
+
+## Tags
+
+Tags are the only frontmatter that becomes navigation. Each tag chip on a page
+links to a tag page, and a query starting with `#` in the search modal searches
+tags rather than page text. A tag with no URL form stays an unlinked chip, and
+a tag page is never in the search index itself: it is reached through chips and
+tag search, not text search.
+
+A tag page opens with the count, the tags that co-occur with it, and a link to
+the full catalogue at the bottom. Its listing groups pages by section, with a
+control to flatten the groups and one to show deprecated pages, which are
+hidden otherwise. Each row carries the title, the type, the description, the
+concept path, and the page's other tags. Status badges render from data the
+bundle actually carries: draft and deprecated from `status`, stale from
+`stale_after`. Trust tiers and dates need `verified` and `generated`
+frontmatter no page is required to have, so the page does not guess them.
 
 ## Caching
 

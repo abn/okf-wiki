@@ -56,7 +56,8 @@
   <aside class="sidebar" id="sideDrawer">{{.Nav}}</aside>
   <main class="content" id="main">
     <article class="prose">
-      <h1>{{.Title}}</h1>
+      {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}
+      <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
       {{if .Description}}<p class="page-lead">{{.Description}}</p>{{end}}
       {{.Meta}}
       {{.TOC}}

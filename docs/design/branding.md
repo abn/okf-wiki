@@ -52,6 +52,8 @@ Set by flag or environment variable, and independent of the theme:
 | Field | What it holds |
 | :--- | :--- |
 | `{{.Title}}` `{{.Description}}` | the page title and lead |
+| `{{.Kicker}}` | an eyebrow label above the title, empty on ordinary pages |
+| `{{.TitleHTML}}` | trusted H1 markup replacing the title when set, today only on synthetic pages |
 | `{{.Body}}` `{{.TOC}}` `{{.Meta}}` `{{.Nav}}` `{{.Breadcrumb}}` | the rendered document, already trusted HTML |
 | `{{.Base}}` | the URL prefix, with a leading and trailing slash |
 | `{{.AssetVersion}}` | the resolved theme's content hash |

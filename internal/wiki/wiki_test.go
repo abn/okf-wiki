@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLinkPath(t *testing.T) {
@@ -1248,4 +1249,356 @@ func hasMermaidBundle(t *testing.T) bool {
 	t.Helper()
 	st, err := os.Stat(filepath.Join(docsRoot(t), "mermaid", "mermaid-bundle.min.mjs"))
 	return err == nil && st.Size() > 0
+}
+
+// TestTagPagesRender covers the tag namespace end to end. Tag chips link to a
+// page per tag, the page lists every page carrying it, and the catalogue the
+// search modal reads names the same pages.
+func TestTagPagesRender(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "type: Overview", "tags: [alpha, shared]", "---",
+		"# Home", "",
+	}, "\n"))
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "guide", "intro.md"), strings.Join([]string{
+		"---", "title: Intro", "type: Guide", "tags: [Shared, beta]", "---",
+		"# Intro", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "guide", "plain.md"), strings.Join([]string{
+		"---", "title: Plain", "type: Guide", "---",
+		"# Plain", "",
+	}, "\n"))
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+
+	// "Shared" and "shared" slugify alike, so they share one page under the
+	// first spelling seen.
+	shared, err := os.ReadFile(filepath.Join(site, "tags", "shared.html"))
+	if err != nil {
+		t.Fatalf("shared tag page was not written: %v", err)
+	}
+	html := string(shared)
+	for _, want := range []string{`href="/wiki/index.html"`, `href="/wiki/guide/intro.html"`, ">Home<", ">Intro<"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("shared tag page does not contain %s", want)
+		}
+	}
+	// Membership is asserted against the listing itself: the rendered shell
+	// carries the sidebar, which links every page on every page.
+	listings := r.tagListings()
+	var sharedListing tagListing
+	for _, l := range listings {
+		if l.Slug == "shared" {
+			sharedListing = l
+		}
+	}
+	listBody := r.tagPageBody(sharedListing, listings, 0, time.Now().UTC())
+	for _, want := range []string{
+		`data-tag-group="Overview"`,
+		`data-tag-group="Guide"`,
+		`data-title="Home"`,
+		`data-title="Intro"`,
+		`href="/wiki/guide/intro.html"`,
+		`<span class="chip">Overview</span>`,
+		`<span class="chip">Guide</span>`,
+		`data-tag-setmode="section"`,
+		`data-tag-setmode="all"`,
+		`id="all-tags"`,
+		`aria-current="true"`,
+	} {
+		if !strings.Contains(listBody, want) {
+			t.Errorf("shared listing does not contain %s", want)
+		}
+	}
+	if strings.Contains(listBody, "plain.html") {
+		t.Error("shared listing links an untagged page")
+	}
+	// The hook names live in the inline script regardless; what must be
+	// absent is the rendered toggle and count line. The trailing > keeps the
+	// match on markup, since the script mentions the same hooks.
+	if strings.Contains(listBody, `<label class="tag-check">`) ||
+		strings.Contains(listBody, `data-tag-dep-note>`) {
+		t.Error("shared listing has deprecated controls with nothing deprecated")
+	}
+	// Often-with names the co-occurring tags with counts, excluding the tag
+	// itself, and points at the full catalogue. The hash is its own span so
+	// themes can mute it without muting the name.
+	for _, want := range []string{
+		`href="/wiki/tags/alpha.html"><span class="tag-hash">#</span>alpha 1`,
+		`href="/wiki/tags/beta.html"><span class="tag-hash">#</span>beta 1`,
+		`href="#all-tags"`,
+	} {
+		if !strings.Contains(listBody, want) {
+			t.Errorf("shared listing does not contain %s", want)
+		}
+	}
+
+	// Chips link to the tag page; the type chip stays a span.
+	home, err := os.ReadFile(filepath.Join(site, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/alpha.html">alpha</a>`) {
+		t.Error("home page has no link chip for tag alpha")
+	}
+	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/shared.html">shared</a>`) {
+		t.Error("home page has no link chip for tag shared")
+	}
+	if !strings.Contains(string(home), `<span class="chip chip-type">Overview</span>`) {
+		t.Error("type chip should stay a span")
+	}
+
+	// The catalogue names the same pages the tag page lists.
+	raw, err := os.ReadFile(filepath.Join(site, "tags.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tags []struct {
+		Display string `json:"t"`
+		URL     string `json:"u"`
+		Pages   int    `json:"n"`
+	}
+	if err := json.Unmarshal(raw, &tags); err != nil {
+		t.Fatal(err)
+	}
+	byURL := map[string]int{}
+	for _, tg := range tags {
+		byURL[tg.URL] = tg.Pages
+	}
+	want := map[string]int{
+		"/wiki/tags/alpha.html":  1,
+		"/wiki/tags/shared.html": 2,
+		"/wiki/tags/beta.html":   1,
+	}
+	for u, n := range want {
+		if byURL[u] != n {
+			t.Errorf("tags.json: %s has %d pages, want %d (got %v)", u, byURL[u], n, byURL)
+		}
+	}
+	if len(tags) != len(want) {
+		t.Errorf("tags.json has %d rows, want %d", len(tags), len(want))
+	}
+}
+
+// TestTagPageHasNoActiveNav asserts the tag page is an orphan view: the
+// sidebar marks nothing active, and the breadcrumb reads Docs plus the tag.
+func TestTagPageHasNoActiveNav(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ntype: Overview\ntags: [alpha]\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listings := r.tagListings()
+	if len(listings) != 1 {
+		t.Fatalf("want 1 tag listing, got %d", len(listings))
+	}
+	body, err := r.RenderTagPage(listings[0], listings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The header Docs link is hardcoded active on every page, so scope the
+	// check to the sidebar's own active markers.
+	if strings.Contains(body, `side-title-link active`) || strings.Contains(body, `<li class="active"`) {
+		t.Error("tag page marks a sidebar entry active")
+	}
+	if !strings.Contains(body, "Docs</a>") || !strings.Contains(body, "<span>Tags</span>") ||
+		!strings.Contains(body, `<span class="tag-hash">#</span>alpha</span>`) {
+		t.Error("tag page breadcrumb does not read Docs / Tags / #tag")
+	}
+	if !strings.Contains(body, `<h1><span class="tag-hash">#</span>alpha</h1>`) {
+		t.Error("tag page heading does not mute exactly the hash")
+	}
+}
+
+// TestTagPageLifecycle covers the status-driven parts of a tag page: a
+// deprecated page is hidden behind the toggle and counted, draft and stale
+// pages carry badges. Trust tiers and dates are not rendered because no page
+// is required to carry verified or generated frontmatter.
+func TestTagPageLifecycle(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "type: Overview", "tags: [alpha]", "---", "# Home", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "old.md"), strings.Join([]string{
+		"---", "title: Old", "type: Guide", "status: deprecated", "tags: [alpha]", "---",
+		"# Old", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "wip.md"), strings.Join([]string{
+		"---", "title: Wip", "type: Guide", "status: draft", "tags: [alpha]", "---",
+		"# Wip", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "rotten.md"), strings.Join([]string{
+		"---", "title: Rotten", "type: Guide", "stale_after: 2000-01-01T00:00:00Z",
+		"tags: [alpha]", "---", "# Rotten", "",
+	}, "\n"))
+	mustWrite(t, filepath.Join(dir, "fresh.md"), strings.Join([]string{
+		"---", "title: Fresh", "type: Guide", "stale_after: 2999-01-01T00:00:00Z",
+		"tags: [alpha]", "---", "# Fresh", "",
+	}, "\n"))
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listings := r.tagListings()
+	if len(listings) != 1 {
+		t.Fatalf("want 1 tag listing, got %d", len(listings))
+	}
+	body, err := r.RenderTagPage(listings[0], listings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(body, `<input type="checkbox" data-tag-dep>`) {
+		t.Error("tag page with a deprecated page has no toggle")
+	}
+	if !strings.Contains(body, "1 deprecated hidden") {
+		t.Error("tag page does not count the hidden deprecated page")
+	}
+	if !strings.Contains(body, `data-deprecated="true" hidden`) {
+		t.Error("deprecated row is not hidden server-side")
+	}
+	for _, want := range []string{
+		`<span class="chip">Draft</span>`,
+		`<span class="chip">Stale</span>`,
+		`<span class="chip">Deprecated</span>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("tag page does not contain %s", want)
+		}
+	}
+	if strings.Count(body, `<span class="chip">Stale</span>`) != 1 {
+		t.Error("the fresh page must not carry a Stale badge")
+	}
+}
+
+// TestTagSlugWithoutURLForm covers tags that slugify to nothing. They have no
+// page to point at, so the chip stays a span rather than a dead link.
+func TestTagSlugWithoutURLForm(t *testing.T) {
+	dir := t.TempDir()
+	// Quoted: an unquoted !!! is a YAML tag directive and never reaches the list.
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ntype: Overview\ntags: [\"!!!\", ok]\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.tagListings()) != 1 {
+		t.Errorf("want only the linkable tag listed, got %v", r.tagListings())
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), `<span class="chip">!!!</span>`) {
+		t.Error("unsluggable tag should render as a plain span")
+	}
+	if !strings.Contains(string(home), `<a class="chip" href="/wiki/tags/ok.html">ok</a>`) {
+		t.Error("sluggable tag should render as a link")
+	}
+}
+
+// TestTagPageCollisionFailsTheRender covers a bundle with a tags/ section and
+// a tag claiming the same path. Overwriting either way loses a page silently,
+// so the render fails and names both.
+func TestTagPageCollisionFailsTheRender(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "tags"))
+	mustWrite(t, filepath.Join(dir, "tags", "foo.md"), "---\ntitle: Foo\ntype: Guide\n---\n# Foo\n")
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ntype: Overview\ntags: [foo]\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.RenderAll(t.TempDir())
+	if err == nil {
+		t.Fatal("RenderAll succeeded with a tag colliding with a section page")
+	}
+	if !strings.Contains(err.Error(), "foo") {
+		t.Errorf("error does not name the collision: %v", err)
+	}
+}
+
+// TestTagsJSONEmptyBundle asserts an untagged bundle writes an empty array,
+// so the search modal never has to distinguish null from missing.
+func TestTagsJSONEmptyBundle(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ntype: Overview\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "wiki", "tags.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(raw)) != "[]" {
+		t.Errorf("tags.json = %s, want []", raw)
+	}
+	if _, err := os.Stat(filepath.Join(out, "wiki", "tags")); !os.IsNotExist(err) {
+		t.Error("untagged bundle should not grow a tags directory")
+	}
+}
+
+// TestBundledDocsTags wires the tag namespace into the suite's own-bundle
+// render, so a regression in our own wiki is caught rather than only covered
+// by fixtures.
+func TestBundledDocsTags(t *testing.T) {
+	r, err := New(Config{Content: docsDir(t), Base: "/wiki/", Brand: Brand{Name: "okf-wiki"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+	raw, err := os.ReadFile(filepath.Join(site, "tags.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tags []struct {
+		Display string `json:"t"`
+		URL     string `json:"u"`
+		Pages   int    `json:"n"`
+	}
+	if err := json.Unmarshal(raw, &tags); err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) == 0 {
+		t.Fatal("our own bundle produced no tags")
+	}
+	found := false
+	for _, tg := range tags {
+		p := filepath.Join(site, strings.TrimPrefix(tg.URL, "/wiki/"))
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("tag page %s missing: %v", tg.URL, err)
+		}
+		if tg.Display == "testbed" {
+			found = true
+			if tg.Pages < 5 {
+				t.Errorf("tag testbed has %d pages, want at least 5", tg.Pages)
+			}
+		}
+	}
+	if !found {
+		t.Error("tag testbed missing from our own catalogue")
+	}
 }

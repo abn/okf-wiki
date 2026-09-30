@@ -132,6 +132,14 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   title, which is how a theme marks position
 - `.breadcrumb`, `.crumb-sep`, `.crumb-cur`
 - `.prose`, `.page-lead`, `.page-meta`, `.chip`, `.chip-type`
+- Tag pages: `.kicker`, `.tag-hash`, `.tag-often`, `.tag-all-link`,
+  `.tag-controls`, `.seg` with `aria-pressed` buttons, `.tag-check`,
+  `.tag-group`, `.tag-row` with `.tag-row-head`, `.tag-badges` and
+  `.tag-row-meta`, `.tag-muted`, `.tag-all`, and `a.chip[aria-current]` for
+  the current tag. The grouping and deprecated toggles, and whole-row
+  navigation, are driven by an inline script on `data-tag-list`,
+  `data-tag-group`, `data-tag-row`, `data-tag-setmode`, `data-tag-dep` and
+  `data-tag-dep-note` hooks, so they work without new assets.
 - `.toc`, whose level-three entries carry `.l3`, and `.callout` with
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,

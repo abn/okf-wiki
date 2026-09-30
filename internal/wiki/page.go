@@ -11,7 +11,13 @@ import (
 // between the renderer and a theme: a theme's template.html may rely on any of
 // these fields, and the renderer promises all of them are populated.
 type shellData struct {
-	Title        string
+	Title string
+	// Kicker is an eyebrow label above the title, empty on ordinary pages.
+	// Only synthetic pages set it today; a theme renders nothing when unset.
+	Kicker string
+	// TitleHTML is trusted H1 markup replacing Title when set. Ordinary
+	// pages never set it; their title stays escaped text.
+	TitleHTML    template.HTML
 	Description  string
 	Version      string
 	GeneratedAt  string
@@ -59,6 +65,8 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	base := r.cfg.base()
 	data := shellData{
 		Title:        title,
+		Kicker:       p.Kicker,
+		TitleHTML:    template.HTML(p.TitleHTML),
 		Description:  description,
 		Version:      r.Version(),
 		GeneratedAt:  r.GeneratedAt(),
@@ -72,7 +80,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Base:         base,
 		Breadcrumb:   template.HTML(r.breadcrumbHTML(p)),
 		Nav:          template.HTML(r.sidebarHTML(p.Section, p.Slug)),
-		Meta:         template.HTML(buildMeta(p)),
+		Meta:         template.HTML(r.buildMeta(p)),
 		TOC:          template.HTML(buildTOC(p)),
 		Body:         template.HTML(stripLeadingH1(p.Body, title)),
 		QuickJSON:    template.JS(r.quickLinksJSON()),
@@ -158,17 +166,27 @@ func buildTOC(p Page) string {
 	return b.String()
 }
 
-func buildMeta(p Page) string {
+// buildMeta renders the type and tag chips under the title. The type stays a
+// span, since it names the page rather than pointing anywhere. Each tag links
+// to its tag page, which lists every page carrying it. A tag with no URL form
+// stays a span, so it never points at a page that was never written.
+func (r *Renderer) buildMeta(p Page) string {
 	var chips []string
 	if p.Type != "" {
 		chips = append(chips, fmt.Sprintf(`<span class="chip chip-type">%s</span>`, template.HTMLEscapeString(p.Type)))
 	}
 	for _, t := range p.Tags {
-		t = strings.TrimSpace(t)
-		if t == "" {
+		name := strings.TrimSpace(t)
+		if name == "" {
 			continue
 		}
-		chips = append(chips, fmt.Sprintf(`<span class="chip">%s</span>`, template.HTMLEscapeString(t)))
+		slug := slugify(name)
+		if slug == "" {
+			chips = append(chips, fmt.Sprintf(`<span class="chip">%s</span>`, template.HTMLEscapeString(name)))
+			continue
+		}
+		chips = append(chips, fmt.Sprintf(`<a class="chip" href="%stags/%s.html">%s</a>`,
+			r.cfg.base(), slug, template.HTMLEscapeString(name)))
 	}
 	if len(chips) == 0 {
 		return ""
@@ -253,6 +271,25 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 func (r *Renderer) breadcrumbHTML(p Page) string {
 	base := r.cfg.base()
 	parts := []string{`<a href="` + base + `">Docs</a>`}
+	// Tag pages belong to no section. They read Docs / Tags / #tag, with
+	// Tags as unclassed text since there is no tag index page to point it
+	// at and no theme class for a non-current, non-link crumb. The slug
+	// prefix alone is not enough: a tags/ section holds real pages, so the
+	// empty section marks the synthetic ones. The title already carries
+	// the hash.
+	if p.Section == "" && strings.HasPrefix(p.Slug, "tags/") {
+		parts = append(parts, `<span>Tags</span>`)
+		title := p.Title
+		if title == "" {
+			title = p.Slug
+		}
+		// The title carries the hash; split it off so themes can mute it
+		// the way tag chips do.
+		name := strings.TrimPrefix(title, "#")
+		parts = append(parts, fmt.Sprintf(`<span class="crumb-cur"><span class="tag-hash">#</span>%s</span>`,
+			template.HTMLEscapeString(name)))
+		return strings.Join(parts, `<span class="crumb-sep">/</span>`)
+	}
 	if p.Section != "" {
 		for _, s := range r.sections {
 			if s.ID == p.Section {

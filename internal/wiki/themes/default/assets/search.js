@@ -104,10 +104,86 @@
     return prefix + highlight(content.slice(start, end), terms) + suffix;
   }
 
+  // Tags live in a separate file from the text index, and are only fetched
+  // for hash-prefixed queries, so a text search never pays for them.
+  var tagsIndex = null;
+  var tagsLoading = false;
+
+  function fetchTags() {
+    if (tagsIndex || tagsLoading) {
+      return Promise.resolve(tagsIndex);
+    }
+    tagsLoading = true;
+    var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
+    var base = window.__WIKI_BASE || '/wiki/';
+    return fetch(base + 'tags.json' + v)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        tagsIndex = data || [];
+        tagsLoading = false;
+        return tagsIndex;
+      })
+      .catch(function (err) {
+        tagsLoading = false;
+        console.warn('Failed to load wiki tag catalogue:', err);
+        return [];
+      });
+  }
+
+  // A query starting with # searches the tag namespace rather than page
+  // text. Each hit is a tag page, which itself lists every page carrying it.
+  function runTagSearch(tagQuery) {
+    if (!tagQuery) {
+      selectedIndex = -1;
+      currentResults = [];
+      resultsContainer.innerHTML =
+        '<div class="search-empty-state"><p>Type a tag name after #.</p></div>';
+      return;
+    }
+    if (!tagsIndex) {
+      resultsContainer.innerHTML = '<div class="search-empty-state"><p>Loading tags...</p></div>';
+      fetchTags().then(runSearch);
+      return;
+    }
+
+    var scored = [];
+    for (var i = 0; i < tagsIndex.length; i++) {
+      var tag = tagsIndex[i];
+      var name = tag.t ? tag.t.toLowerCase() : '';
+      var score = -1;
+      if (name === tagQuery) score = 100;
+      else if (name.indexOf(tagQuery) === 0) score = 50;
+      else if (name.indexOf(tagQuery) !== -1) score = 10;
+      if (score >= 0) scored.push({ tag: tag, score: score });
+    }
+    scored.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      var an = a.tag.t.toLowerCase(), bn = b.tag.t.toLowerCase();
+      return an < bn ? -1 : an > bn ? 1 : 0;
+    });
+
+    // Rows reuse the page-result shape, so keyboard, mouse and Enter work
+    // unchanged: the section reads Tags, the doc reads the page count.
+    currentResults = scored.slice(0, 12).map(function (s) {
+      return {
+        u: s.tag.u,
+        s: 'Tags',
+        d: s.tag.n === 1 ? '1 page' : s.tag.n + ' pages',
+        t: '#' + s.tag.t,
+        c: ''
+      };
+    });
+    renderResults([tagQuery], '#' + tagQuery);
+  }
+
   function renderInitialState() {
     var links = (window.__WIKI_QUICK || []).slice(0, 6);
     var html = '<div class="search-empty-state">' +
-      '<p>Type a search term, or jump to a section.</p>';
+      '<p>Type a search term, or jump to a section.</p>' +
+      '<p class="search-empty-hint">Prefix with # to search tags only.</p>';
     if (links.length) {
       html += '<div class="search-quick-links"><span>Jump to:</span>';
       for (var i = 0; i < links.length; i++) {
@@ -125,6 +201,10 @@
       selectedIndex = -1;
       currentResults = [];
       renderInitialState();
+      return;
+    }
+    if (query.charAt(0) === '#') {
+      runTagSearch(query.slice(1).trim());
       return;
     }
     if (!searchIndex) {
