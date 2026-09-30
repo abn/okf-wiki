@@ -28,8 +28,8 @@ type rawSearchChunk struct {
 
 // extractSearchChunks splits a page into one text chunk per heading, anchored
 // to that heading's id. The H1 is skipped, so content under it joins the first
-// real heading's chunk. pageTitle is unused.
-func extractSearchChunks(doc ast.Node, src []byte, pageTitle string) []rawSearchChunk {
+// real heading's chunk.
+func extractSearchChunks(doc ast.Node, src []byte) []rawSearchChunk {
 	var chunks []rawSearchChunk
 	currentHeading := ""
 	currentAnchor := ""
@@ -61,7 +61,6 @@ func extractSearchChunks(doc ast.Node, src []byte, pageTitle string) []rawSearch
 	if txt != "" || currentHeading != "" {
 		chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt})
 	}
-	_ = pageTitle
 	return chunks
 }
 
@@ -112,9 +111,6 @@ func (r *Renderer) BuildSearchIndex() []SearchEntry {
 		}
 		for _, p := range s.Pages {
 			pageURL := r.cfg.base() + p.Slug + ".html"
-			if p.Slug == "index" {
-				pageURL = r.cfg.base() + "index.html"
-			}
 			docTitle := p.Title
 			if docTitle == "" {
 				docTitle = p.Slug

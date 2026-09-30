@@ -65,8 +65,6 @@ type Theme struct {
 	Description string
 	Source      string // "embedded", or the directory an override was read from
 
-	loaded loadedLayer
-
 	files        []themeFile
 	templateText string
 	slotText     map[string]string

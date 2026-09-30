@@ -104,8 +104,6 @@ func (r *Renderer) GeneratedAt() string { return r.generatedAt }
 
 func (r *Renderer) AssetVersion() string { return r.assetVersion }
 
-func (r *Renderer) Brand() Brand { return r.cfg.Brand }
-
 func (r *Renderer) Theme() *Theme { return r.theme }
 
 // Sections returns the sections in render order, with empty sections omitted.
@@ -371,7 +369,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	if p.Title == "" {
 		p.Title = slug
 	}
-	p.searchChunks = extractSearchChunks(doc, src, p.Title)
+	p.searchChunks = extractSearchChunks(doc, src)
 
 	var buf bytes.Buffer
 	if err := r.md.Renderer().Render(&buf, src, doc); err != nil {
