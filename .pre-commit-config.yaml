@@ -27,6 +27,15 @@ repos:
         always_run: true
       - id: no-em-dash
         name: no em-dashes
-        entry: bash -c 'if grep -rn "—" "$@" ; then echo "em-dash found in file above"; exit 1; fi' --
+        # Scoped to text, not just markdown: the same rule covers the theme
+        # assets and the Go sources, and a markdown-only scope left the
+        # stylesheets and clients unchecked, which is where em-dashes had
+        # already appeared. The character is built from a hex escape rather
+        # than written literally, so this file does not match its own grep.
+        # --binary-files=without-match keeps the woff2 fonts out of it.
+        entry: >-
+          bash -c 'dash=$(printf "\xe2\x80\x94");
+          if grep -rn --binary-files=without-match "$dash" "$@";
+          then echo "em-dash found in the file above"; exit 1; fi' --
         language: system
-        types: [markdown]
+        files: '\.(md|go|css|js|html|ya?ml)$'
