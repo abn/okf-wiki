@@ -4,8 +4,15 @@ name: Publish wiki to Pages
 # default theme is used, which is the point of the exercise: the action runs the
 # published image, so the site is exactly what a consumer gets from a pull.
 
+# Triggered by the image publish, not by the push. The render runs the
+# published image, so rendering on push races the image build: the job pulls
+# :latest before the new image lands and deploys a site built by the previous
+# binary, one release behind, with every workflow green. Waiting for the
+# publish keeps the site and the image in step.
 on:
-  push:
+  workflow_run:
+    workflows: ["Publish image"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -21,12 +28,19 @@ concurrency:
 jobs:
   publish:
     name: Render and deploy
+    # A failed image build must not deploy anything, and a manual dispatch
+    # carries no workflow_run to inspect.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.deploy-url }}
     steps:
+      # The commit the image was built from, so docs and binary agree. Empty
+      # on manual dispatch, where checkout falls back to the default branch.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # ./action, not abn/okf-wiki/action@v1: a repository consuming its own
       # action should not depend on a published ref of itself, and a moving tag
