@@ -32,10 +32,10 @@ flowchart LR
    pass through as `<pre class="mermaid">` for the browser to render.
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
-5. **Emit.** Pages are written under the base path, followed by the resolved
-   theme's assets (stylesheet, fonts, tokens, the search and diagram clients,
-   favicon), the optional Mermaid vendor bundle, and a `theme.json` recording
-   which theme produced the output.
+5. **Emit.** Pages are written under the base path, followed by the bundle's own
+   non-Markdown files, the resolved theme's assets (stylesheet, fonts, tokens,
+   the search and diagram clients, favicon), the optional Mermaid vendor bundle,
+   and a `theme.json` recording which theme produced the output.
 
 ## Themes
 
@@ -48,9 +48,15 @@ a theme change reach the browser. See
 ## Links
 
 A relative link that stays inside the bundle becomes a link to the rendered
-page. A link that escapes the bundle (for example `../../roles/x.yml`) becomes a
+page. A relative link to a file that is not Markdown, such as an image, becomes a
+link to that file: every non-Markdown file in the bundle is copied into the site
+under the same path, so an asset resolves the way a page does. Dotfiles and
+dot-directories are not copied.
+
+A link that escapes the bundle (for example `../../roles/x.yml`) becomes a
 `/repo/...` link when `--repo` is set, served from a read-only mount of the
-repository root. Without `--repo` the original relative link is kept.
+repository root. Without `--repo` the original relative link is kept, since
+there is nothing that could serve it.
 
 ## Caching
 

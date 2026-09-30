@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -141,6 +142,9 @@ func (r *Renderer) RenderAll(out string) error {
 	}
 
 	if err := r.theme.WriteTo(site); err != nil {
+		return err
+	}
+	if err := copyBundleAssets(r.cfg.Content, site); err != nil {
 		return err
 	}
 	if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor")); err != nil {
@@ -313,6 +317,11 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		switch nn := n.(type) {
 		case *ast.Link:
 			nn.Destination = []byte(r.linkPath(p.Slug, string(nn.Destination)))
+		case *ast.Image:
+			// An image destination is a file in the bundle, and is copied into
+			// the site. Rewriting it the way a link is rewritten is what stops
+			// a relative src from pointing at a path that was never written.
+			nn.Destination = []byte(r.linkPath(p.Slug, string(nn.Destination)))
 		case *ast.Blockquote:
 			detectAlert(nn, src)
 		}
@@ -383,6 +392,9 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 	dir := path.Dir(fromSlug)
 	clean := path.Clean(path.Join(dir, target))
 
+	// A target that climbs out of the bundle is not ours to publish. It can
+	// only be reached through a repository mount, so without one the href is
+	// left as written rather than pointed at a /repo/ URL nothing serves.
 	if strings.HasPrefix(clean, "..") {
 		if r.cfg.Repo == "" {
 			return href
@@ -394,7 +406,9 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 		return "/repo/" + repoRel + frag
 	}
 	if !strings.HasSuffix(clean, ".md") {
-		return "/repo/" + clean + frag
+		// Every non-Markdown file in the bundle is copied into the site under
+		// its own path, so an in-bundle asset resolves like a page does.
+		return r.cfg.base() + clean + frag
 	}
 	return r.cfg.base() + strings.TrimSuffix(clean, ".md") + ".html" + frag
 }
@@ -476,6 +490,42 @@ func slugify(s string) string {
 		res = strings.ReplaceAll(res, "--", "-")
 	}
 	return strings.Trim(res, "-")
+}
+
+// copyBundleAssets copies every non-Markdown file in the bundle into the site,
+// keeping its path. Without this an image in a page is a link to a file the
+// render never wrote, so the page ships with a broken image and no error.
+//
+// Dotfiles and dot-directories are skipped: a bundle directory is a real
+// working tree as often as not, and nothing in a wiki should be able to publish
+// a .git directory or a .env.
+func copyBundleAssets(root, dest string) error {
+	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(root, p)
+		if relErr != nil {
+			return relErr
+		}
+		if rel == "." {
+			return nil
+		}
+		name := d.Name()
+		if strings.HasPrefix(name, ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.EqualFold(filepath.Ext(name), ".md") {
+			return nil
+		}
+		return copyFile(p, filepath.Join(dest, rel))
+	})
 }
 
 // copyVendor copies the mermaid bundle directory into the output, if present.

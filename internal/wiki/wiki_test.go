@@ -743,3 +743,119 @@ func TestUniqueID(t *testing.T) {
 		}
 	}
 }
+
+// TestBundleAssetsAreCopied covers the files a page can point at without being
+// one. Before this, a bundle asset was neither copied into the site nor
+// rewritten in the page, so the image was a link to a file that was never
+// written and the render still reported success.
+func TestBundleAssetsAreCopied(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "assets", "nested"))
+	mustWrite(t, filepath.Join(dir, "assets", "diagram.png"), "PNG")
+	mustWrite(t, filepath.Join(dir, "assets", "nested", "deep.svg"), "<svg/>")
+	mustWrite(t, filepath.Join(dir, "notes.txt"), "notes")
+	mustWrite(t, filepath.Join(dir, ".env"), "SECRET=1")
+	mustMkdir(t, filepath.Join(dir, ".git"))
+	mustWrite(t, filepath.Join(dir, ".git", "config"), "[core]")
+
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home",
+		"![shot](assets/diagram.png)",
+		"",
+		"[notes](notes.txt)",
+		"",
+		"![deep](assets/nested/deep.svg)",
+	}, "\n"))
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+
+	for _, rel := range []string{"assets/diagram.png", "assets/nested/deep.svg", "notes.txt"} {
+		if _, err := os.Stat(filepath.Join(site, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("bundle asset %s was not copied: %v", rel, err)
+		}
+	}
+	// A dot-directory must not be publishable through the bundle.
+	if _, err := os.Stat(filepath.Join(site, ".env")); err == nil {
+		t.Error(".env was copied into the site")
+	}
+	if _, err := os.Stat(filepath.Join(site, ".git")); err == nil {
+		t.Error(".git was copied into the site")
+	}
+
+	body, err := os.ReadFile(filepath.Join(site, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(body)
+	for _, want := range []string{
+		`src="/wiki/assets/diagram.png"`,
+		`src="/wiki/assets/nested/deep.svg"`,
+		`href="/wiki/notes.txt"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("page does not contain %s", want)
+		}
+	}
+	// The relative form is what breaks: it resolves against /wiki/index.html.
+	if strings.Contains(html, `src="assets/diagram.png"`) {
+		t.Error("image src was left relative to the page")
+	}
+	// An in-bundle asset is not a repository file.
+	if strings.Contains(html, "/repo/assets/") {
+		t.Error("in-bundle asset was pointed at /repo/")
+	}
+}
+
+// Without a repository root there is nothing to serve an escaping target, so the
+// href must survive as written rather than become a dead /repo/ URL.
+func TestLinkPathWithoutRepoKeepsEscapingHref(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home",
+		"[outside](../../README.md)",
+		"[page](other.md)",
+		"[asset](data.json)",
+	}, "\n"))
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			page = p
+		}
+	}
+	got := r.linkPath(page.Slug, "../../README.md")
+	if strings.HasPrefix(got, "/repo/") {
+		t.Errorf("escaping link = %q, want it left as written", got)
+	}
+	if got := r.linkPath(page.Slug, "data.json"); got != "/wiki/data.json" {
+		t.Errorf("in-bundle asset = %q, want /wiki/data.json", got)
+	}
+	if got := r.linkPath(page.Slug, "other.md"); got != "/wiki/other.html" {
+		t.Errorf("in-bundle page = %q, want /wiki/other.html", got)
+	}
+}
+
+func mustMkdir(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustWrite(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
