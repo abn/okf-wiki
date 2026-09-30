@@ -973,3 +973,72 @@ func TestDotDirectoriesAreNotContent(t *testing.T) {
 		t.Error(".hidden was copied into the site")
 	}
 }
+
+// TestTitleCaseHandlesNonASCII covers a section whose directory name starts
+// with a multi-byte character. Upper-casing the first byte of one produces
+// U+FFFD, so the section used to be titled "ber" with a replacement character
+// in front of it.
+func TestTitleCaseHandlesNonASCII(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"design", "Design"},
+		{"multi-word-name", "Multi Word Name"},
+		{"snake_case_name", "Snake Case Name"},
+		{"über", "Über"},
+		{"über-notes", "Über Notes"},
+		{"中文文档", "中文文档"},
+		{"русский", "Русский"},
+		{"Ελληνικά", "Ελληνικά"},
+		{"2024-release", "2024 Release"},
+		{"a", "A"},
+	}
+	for _, tc := range tests {
+		if got := titleCase(tc.in); got != tc.want {
+			t.Errorf("titleCase(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+		if strings.ContainsRune(titleCase(tc.in), 0xFFFD) {
+			t.Errorf("titleCase(%q) produced a replacement character", tc.in)
+		}
+	}
+}
+
+// A non-ASCII section name reaches the sidebar, the breadcrumb and the URL, so
+// the whole path has to survive rather than just the helper.
+func TestNonASCIISectionNameRenders(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "über"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n\n[Zurück](über/index.md)\n")
+	mustWrite(t, filepath.Join(dir, "über", "index.md"), "---\ntitle: Über\n---\n# Über\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var title string
+	for _, s := range r.Sections() {
+		if s.ID == "über" {
+			title = s.Title
+		}
+	}
+	if title != "Über" {
+		t.Errorf("section title = %q, want %q", title, "Über")
+	}
+
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "wiki", "über", "index.html")); err != nil {
+		t.Errorf("the page was not written under its own name: %v", err)
+	}
+	home, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(home)
+	if strings.ContainsRune(html, 0xFFFD) {
+		t.Error("the rendered page contains a replacement character")
+	}
+	if !strings.Contains(html, `href="/wiki/über/index.html"`) {
+		t.Errorf("the link to the section did not keep the character: %s", html)
+	}
+}

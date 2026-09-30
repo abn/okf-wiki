@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // DefaultBase is the URL prefix the rendered wiki is served under.
@@ -99,8 +100,10 @@ func parseSections(s string) []sectionSpec {
 }
 
 // titleCase turns a directory name (hyphens/underscores) into a display title.
-// It upper-cases by byte, so a section whose name starts outside ASCII has its
-// first character replaced rather than capitalised.
+// The first letter of each word is upper-cased by rune, not by byte: a byte
+// slice of a multi-byte character is not a character, and upper-casing one
+// produces U+FFFD, so a section named "über" titled itself as a replacement
+// character.
 func titleCase(s string) string {
 	s = strings.NewReplacer("-", " ", "_", " ").Replace(s)
 	words := strings.Fields(s)
@@ -108,7 +111,8 @@ func titleCase(s string) string {
 		if w == "" {
 			continue
 		}
-		words[i] = strings.ToUpper(w[:1]) + w[1:]
+		r, size := utf8.DecodeRuneInString(w)
+		words[i] = strings.ToUpper(string(r)) + w[size:]
 	}
 	return strings.Join(words, " ")
 }

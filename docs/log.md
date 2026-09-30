@@ -53,3 +53,6 @@ deprecated, or restructured. It is deliberately separate from software releases.
   bundle is published without.
 - `testbed/nested/setup/first-run.md` is a page two directories deep, so nested
   content and links that climb back out of it are visible in the bundle.
+- An `über` section, whose directory name begins with a multi-byte character.
+  It exists because section titles are built from directory names, and a
+  non-ASCII name used to produce a replacement character.

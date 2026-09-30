@@ -23,8 +23,11 @@ flowchart LR
 1. **Walk.** The content directory is read. Root Markdown files form one
    section, and each subdirectory under the root is a section, in that order and
    titles from `--sections`, with any unlisted directory appended
-   alphabetically. A directory inside a section is not a section of its own: its
-   pages belong to the section above and keep the path in their slug, so
+   alphabetically. An unlisted directory's title is its name with hyphens and
+   underscores turned into spaces and the first letter of each word upper-cased,
+   which is done by character rather than by byte so a non-ASCII name titles
+   itself correctly. A directory inside a section is not a section of its own:
+   its pages belong to the section above and keep the path in their slug, so
    `guide/setup/install.md` in a `guide` section is served at
    `/wiki/guide/setup/install.html`. Markdown is collected at any depth. Files
    and directories whose name begins with a dot are skipped, so a bundle that is
