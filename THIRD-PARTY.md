@@ -1,5 +1,8 @@
 # Third-party notices
 
+okf-wiki itself is MIT licensed; see [LICENSE](LICENSE). That license does not
+extend to what this project bundles.
+
 okf-wiki bundles third-party work in two places: self-hosted fonts served with
 every page, and the offline Mermaid diagram runtime baked into the container
 image. This file records those components and their licenses.

@@ -6,3 +6,6 @@ mermaid/node_modules
 mermaid/mermaid-bundle.min.mjs
 docs
 *.md
+# The licence notices are copied into the image, so they are not excluded.
+!LICENSE
+!THIRD-PARTY.md

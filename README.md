@@ -74,6 +74,9 @@ agreement.
 
 ## Licensing
 
-No project LICENSE has been chosen yet. Third-party components (self-hosted
-fonts and the bundled diagram runtime) and their licenses are recorded in
-[THIRD-PARTY.md](THIRD-PARTY.md).
+MIT. See [LICENSE](LICENSE).
+
+Third-party components ship with their own licenses, which are recorded in
+[THIRD-PARTY.md](THIRD-PARTY.md): the self-hosted fonts under the SIL Open Font
+License, and the bundled diagram runtime, which is mostly MIT. A theme may bundle
+its own faces, and then that theme's license applies to them.

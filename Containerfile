@@ -26,6 +26,12 @@ ENV OKF_WIKI_ADDR=0.0.0.0:8080 \
     OKF_WIKI_OUT=/tmp/okf-wiki \
     OKF_WIKI_VENDOR=/app/vendor
 
+# MIT requires the copyright notice to travel with copies of the software, and
+# the image is a copy. The notices for what is baked into it are here too, since
+# the fonts and the diagram runtime are the only parts of the image that are not
+# ours.
+COPY LICENSE THIRD-PARTY.md /usr/share/licenses/okf-wiki/
+
 # A theme is a read-only bind mount plus OKF_WIKI_THEME=/theme. It is not baked
 # in: the image ships the embedded default and an override layers over it at
 # render time, so re-skinning never needs a rebuild.
