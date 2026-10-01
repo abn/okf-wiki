@@ -60,17 +60,18 @@ usage:
   A flag or an environment variable still wins.
 
 flags (render):
-  --content DIR    OKF bundle to render (auto-detected if omitted)
-  --out DIR        output directory (default: .scratch/wiki)
-  --base PATH      URL prefix the wiki is served under (default "/wiki/")
-  --repo DIR       repository root exposed read-only at /repo/ (optional)
-  --vendor DIR     directory holding the mermaid bundle (required if the
-                   bundle has a diagram, or the render is not offline)
-  --theme DIR      theme directory layered over the embedded default (optional)
-  --brand STR      brand wordmark (default "okf-wiki")
-  --brand-sub STR  brand subtitle (default "docs")
-  --title STR      document title suffix (default "Wiki")
-  --sections LIST  section order as id:Title pairs, comma-separated
+  --content DIR      OKF bundle to render (auto-detected if omitted)
+  --out DIR          output directory (default: .scratch/wiki)
+  --base PATH        URL prefix the wiki is served under (default "/wiki/")
+  --repo DIR         repository root exposed read-only at /repo/ (optional)
+  --vendor DIR       directory holding the mermaid bundle (required if the
+                     bundle has a diagram, or the render is not offline)
+  --theme DIR        theme directory layered over the embedded default (optional)
+  --brand STR        brand wordmark (default "okf-wiki")
+  --brand-sub STR    brand subtitle (default "docs")
+  --version-tag STR  freeform version label beside the wordmark (optional)
+  --title STR        document title suffix (default "Wiki")
+  --sections LIST    section order as id:Title pairs, comma-separated
 
 flags (serve adds):
   --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)
@@ -82,7 +83,8 @@ rather than cut.
 
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
-  OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_ADDR, OKF_WIKI_OPEN
+  OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_ADDR,
+  OKF_WIKI_OPEN
 `)
 }
 
@@ -141,6 +143,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.ThemeDir, "theme", env("OKF_WIKI_THEME", ""), "theme directory layered over the embedded default")
 	fs.StringVar(&c.Brand.Name, "brand", env("OKF_WIKI_BRAND", "okf-wiki"), "brand wordmark")
 	fs.StringVar(&c.Brand.Sub, "brand-sub", env("OKF_WIKI_BRAND_SUB", "docs"), "brand subtitle")
+	fs.StringVar(&c.Brand.VersionTag, "version-tag", env("OKF_WIKI_VERSION_TAG", ""), "freeform version label beside the wordmark")
 	fs.StringVar(&c.Brand.Title, "title", env("OKF_WIKI_TITLE", "Wiki"), "document title suffix")
 	fs.StringVar(&c.Brand.Sections, "sections", env("OKF_WIKI_SECTIONS", ""), "section order as id:Title pairs")
 	return c

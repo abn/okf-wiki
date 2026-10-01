@@ -41,6 +41,10 @@ inputs:
     description: Brand subtitle label.
     required: false
     default: docs
+  version-tag:
+    description: Freeform version label shown beside the wordmark. Empty shows none.
+    required: false
+    default: ""
   title:
     description: Document title suffix.
     required: false
@@ -119,6 +123,7 @@ runs:
         THEME: ${{ steps.resolve.outputs.theme }}
         BRAND: ${{ inputs.brand }}
         BRAND_SUB: ${{ inputs.brand-sub }}
+        VERSION_TAG: ${{ inputs.version-tag }}
         TITLE: ${{ inputs.title }}
         SECTIONS: ${{ inputs.sections }}
         BASE: ${{ steps.resolve.outputs.base }}
@@ -127,7 +132,8 @@ runs:
 
         # No --vendor: the image's baked-in mermaid bundle is wanted.
         args=(render --content "$CONTENT" --out "$OUT" --base "$BASE"
-              --brand "$BRAND" --brand-sub "$BRAND_SUB" --title "$TITLE")
+              --brand "$BRAND" --brand-sub "$BRAND_SUB" --title "$TITLE"
+              --version-tag "$VERSION_TAG")
         [ -n "$SECTIONS" ] && args+=(--sections "$SECTIONS")
         [ -n "$THEME" ] && args+=(--theme "$THEME")
 

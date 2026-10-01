@@ -26,6 +26,9 @@ type shellData struct {
 	BrandTail    string
 	BrandSub     string
 	BrandTitle   string
+	// VersionTag is a freeform version label beside the wordmark, empty when
+	// none is configured.
+	VersionTag   string
 	ThemeName    string
 	ThemeVersion string
 	// Base is the URL prefix every asset and page link hangs off, with a
@@ -82,6 +85,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		BrandTail:    tail,
 		BrandSub:     r.cfg.Brand.Sub,
 		BrandTitle:   r.cfg.Brand.Title,
+		VersionTag:   r.cfg.Brand.VersionTag,
 		ThemeName:    r.theme.Name,
 		ThemeVersion: r.theme.Version,
 		Base:         base,

@@ -92,6 +92,26 @@ a { color: var(--color-accent-text); text-decoration: none; }
   border-left: 1px solid var(--color-line-strong); padding-left: var(--space-3);
 }
 
+/* The wordmark and an optional version tag, held together at the left end of
+   the header so space-between still sends the controls to the right. */
+.brand-cluster { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+/* A freeform version label beside the wordmark, drawn only when one is
+   configured. A quiet pill, so it reads as metadata rather than part of the
+   name, and tabular figures keep "v1.10" from jumping sideways next to "v1.9". */
+.version-tag {
+  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap;
+  color: var(--color-text-muted);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  padding: 5px var(--space-3);
+  /* The label is freeform, so it yields before it can push the controls off
+     the bar: the pill shrinks and trims rather than widening the header. */
+  min-width: 0; max-width: 40vw; overflow: hidden; text-overflow: ellipsis;
+}
+
 .nav-cluster { display: flex; align-items: center; gap: var(--space-2); }
 .top-nav { display: flex; align-items: center; gap: var(--space-1); }
 .top-nav a {

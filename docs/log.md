@@ -5,6 +5,10 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-01
 
+* **Update**: A `--version-tag` flag (and `OKF_WIKI_VERSION_TAG`), plus a
+  `version-tag` action input, renders a freeform label as a pill beside the
+  wordmark when set and nothing when unset. The flag reference, the branding
+  page and the action inputs document it.
 * **Update**: `design/rendering.md` documents the `sources` construct: how a
   footnote becomes a numbered citation to the generated Sources section, how an
   entry resolves, and which credibility signals it shows.

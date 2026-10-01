@@ -21,6 +21,9 @@ type Brand struct {
 	Sub string
 	// Title is the document <title> suffix, e.g. "Wiki".
 	Title string
+	// VersionTag is a freeform version label shown beside the wordmark, e.g.
+	// "v1.2.3" or "nightly". Empty renders nothing.
+	VersionTag string
 	// Sections is a comma-separated order list of "id:Title" pairs. Sections
 	// not listed are appended, title-cased from their directory name.
 	Sections string

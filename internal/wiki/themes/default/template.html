@@ -22,11 +22,14 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap header-inner">
-    <a class="brand" href="{{.Base}}">
-      <img class="brand-mark" src="{{.Base}}brand-mark.svg" width="26" height="26" alt="">
-      <span class="wordmark">{{.BrandName}}<span class="wordmark-dot">{{.BrandTail}}</span></span>
-      {{if .BrandSub}}<span class="brand-sub">{{.BrandSub}}</span>{{end}}
-    </a>
+    <div class="brand-cluster">
+      <a class="brand" href="{{.Base}}">
+        <img class="brand-mark" src="{{.Base}}brand-mark.svg" width="26" height="26" alt="">
+        <span class="wordmark">{{.BrandName}}<span class="wordmark-dot">{{.BrandTail}}</span></span>
+        {{if .BrandSub}}<span class="brand-sub">{{.BrandSub}}</span>{{end}}
+      </a>
+      {{if .VersionTag}}<span class="version-tag">{{.VersionTag}}</span>{{end}}
+    </div>
     <div class="nav-cluster">
       <nav class="top-nav" aria-label="Site">
         <a href="{{.Base}}" class="active">Docs</a>

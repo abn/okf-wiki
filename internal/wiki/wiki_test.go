@@ -346,6 +346,48 @@ func TestRenderRelocatesToTheBase(t *testing.T) {
 	}
 }
 
+// TestVersionTagRendersWhenSet covers the freeform version label: it appears
+// beside the wordmark when configured, is escaped as the text it is, and leaves
+// no markup behind when empty.
+func TestVersionTagRendersWhenSet(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home", "",
+	}, "\n"))
+
+	render := func(tag string) string {
+		t.Helper()
+		r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "okf-wiki", VersionTag: tag}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := t.TempDir()
+		if err := r.RenderAll(out); err != nil {
+			t.Fatal(err)
+		}
+		page, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(page)
+	}
+
+	withTag := render("v1.2.3")
+	if !strings.Contains(withTag, `class="version-tag"`) || !strings.Contains(withTag, "v1.2.3") {
+		t.Error("a configured version tag was not rendered")
+	}
+
+	without := render("")
+	if strings.Contains(without, "version-tag") {
+		t.Error("an empty version tag left markup behind")
+	}
+
+	escaped := render(`<script>alert(1)</script>`)
+	if strings.Contains(escaped, "<script>alert(1)</script>") {
+		t.Error("the version tag is injected as markup rather than escaped text")
+	}
+}
+
 // TestRenderAtRootBaseKeepsTheHomePage guards the case where the site is served
 // from the output root. There is no room for a redirect there, so writing one
 // would overwrite the wiki's own index.html with a self-redirect.

@@ -42,6 +42,9 @@ Set by flag or environment variable, and independent of the theme:
   handed to the template as a separate field, which a theme may paint in its
   accent.
 - `--brand-sub` / `OKF_WIKI_BRAND_SUB`: the small label beside the wordmark.
+- `--version-tag` / `OKF_WIKI_VERSION_TAG`: a freeform version label shown as a
+  pill beside the wordmark, for a release tag, a build name, or anything else
+  that names this deployment. Empty shows nothing.
 - `--title` / `OKF_WIKI_TITLE`: the document title suffix.
 - `--sections`: section order as comma-separated `id:Title` pairs.
 
@@ -60,6 +63,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.Base}}` | the URL prefix, with a leading and trailing slash |
 | `{{.AssetVersion}}` | the resolved theme's content hash |
 | `{{.BrandName}}` `{{.BrandTail}}` `{{.BrandSub}}` `{{.BrandTitle}}` | the configured brand |
+| `{{.VersionTag}}` | a freeform version label beside the wordmark, empty when unset |
 | `{{.ThemeName}}` `{{.ThemeVersion}}` | the resolved theme's identity |
 | `{{.QuickJSON}}` | the search modal's quick-link list, as a JS value |
 | `{{.Slot "name"}}` | a named fragment from the manifest's `slots` |

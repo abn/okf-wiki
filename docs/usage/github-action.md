@@ -86,6 +86,7 @@ yourself.
 | `base` | `auto` | URL prefix the site is served under |
 | `brand` | `okf-wiki` | wordmark |
 | `brand-sub` | `docs` | subtitle label |
+| `version-tag` | empty | freeform version label beside the wordmark |
 | `title` | `Wiki` | document title suffix |
 | `sections` | empty | section order, `id:Title` pairs |
 | `deploy` | `false` | publish to GitHub Pages |

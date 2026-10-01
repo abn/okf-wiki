@@ -19,6 +19,7 @@ Resolution order is flag, then environment variable, then default.
 | `--theme` | `OKF_WIKI_THEME` | empty | Theme directory layered over the embedded default |
 | `--brand` | `OKF_WIKI_BRAND` | `okf-wiki` | Wordmark |
 | `--brand-sub` | `OKF_WIKI_BRAND_SUB` | `docs` | Subtitle label |
+| `--version-tag` | `OKF_WIKI_VERSION_TAG` | empty | Freeform version label shown beside the wordmark |
 | `--title` | `OKF_WIKI_TITLE` | `Wiki` | Document title suffix |
 | `--sections` | `OKF_WIKI_SECTIONS` | empty | Section order, `id:Title` pairs |
 | `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
