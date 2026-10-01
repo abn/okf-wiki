@@ -53,6 +53,10 @@ inputs:
     description: Section order as comma-separated id:Title pairs.
     required: false
     default: ""
+  nav-links:
+    description: Header links as comma-separated Label=URL pairs.
+    required: false
+    default: ""
   deploy:
     description: "Publish to GitHub Pages. Needs pages: write and id-token: write."
     required: false
@@ -126,6 +130,7 @@ runs:
         VERSION_TAG: ${{ inputs.version-tag }}
         TITLE: ${{ inputs.title }}
         SECTIONS: ${{ inputs.sections }}
+        NAV_LINKS: ${{ inputs.nav-links }}
         BASE: ${{ steps.resolve.outputs.base }}
       run: |
         set -euo pipefail
@@ -135,6 +140,7 @@ runs:
               --brand "$BRAND" --brand-sub "$BRAND_SUB" --title "$TITLE"
               --version-tag "$VERSION_TAG")
         [ -n "$SECTIONS" ] && args+=(--sections "$SECTIONS")
+        [ -n "$NAV_LINKS" ] && args+=(--nav-links "$NAV_LINKS")
         [ -n "$THEME" ] && args+=(--theme "$THEME")
 
         # Root in the container is the runner user under rootless podman; the

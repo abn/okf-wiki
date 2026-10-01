@@ -72,6 +72,7 @@ flags (render):
   --version-tag STR  freeform version label beside the wordmark (optional)
   --title STR        document title suffix (default "Wiki")
   --sections LIST    section order as id:Title pairs, comma-separated
+  --nav-links LIST   header links as Label=URL pairs, comma-separated
 
 flags (serve adds):
   --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)
@@ -83,8 +84,8 @@ rather than cut.
 
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
-  OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_ADDR,
-  OKF_WIKI_OPEN
+  OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
+  OKF_WIKI_ADDR, OKF_WIKI_OPEN
 `)
 }
 
@@ -146,6 +147,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Brand.VersionTag, "version-tag", env("OKF_WIKI_VERSION_TAG", ""), "freeform version label beside the wordmark")
 	fs.StringVar(&c.Brand.Title, "title", env("OKF_WIKI_TITLE", "Wiki"), "document title suffix")
 	fs.StringVar(&c.Brand.Sections, "sections", env("OKF_WIKI_SECTIONS", ""), "section order as id:Title pairs")
+	fs.StringVar(&c.Brand.NavLinks, "nav-links", env("OKF_WIKI_NAV_LINKS", ""), "header links as Label=URL pairs")
 	return c
 }
 

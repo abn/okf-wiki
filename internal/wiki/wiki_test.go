@@ -388,6 +388,60 @@ func TestVersionTagRendersWhenSet(t *testing.T) {
 	}
 }
 
+// TestTopNavLinks covers the header's outbound links. An external target opens
+// in a new tab and is marked, an in-bundle target resolves to the rendered page
+// and stays in this tab, and neither label nor target is injected as markup.
+func TestTopNavLinks(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home", "",
+	}, "\n"))
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "guide", "intro.md"), strings.Join([]string{
+		"---", "title: Intro", "---", "# Intro", "",
+	}, "\n"))
+
+	render := func(nav string) string {
+		t.Helper()
+		r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t", NavLinks: nav}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := t.TempDir()
+		if err := r.RenderAll(out); err != nil {
+			t.Fatal(err)
+		}
+		page, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(page)
+	}
+
+	page := render("Intro=guide/intro.md,GitHub=https://github.com/abn/okf-wiki")
+	if !strings.Contains(page, `href="/wiki/guide/intro.html">Intro`) {
+		t.Error("an in-bundle nav link did not resolve to its rendered page")
+	}
+	if strings.Contains(page, `aria-label="Intro (opens in a new tab)"`) {
+		t.Error("an in-bundle nav link was treated as external")
+	}
+	if !strings.Contains(page, `target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in a new tab)"`) {
+		t.Error("an external nav link did not open in a new tab and say so")
+	}
+	if !strings.Contains(page, `class="nav-ext"`) {
+		t.Error("an external nav link carries no visible marker")
+	}
+
+	if none := render(""); strings.Contains(none, "top-nav") {
+		t.Error("an empty nav left markup behind")
+	}
+
+	escaped := render(`A<b>=https://example.com/?q="x"`)
+	if strings.Contains(escaped, "<b>") {
+		t.Error("the nav label is injected as markup rather than escaped text")
+	}
+}
+
 // TestRenderAtRootBaseKeepsTheHomePage guards the case where the site is served
 // from the output root. There is no room for a redirect there, so writing one
 // would overwrite the wiki's own index.html with a self-redirect.

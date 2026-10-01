@@ -144,6 +144,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 - Content layout: `.toc-aside` with `.toc-aside-title` and `.toc-list`,
   `.toc-btn` with `.toc-panel`, and `.prevnext` with `.prevnext-card`,
   `.prevnext-prev`, `.prevnext-next`, `.prevnext-dir` and `.prevnext-title`.
+  The header's `{{.TopNav}}` links sit in `.top-nav`, each external one carrying
+  `.nav-ext` on its arrow; the same links render again on a phone under
+  `.side-links` with a `.side-links-title`.
 - `.toc`, `.heading-anchor`, and `.callout` with
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,

@@ -36,8 +36,10 @@ type shellData struct {
 	Base       string
 	Breadcrumb template.HTML
 	Nav        template.HTML
-	Meta       template.HTML
-	TOC        template.HTML
+	// TopNav is the header's outbound links, empty when none are configured.
+	TopNav template.HTML
+	Meta   template.HTML
+	TOC    template.HTML
 	// TOCList is the same entries as TOC as a bare list, for the sidebar
 	// column and the dropdown panel. TOC keeps the details element for
 	// themes that place it in the body.
@@ -91,6 +93,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Base:         base,
 		Breadcrumb:   template.HTML(r.breadcrumbHTML(p)),
 		Nav:          template.HTML(r.sidebarHTML(p.Section, p.Slug)),
+		TopNav:       template.HTML(r.topNavHTML()),
 		Meta:         template.HTML(r.buildMeta(p)),
 		TOC:          template.HTML(buildTOC(p)),
 		TOCList:      template.HTML(buildTOCList(p)),
@@ -343,6 +346,45 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 		b.WriteString(`</ul></details>`)
 	}
 	b.WriteString(`</nav>`)
+	return b.String()
+}
+
+// navExtArrow marks a link that leaves the wiki. It is decorative: the
+// new-tab behaviour is carried by the link's own label for a screen reader.
+const navExtArrow = `<svg class="nav-ext" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 7.8 7.8 4.2M5 4.2h3.2V7.4"/></svg>`
+
+// external reports whether a target leaves the wiki. Only http and https count:
+// a relative target is a page of this site, and a mailto or tel is handed to
+// the system rather than opened in a window.
+func external(target string) bool {
+	t := strings.ToLower(strings.TrimSpace(target))
+	return strings.HasPrefix(t, "http://") || strings.HasPrefix(t, "https://")
+}
+
+// topNavHTML renders the configured header links, in two kinds. A target with
+// an http or https scheme leaves the wiki: it opens in a new tab and says so,
+// with the arrow as the visible signal and the same words in the label for a
+// screen reader. Any other target is a page of this bundle and resolves exactly
+// as a body link does, from the bundle root, so "usage/cli.md" becomes the
+// rendered page under the base and opens in the same tab. Label and href are
+// escaped, since both come from configuration rather than the bundle. Empty
+// when none are configured, so the header renders neither an empty nav nor its
+// dividing rule.
+func (r *Renderer) topNavHTML() string {
+	links := parseNav(r.cfg.Brand.NavLinks)
+	var b strings.Builder
+	for _, l := range links {
+		label := template.HTMLEscapeString(l.Label)
+		href := r.linkPath("", l.URL)
+		attrs := ""
+		if external(l.URL) {
+			href = l.URL
+			attrs = fmt.Sprintf(` target="_blank" rel="noopener noreferrer" aria-label="%s"`,
+				template.HTMLEscapeString(l.Label+" (opens in a new tab)"))
+			label += navExtArrow
+		}
+		fmt.Fprintf(&b, `<a href="%s"%s>%s</a>`, template.HTMLEscapeString(href), attrs, label)
+	}
 	return b.String()
 }
 

@@ -22,6 +22,7 @@ Resolution order is flag, then environment variable, then default.
 | `--version-tag` | `OKF_WIKI_VERSION_TAG` | empty | Freeform version label shown beside the wordmark |
 | `--title` | `OKF_WIKI_TITLE` | `Wiki` | Document title suffix |
 | `--sections` | `OKF_WIKI_SECTIONS` | empty | Section order, `id:Title` pairs |
+| `--nav-links` | `OKF_WIKI_NAV_LINKS` | empty | Header links, `Label=URL` pairs |
 | `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
 
@@ -34,6 +35,14 @@ with no wiki subdirectory, and there is no root redirect, because the wiki's own
 `index.html` already occupies that path. This is the base the GitHub Action
 computes for a user or organisation Pages site, so it is a normal configuration
 rather than an edge case.
+
+`--nav-links` adds links to the header, comma-separated as `Label=URL` pairs. A
+target with an `http` or `https` scheme leaves the wiki: it opens in a new tab
+and is marked with an arrow. Any other target is a path in this bundle and
+resolves exactly as a body link does, from the bundle root, so
+`Usage=usage/cli.md` becomes the rendered page under the base and opens in the
+same tab. A pair missing its label or its target is skipped. On a phone the
+links move into the navigation drawer, under an "Elsewhere" heading.
 
 ## Endpoints
 

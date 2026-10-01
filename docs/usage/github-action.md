@@ -89,6 +89,7 @@ yourself.
 | `version-tag` | empty | freeform version label beside the wordmark |
 | `title` | `Wiki` | document title suffix |
 | `sections` | empty | section order, `id:Title` pairs |
+| `nav-links` | empty | header links, `Label=URL` pairs |
 | `deploy` | `false` | publish to GitHub Pages |
 
 All but `base` and `deploy` are flags on `okf-wiki render`, passed through as

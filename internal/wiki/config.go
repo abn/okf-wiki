@@ -24,9 +24,41 @@ type Brand struct {
 	// VersionTag is a freeform version label shown beside the wordmark, e.g.
 	// "v1.2.3" or "nightly". Empty renders nothing.
 	VersionTag string
+	// NavLinks is a comma-separated list of "Label=URL" pairs for the header's
+	// top navigation, for outbound destinations such as a repository or a
+	// sibling site. Empty renders no links.
+	NavLinks string
 	// Sections is a comma-separated order list of "id:Title" pairs. Sections
 	// not listed are appended, title-cased from their directory name.
 	Sections string
+}
+
+// NavLink is one entry in the header's top navigation: a label and a target.
+type NavLink struct {
+	Label string
+	URL   string
+}
+
+// parseNav parses "Label=URL,Label=URL" into header links. A part missing its
+// label or its target is skipped, so a stray comma never renders an empty
+// control. A label may not contain a comma; a target is split on the first "="
+// so a query string survives.
+func parseNav(s string) []NavLink {
+	var out []NavLink
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		label, target, found := strings.Cut(part, "=")
+		label = strings.TrimSpace(label)
+		target = strings.TrimSpace(target)
+		if !found || label == "" || target == "" {
+			continue
+		}
+		out = append(out, NavLink{Label: label, URL: target})
+	}
+	return out
 }
 
 // Config is the resolved configuration for a render/serve run.
