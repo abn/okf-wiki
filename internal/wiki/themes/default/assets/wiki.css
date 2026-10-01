@@ -170,8 +170,16 @@ a { color: var(--color-accent-text); text-decoration: none; }
   align-items: start;
 }
 /* The reading column caps at 760px; the grid column itself keeps growing, so
-   the prev/next cards span the column while the text stays readable. */
-.content { min-width: 0; width: 100%; max-width: 760px; }
+   the prev/next cards span the column while the text stays readable. It also
+   fills the viewport, so the cards sit at the foot of a short page instead of
+   floating just under a few lines. The subtraction is the header, the
+   breadcrumb bar, both one-pixel borders, and the layout's own padding, so a
+   short page still fits without scrolling. */
+.content {
+  min-width: 0; width: 100%; max-width: 760px;
+  display: flex; flex-direction: column;
+  min-height: calc(100vh - 210px);
+}
 
 .drawer-backdrop {
   display: none; position: fixed; inset: 0;
@@ -499,8 +507,10 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 
 /* ------------------------------------------------------- previous and next
    Two cards following the section order. A lone card holds its side so the
-   grid never collapses it across the column. */
-.prevnext { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: var(--space-12) 0 0; }
+   grid never collapses it across the column. The auto top margin takes any
+   slack in a short reading column, and the padding keeps a fixed minimum
+   distance from the prose when there is none. */
+.prevnext { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: auto 0 0; padding-top: var(--space-12); }
 .prevnext-card {
   display: block; border: 1px solid var(--color-line); border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5); text-decoration: none;
