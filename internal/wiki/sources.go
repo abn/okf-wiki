@@ -26,8 +26,8 @@ type Source struct {
 // applySources rewrites footnote references whose label matches a sources[]
 // id into numbered links to the generated Sources section, and drops their
 // definitions from the footnote list so they do not render dangling.
-// Unmatched footnotes render exactly as goldmark would. Numbering follows
-// first appearance, and a repeated citation reuses its number.
+// Unmatched footnotes render exactly as goldmark would. A repeated citation
+// reuses its number.
 //
 // Numbering counts matched citations only, while goldmark numbers every
 // footnote in parse order, so a page mixing both can show one numeral twice.
