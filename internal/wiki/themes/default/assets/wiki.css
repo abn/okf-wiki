@@ -458,25 +458,44 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 }
 .toc-aside .toc-list { border-left: 1px solid var(--color-line); }
 .toc-aside .toc-list a { border-left: 2px solid transparent; margin-left: -1px; padding-left: var(--space-3); }
-.toc-aside .toc-list a.active { color: var(--color-heading); border-color: var(--color-accent-text); }
 .toc-btn {
   display: none; align-items: center; gap: var(--space-1);
+  /* Pushed to the far end of the bar: the button is the right-hand control,
+     mirroring the hamburger on the left. */
+  margin-left: auto;
   background: transparent; border: 1px solid transparent; color: var(--color-heading);
   padding: 6px var(--space-3); border-radius: var(--radius-pill); cursor: pointer;
   font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
   transition: background var(--dur) var(--ease);
 }
 .toc-btn:hover { background: var(--color-accent-soft); }
+/* The panel is the drawer's surface in a smaller frame: same background, same
+   hairline, same width, and the same square top corner where it meets the bar
+   it hangs from. It is anchored to the bar's right edge, below the button. */
 .toc-panel {
-  position: absolute; top: calc(100% + 8px); right: var(--space-6);
+  /* right is measured from the padding box, so it repeats the bar's own inset
+     to line the panel up with the button rather than the viewport edge. */
+  position: absolute; top: 100%; right: var(--space-6);
   width: min(320px, 84vw); max-height: 60vh; overflow-y: auto;
   background: var(--color-bg-elevated); border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  padding: var(--space-2) var(--space-4) var(--space-3); z-index: var(--z-overlay);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4) var(--space-4) var(--space-5); z-index: var(--z-overlay);
 }
 .toc-panel[hidden] { display: none; }
-.toc-panel .toc-list a { padding: 6px 0; }
-.toc-panel .toc-list a.active { color: var(--color-heading); font-weight: var(--fw-semibold); }
+.toc-panel .toc-list { border-left: 1px solid var(--color-line); }
+.toc-panel .toc-list a {
+  border-left: 2px solid transparent; margin-left: -1px;
+  padding: 6px 0 6px var(--space-3);
+}
+/* The section in view carries the same left guard in both the rail and the
+   panel, so the marker reads as one thing wherever it appears. */
+.toc-panel .toc-list a.active,
+.toc-aside .toc-list a.active {
+  color: var(--color-heading); font-weight: var(--fw-semibold);
+  border-left-color: var(--color-accent-text);
+}
 
 /* ------------------------------------------------------- previous and next
    Two cards following the section order. A lone card holds its side so the
