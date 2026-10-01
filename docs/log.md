@@ -3,6 +3,12 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-01
+
+* **Update**: `design/rendering.md` documents the `sources` construct: how a
+  footnote becomes a numbered citation to the generated Sources section, how an
+  entry resolves, and which credibility signals it shows.
+
 ## 2026-09-30
 
 * **Update**: Tag chips on every page now link to a tag page listing all pages

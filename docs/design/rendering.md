@@ -52,6 +52,9 @@ flowchart LR
    field around it. A diagram that will not parse becomes a red card carrying
    the parser's message and the source, so the mistake is readable where it
    is written rather than an empty block.
+
+   Footnotes whose label matches a `sources[]` id are rewritten into numbered
+   citations to a generated Sources section; see [Sources](#sources).
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
    Tags are collected into `tags.json`, a catalogue of display name, tag page
@@ -101,6 +104,52 @@ concept path, and the page's other tags. Status badges render from data the
 bundle actually carries: draft and deprecated from `status`, stale from
 `stale_after`. Trust tiers and dates need `verified` and `generated`
 frontmatter no page is required to have, so the page does not guess them.
+
+## Sources
+
+A page declares the material its claims come from in a `sources` list in
+frontmatter. Each entry is a followable artifact or a scope descriptor, and
+carries an `id` that a footnote can name:
+
+```yaml
+sources:
+  - id: okf-spec
+    resource: https://github.com/GoogleCloudPlatform/knowledge-catalog
+    title: The OKF specification
+    author: team:knowledge-catalog
+    last_modified: 2026-06-30T00:00:00Z
+```
+
+A body footnote whose label matches an entry's `id` becomes a numbered citation
+linking to a generated `Sources` heading at the end of the page, and the
+footnote's own definition is dropped so the material appears once. A repeated
+citation reuses its number. Numbers follow the order of the `sources` list, not
+the order the claims appear, so the reference list reads the same however the
+prose is arranged. An entry with no `id` cannot be cited but is still listed,
+because the page declares it.
+
+`resource` decides how an entry resolves. An absolute URL links as written, a
+relative path resolves like any other bundle link, and free text, such as a
+sentence naming the scope a claim applies to, renders as plain text, since
+there is nothing to follow. The link text falls back from `title` to `resource`
+to `id`, so an entry is never an empty link.
+
+`author` and `last_modified` are optional signals, and an absolute URL adds its
+host. The list shows host, author, then date, and omits whatever is absent
+rather than leaving a blank. An RFC 3339 `last_modified` is reformatted for
+reading; anything else is shown as written, so a malformed date is visible
+rather than silently missing. `usage_count` from the OKF source family is
+accepted and not rendered.
+
+The generated heading is an ordinary level-two heading, so it joins the on-page
+table of contents, and its id is made unique against the page, since a page may
+already link somewhere called `sources`.
+
+The two footnote kinds can share a page: a footnote whose label matches no entry
+keeps goldmark's own number and definition. Because the two number
+independently, a page mixing them can show one numeral twice. Both links still
+resolve; only the numerals collide. [Blocks](../testbed/blocks.md) exercises
+every case on one page.
 
 ## Caching
 
