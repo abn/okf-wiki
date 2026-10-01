@@ -836,7 +836,10 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .breadcrumb { flex: 1; }
 }
 @media (max-width: 620px) {
-  .wrap { padding: 0 var(--space-4); }
+  /* Only the horizontal inset narrows. The shorthand also resets the layout's
+     own vertical padding to zero, which puts the first heading against the
+     breadcrumb bar and the cards against the foot of the viewport. */
+  .wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
   .toc-panel { right: var(--space-4); }
   .brand-sub { display: none; }
   .search-modal-backdrop { padding-top: 6vh; }
