@@ -128,30 +128,88 @@
         if (e.key === 'Escape') closeToc();
       });
     }
+    // The section in view is the last heading above a reading line, computed
+    // from positions rather than observed. An observer cannot see the last
+    // section on a short page: its heading never reaches a fixed band because
+    // there is not enough content below it to scroll it there, so the marker
+    // stuck on the section before it. Scrolled to the end, the last heading
+    // wins outright, which is also what a reader expects there.
     var links = Array.prototype.slice.call(
       document.querySelectorAll('.toc-aside a[href^="#"], #tocPanel a[href^="#"]'));
-    if (links.length && 'IntersectionObserver' in window) {
-      var byId = {};
-      links.forEach(function (a) {
-        var id = a.getAttribute('href').slice(1);
-        (byId[id] = byId[id] || []).push(a);
-      });
-      var current = null;
-      function mark(list, on) {
-        list.forEach(function (a) { a.classList.toggle('active', on); });
-      }
-      var obs = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (!en.isIntersecting) return;
-          if (current) mark(current, false);
-          current = byId[en.target.id] || null;
-          if (current) mark(current, true);
-        });
-      }, { rootMargin: '-20% 0px -70% 0px' });
-      document.querySelectorAll('article h2[id]').forEach(function (h) {
-        obs.observe(h);
-      });
+    if (!links.length) return;
+
+    var byId = {};
+    links.forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      (byId[id] = byId[id] || []).push(a);
+    });
+    var heads = Array.prototype.slice.call(document.querySelectorAll('article h2[id]'))
+      .filter(function (h) { return byId[h.id]; });
+    if (!heads.length) return;
+
+    var current = null;
+    function mark(list, on) {
+      list.forEach(function (a) { a.classList.toggle('active', on); });
     }
+    function setActive(id) {
+      if (id === current) return;
+      if (current && byId[current]) mark(byId[current], false);
+      current = id;
+      if (current && byId[current]) mark(byId[current], true);
+    }
+    // A table-of-contents jump names the section the reader asked for, so it
+    // holds until they scroll again. Without this the end-of-page rule below
+    // would override a jump to a section too near the end to reach the
+    // reading line, and mark the last section instead.
+    var pinned = null;
+    function pinToHash() {
+      var id = window.location.hash.slice(1);
+      if (byId[id]) {
+        pinned = id;
+        setActive(id);
+      }
+    }
+    window.addEventListener('hashchange', pinToHash);
+    // Any of these means the reader is driving again, so the position wins.
+    // mousedown also covers a scrollbar drag, which fires no wheel event.
+    ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (ev) {
+      window.addEventListener(ev, function () { pinned = null; }, { passive: true });
+    });
+    function readingLine() {
+      // A third down the viewport. The line has to sit below where a
+      // table-of-contents jump lands a heading, which is the heading's own
+      // scroll margin just under the two sticky bars, or the marker would
+      // disagree with the jump the reader just made; and above the middle, so
+      // a section becomes current as its heading arrives rather than once it
+      // has passed.
+      return window.innerHeight * 0.33;
+    }
+    function update() {
+      if (pinned) return;
+      var line = readingLine();
+      var atEnd = window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2;
+      if (atEnd) {
+        setActive(heads[heads.length - 1].id);
+        return;
+      }
+      var pick = heads[0].id;
+      for (var i = 0; i < heads.length; i++) {
+        if (heads[i].getBoundingClientRect().top <= line) pick = heads[i].id;
+        else break;
+      }
+      setActive(pick);
+    }
+    var queued = false;
+    function onScroll() {
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(function () { queued = false; update(); });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    pinToHash();
+    update();
   })();
 
   // Heading anchor links. Every section heading gets a # permalink, revealed
