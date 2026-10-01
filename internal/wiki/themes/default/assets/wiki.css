@@ -603,9 +603,10 @@ pre.mermaid {
   text-align: center; overflow-x: auto;
   color: var(--color-text-muted); font-family: var(--font-ui); font-size: var(--text-sm);
 }
-/* Inline diagrams fit the reading column. The lightbox clone (outside
-   pre.mermaid) is set to natural size for detail. */
-pre.mermaid svg { max-width: 100% !important; height: auto; display: block; margin: 0 auto; }
+/* Diagrams render at natural width, so a wide one scrolls sideways in its
+   card rather than shrinking its labels to fit. The lightbox clone is sized
+   separately. */
+pre.mermaid svg { height: auto; display: block; margin: 0 auto; }
 pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white-space: pre-wrap; }
 
 /* ---------------------------------------------------------- diagram cards
