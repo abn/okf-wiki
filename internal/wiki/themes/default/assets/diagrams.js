@@ -273,8 +273,6 @@
     initLightbox();
   }
 
-  // Wrap a rendered diagram so an "Expand" affordance can sit over it, fixed
-  // above the diagram's own horizontal scroll.
   // A diagram that will not parse becomes a card carrying the source and the
   // parser's own message, so the mistake is readable where it is written. A
   // failed run empties the element, so the source is restored first.
@@ -293,7 +291,7 @@
     kind.className = 'mermaid-type';
     kind.textContent = 'Diagram';
     bar.appendChild(kind);
-    frame.appendChild(bar);
+    frame.insertBefore(bar, pre);
 
     var card = document.createElement('div');
     card.className = 'mermaid-error';
@@ -397,7 +395,7 @@
       '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
       function () { openLightbox(pre); }));
     bar.appendChild(actions);
-    frame.appendChild(bar);
+    frame.insertBefore(bar, pre);
   }
 
   // Copy the fence body, not the rendered text: the source is what a reader
