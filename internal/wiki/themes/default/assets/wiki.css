@@ -881,10 +881,11 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
     border-top: 1px solid var(--color-line);
   }
   .side-links-title {
-    margin: 0 0 var(--space-2); font-family: var(--font-ui); font-size: var(--text-xs);
+    margin: var(--space-4) 0 var(--space-2); font-family: var(--font-ui); font-size: var(--text-xs);
     font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--color-text-muted);
   }
+  .side-links-title:first-child { margin-top: 0; }
   .side-links a {
     display: block; padding: 6px var(--space-3); border-radius: var(--radius-sm);
     font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);

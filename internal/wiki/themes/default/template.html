@@ -56,7 +56,7 @@
 </div>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="layout wrap">
-  <aside class="sidebar" id="sideDrawer">{{.Nav}}{{if .TopNav}}<div class="side-links"><p class="side-links-title">Elsewhere</p>{{.TopNav}}</div>{{end}}</aside>
+  <aside class="sidebar" id="sideDrawer">{{.Nav}}{{if or .TopNavInternal .TopNavExternal}}<div class="side-links">{{if .TopNavInternal}}<p class="side-links-title">On this wiki</p>{{.TopNavInternal}}{{end}}{{if .TopNavExternal}}<p class="side-links-title">Elsewhere</p>{{.TopNavExternal}}{{end}}</div>{{end}}</aside>
   <main class="content" id="main">
     <article class="prose">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}

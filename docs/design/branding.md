@@ -50,7 +50,8 @@ Set by flag or environment variable, and independent of the theme:
 - `--nav-links` / `OKF_WIKI_NAV_LINKS`: links in the header, comma-separated as
   `Label=URL` pairs. An external target opens in a new tab and is marked with an
   arrow; an in-bundle path resolves as a body link and opens in the same tab. On
-  a phone the links move into the drawer.
+  a phone the links move into the drawer, the in-wiki ones first under "On this
+  wiki" and the rest under "Elsewhere".
 
 ## The template contract
 
@@ -62,7 +63,8 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.Kicker}}` | an eyebrow label above the title, empty on ordinary pages |
 | `{{.TitleHTML}}` | trusted H1 markup replacing the title when set, today only on synthetic pages |
 | `{{.Body}}` `{{.TOC}}` `{{.Meta}}` `{{.Nav}}` `{{.Breadcrumb}}` | the rendered document, already trusted HTML |
-| `{{.TopNav}}` | the header's outbound links, empty when none are configured |
+| `{{.TopNav}}` | the header's links in configured order, empty when none are set |
+| `{{.TopNavInternal}}` `{{.TopNavExternal}}` | the same links split by kind, for the drawer |
 | `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
 | `{{.Base}}` | the URL prefix, with a leading and trailing slash |

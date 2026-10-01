@@ -42,7 +42,8 @@ and is marked with an arrow. Any other target is a path in this bundle and
 resolves exactly as a body link does, from the bundle root, so
 `Usage=usage/cli.md` becomes the rendered page under the base and opens in the
 same tab. A pair missing its label or its target is skipped. On a phone the
-links move into the navigation drawer, under an "Elsewhere" heading.
+links move into the navigation drawer, the in-wiki ones under "On this wiki" and
+the rest under "Elsewhere".
 
 ## Endpoints
 

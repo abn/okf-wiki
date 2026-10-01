@@ -8,7 +8,8 @@ deprecated, or restructured. It is deliberately separate from software releases.
 * **Update**: A `--nav-links` flag (and `OKF_WIKI_NAV_LINKS`), plus a `nav-links`
   action input, adds links to the header as `Label=URL` pairs. An external target
   opens in a new tab and is marked with an arrow; an in-bundle path resolves as a
-  body link and opens in the same tab. On a phone the links move into the drawer.
+  body link and opens in the same tab. On a phone they move into the drawer, the
+  in-wiki links first under "On this wiki" and the rest under "Elsewhere".
 * **Update**: A `--version-tag` flag (and `OKF_WIKI_VERSION_TAG`), plus a
   `version-tag` action input, renders a freeform label as a pill beside the
   wordmark when set and nothing when unset. The flag reference, the branding

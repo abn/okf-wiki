@@ -36,10 +36,14 @@ type shellData struct {
 	Base       string
 	Breadcrumb template.HTML
 	Nav        template.HTML
-	// TopNav is the header's outbound links, empty when none are configured.
+	// TopNav is the header's links, in the order they were configured.
 	TopNav template.HTML
-	Meta   template.HTML
-	TOC    template.HTML
+	// TopNavInternal and TopNavExternal are those same links split by kind, for
+	// the drawer, which puts the in-wiki ones first and labels the rest.
+	TopNavInternal template.HTML
+	TopNavExternal template.HTML
+	Meta           template.HTML
+	TOC            template.HTML
 	// TOCList is the same entries as TOC as a bare list, for the sidebar
 	// column and the dropdown panel. TOC keeps the details element for
 	// themes that place it in the body.
@@ -76,31 +80,33 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	name, tail := splitWordmark(r.cfg.Brand.Name)
 	base := r.cfg.base()
 	data := shellData{
-		Title:        title,
-		Kicker:       p.Kicker,
-		TitleHTML:    template.HTML(p.TitleHTML),
-		Description:  description,
-		Version:      r.Version(),
-		GeneratedAt:  r.GeneratedAt(),
-		AssetVersion: r.AssetVersion(),
-		BrandName:    name,
-		BrandTail:    tail,
-		BrandSub:     r.cfg.Brand.Sub,
-		BrandTitle:   r.cfg.Brand.Title,
-		VersionTag:   r.cfg.Brand.VersionTag,
-		ThemeName:    r.theme.Name,
-		ThemeVersion: r.theme.Version,
-		Base:         base,
-		Breadcrumb:   template.HTML(r.breadcrumbHTML(p)),
-		Nav:          template.HTML(r.sidebarHTML(p.Section, p.Slug)),
-		TopNav:       template.HTML(r.topNavHTML()),
-		Meta:         template.HTML(r.buildMeta(p)),
-		TOC:          template.HTML(buildTOC(p)),
-		TOCList:      template.HTML(buildTOCList(p)),
-		PrevNext:     template.HTML(r.prevNextHTML(p)),
-		Body:         template.HTML(stripLeadingH1(p.Body, title)),
-		QuickJSON:    template.JS(r.quickLinksJSON()),
-		Slots:        r.slots(),
+		Title:          title,
+		Kicker:         p.Kicker,
+		TitleHTML:      template.HTML(p.TitleHTML),
+		Description:    description,
+		Version:        r.Version(),
+		GeneratedAt:    r.GeneratedAt(),
+		AssetVersion:   r.AssetVersion(),
+		BrandName:      name,
+		BrandTail:      tail,
+		BrandSub:       r.cfg.Brand.Sub,
+		BrandTitle:     r.cfg.Brand.Title,
+		VersionTag:     r.cfg.Brand.VersionTag,
+		ThemeName:      r.theme.Name,
+		ThemeVersion:   r.theme.Version,
+		Base:           base,
+		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
+		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
+		TopNav:         template.HTML(r.topNavHTML()),
+		TopNavInternal: template.HTML(r.topNavMatching(false)),
+		TopNavExternal: template.HTML(r.topNavMatching(true)),
+		Meta:           template.HTML(r.buildMeta(p)),
+		TOC:            template.HTML(buildTOC(p)),
+		TOCList:        template.HTML(buildTOCList(p)),
+		PrevNext:       template.HTML(r.prevNextHTML(p)),
+		Body:           template.HTML(stripLeadingH1(p.Body, title)),
+		QuickJSON:      template.JS(r.quickLinksJSON()),
+		Slots:          r.slots(),
 	}
 
 	var b strings.Builder
@@ -361,29 +367,47 @@ func external(target string) bool {
 	return strings.HasPrefix(t, "http://") || strings.HasPrefix(t, "https://")
 }
 
-// topNavHTML renders the configured header links, in two kinds. A target with
-// an http or https scheme leaves the wiki: it opens in a new tab and says so,
-// with the arrow as the visible signal and the same words in the label for a
-// screen reader. Any other target is a page of this bundle and resolves exactly
-// as a body link does, from the bundle root, so "usage/cli.md" becomes the
-// rendered page under the base and opens in the same tab. Label and href are
-// escaped, since both come from configuration rather than the bundle. Empty
-// when none are configured, so the header renders neither an empty nav nor its
-// dividing rule.
+// topNavLink renders one header link. An http or https target leaves the wiki:
+// it opens in a new tab and says so, with the arrow as the visible signal and
+// the same words in the label for a screen reader. Any other target is a page of
+// this bundle and resolves as a body link does, from the bundle root, so
+// "usage/cli.md" becomes the rendered page under the base and opens in the same
+// tab. Label and href are escaped, since both come from configuration rather
+// than the bundle.
+func (r *Renderer) topNavLink(l NavLink) string {
+	label := template.HTMLEscapeString(l.Label)
+	href := r.linkPath("", l.URL)
+	attrs := ""
+	if external(l.URL) {
+		href = l.URL
+		attrs = fmt.Sprintf(` target="_blank" rel="noopener noreferrer" aria-label="%s"`,
+			template.HTMLEscapeString(l.Label+" (opens in a new tab)"))
+		label += navExtArrow
+	}
+	return fmt.Sprintf(`<a href="%s"%s>%s</a>`, template.HTMLEscapeString(href), attrs, label)
+}
+
+// topNavHTML renders the header's links in the order they were configured,
+// whether in-wiki or outbound. The header has no headings to group them under,
+// and the arrow already marks the ones that leave, so the order stands.
 func (r *Renderer) topNavHTML() string {
-	links := parseNav(r.cfg.Brand.NavLinks)
 	var b strings.Builder
-	for _, l := range links {
-		label := template.HTMLEscapeString(l.Label)
-		href := r.linkPath("", l.URL)
-		attrs := ""
-		if external(l.URL) {
-			href = l.URL
-			attrs = fmt.Sprintf(` target="_blank" rel="noopener noreferrer" aria-label="%s"`,
-				template.HTMLEscapeString(l.Label+" (opens in a new tab)"))
-			label += navExtArrow
+	for _, l := range parseNav(r.cfg.Brand.NavLinks) {
+		b.WriteString(r.topNavLink(l))
+	}
+	return b.String()
+}
+
+// topNavMatching renders the configured links whose kind matches wantExternal.
+// The drawer needs the two kinds apart: an in-wiki link is a page of this site,
+// not somewhere else, so it does not belong under the heading the outbound links
+// get. Empty when none of that kind are configured.
+func (r *Renderer) topNavMatching(wantExternal bool) string {
+	var b strings.Builder
+	for _, l := range parseNav(r.cfg.Brand.NavLinks) {
+		if external(l.URL) == wantExternal {
+			b.WriteString(r.topNavLink(l))
 		}
-		fmt.Fprintf(&b, `<a href="%s"%s>%s</a>`, template.HTMLEscapeString(href), attrs, label)
 	}
 	return b.String()
 }

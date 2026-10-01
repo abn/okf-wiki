@@ -431,6 +431,16 @@ func TestTopNavLinks(t *testing.T) {
 	if !strings.Contains(page, `class="nav-ext"`) {
 		t.Error("an external nav link carries no visible marker")
 	}
+	if !strings.Contains(page, "On this wiki") || !strings.Contains(page, "Elsewhere") {
+		t.Error("the drawer does not separate the in-wiki links from the outbound ones")
+	}
+	if strings.Index(page, "On this wiki") > strings.Index(page, "Elsewhere") {
+		t.Error("the in-wiki block comes after the outbound one in the drawer")
+	}
+
+	if onlyExt := render("GitHub=https://github.com/abn/okf-wiki"); strings.Contains(onlyExt, "On this wiki") {
+		t.Error("an outbound-only nav shows an empty in-wiki block in the drawer")
+	}
 
 	if none := render(""); strings.Contains(none, "top-nav") {
 		t.Error("an empty nav left markup behind")
