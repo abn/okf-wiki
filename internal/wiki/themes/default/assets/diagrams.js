@@ -576,6 +576,14 @@
     return lb;
   }
 
+  // A heading's own text, without the # permalink the client appends to it.
+  function headingLabel(h) {
+    var clone = h.cloneNode(true);
+    var anchor = clone.querySelector('.heading-anchor');
+    if (anchor) anchor.remove();
+    return clone.textContent.trim();
+  }
+
   function titleFor(pre) {
     // Nearest preceding heading in the article is a better label than "Diagram".
     // Start from the frame: the diagram is wrapped, so the <pre> itself has no
@@ -583,10 +591,10 @@
     var node = pre.closest('.mermaid-frame') || pre;
     while (node && node.previousElementSibling) {
       node = node.previousElementSibling;
-      if (/^H[1-4]$/.test(node.tagName)) return node.textContent.trim();
+      if (/^H[1-4]$/.test(node.tagName)) return headingLabel(node);
     }
     var h1 = document.querySelector('article h1');
-    return (h1 && h1.textContent.trim()) || 'Diagram';
+    return (h1 && headingLabel(h1)) || 'Diagram';
   }
 
   function openLightbox(pre) {
