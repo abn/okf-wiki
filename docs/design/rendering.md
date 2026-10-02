@@ -43,15 +43,15 @@ flowchart LR
    (`> [!NOTE]`) become callout cards. Mermaid fences pass through as
    `<pre class="mermaid">` for the browser to render.
 
-   The browser draws each diagram into a card: a toolbar naming the type with
-   a copy and an expand affordance, then the drawing in a scroll area. Every
-   type renders at one size, at natural width, so a wide diagram scrolls
-   sideways rather than shrinking its labels; the card caps the height at
-   560px so a tall one scrolls instead of taking the page. Full screen opens
-   a wide diagram at its natural size and closes on Escape or a click on the
-   field around it. A diagram that will not parse becomes a red card carrying
-   the parser's message and the source, so the mistake is readable where it
-   is written rather than an empty block.
+   The browser draws each diagram into a card: a toolbar naming the type, a
+   zoom group and the copy and expand affordances, then the drawing. Every
+   type renders at one size, and a diagram opens fitted to the card, so its
+   whole shape is visible; the zoom buttons step the scale and the card's
+   scroll area takes over. Full screen repeats the drawing, fitted to the
+   window, with the same zoom and a drag to pan, and closes on Escape or a
+   click on the field around it. A diagram that will not parse becomes a red
+   card carrying the parser's message and the source, so the mistake is
+   readable where it is written rather than an empty block.
 
    Footnotes whose label matches a `sources[]` id are rewritten into numbered
    citations to a generated Sources section; see [Sources](#sources).

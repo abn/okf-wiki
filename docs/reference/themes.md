@@ -166,13 +166,15 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 `search-match`.
 
 `diagrams.js` wraps each diagram in `mermaid-frame` with a `mermaid-toolbar`
-carrying `mermaid-type`, `mermaid-actions`, `mermaid-copy` and `mermaid-expand`,
-adds `mermaid-rendered`, and builds the lightbox out of `wiki-lbx` with its
-`wiki-lbx-bar`, `wiki-lbx-id`, `wiki-lbx-pill`, `wiki-lbx-title`,
-`wiki-lbx-ctrls`, `wiki-lbx-btn`, `wiki-lbx-stage`, `wiki-lbx-content` and
-`wiki-lbx-hint`. A diagram that will not parse keeps `mermaid-fallback` on the
-source element and gains a `mermaid-error` card with `mermaid-error-head`,
-`mermaid-error-detail` and `mermaid-error-source`.
+carrying `mermaid-type`, `mermaid-actions`, the card zoom in `mermaid-zoom`,
+`mermaid-zoom-out`, `mermaid-zoom-in` and `mermaid-zoom-pct`, and the
+`mermaid-copy` and `mermaid-expand` buttons. It adds `mermaid-rendered` and
+builds the lightbox out of `wiki-lbx` with its `wiki-lbx-bar`, `wiki-lbx-id`,
+`wiki-lbx-pill`, `wiki-lbx-title`, `wiki-lbx-ctrls`, `wiki-lbx-btn`,
+`wiki-lbx-stage`, `wiki-lbx-content` and `wiki-lbx-hint`. A diagram that will
+not parse keeps `mermaid-fallback` on the source element and gains a
+`mermaid-error` card with `mermaid-error-head`, `mermaid-error-detail` and
+`mermaid-error-source`.
 
 An unstyled class is invisible rather than broken, so a theme that misses one of
 these loses the affordance, not the feature. The ids above are the ones that

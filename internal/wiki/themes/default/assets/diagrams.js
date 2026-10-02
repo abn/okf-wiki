@@ -387,6 +387,29 @@
 
     var actions = document.createElement('span');
     actions.className = 'mermaid-actions';
+
+    // Zoom lives in the card, not only in the viewer: a diagram taller or wider
+    // than the card opens fitted to it, and these step the scale up or down.
+    var zoom = document.createElement('span');
+    zoom.className = 'mermaid-zoom';
+    var out = iconButton('mermaid-zoom-out', 'Zoom out', '<path d="M5 12h14"/>',
+      function () { cardZoom(frame, 0.8); });
+    var pct = document.createElement('button');
+    pct.type = 'button';
+    pct.className = 'mermaid-zoom-pct';
+    pct.setAttribute('aria-label', 'Fit diagram to the card');
+    pct.title = 'Fit diagram to the card';
+    pct.addEventListener('click', function (e) {
+      e.stopPropagation();
+      cardFit(frame);
+    });
+    var zin = iconButton('mermaid-zoom-in', 'Zoom in', '<path d="M12 5v14M5 12h14"/>',
+      function () { cardZoom(frame, 1.25); });
+    zoom.appendChild(out);
+    zoom.appendChild(pct);
+    zoom.appendChild(zin);
+    actions.appendChild(zoom);
+
     actions.appendChild(iconButton('mermaid-copy', 'Copy diagram source',
       '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
       '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
@@ -396,7 +419,80 @@
       function () { openLightbox(pre); }));
     bar.appendChild(actions);
     frame.insertBefore(bar, pre);
+
+    cardInit(frame, pct);
   }
+
+  // The card's own zoom, separate from the viewer. The diagram is resized by
+  // setting the SVG's size, so the card's scroll area takes over once a zoomed
+  // diagram outgrows it.
+  function naturalSize(svg) {
+    var vb = svg && svg.getAttribute('viewBox');
+    if (vb) {
+      var p = vb.split(/[ ,]+/).map(Number);
+      if (p[2] && p[3]) return { w: p[2], h: p[3] };
+    }
+    var r = svg ? svg.getBoundingClientRect() : null;
+    return { w: (r && r.width) || 1, h: (r && r.height) || 1 };
+  }
+
+  function cardInit(frame, pct) {
+    var svg = frame.querySelector('pre.mermaid svg');
+    if (!svg) return;
+    var nat = naturalSize(svg);
+    frame.__zoom = { w: nat.w, h: nat.h, scale: 1, fit: 1, pct: pct };
+    cardFit(frame);
+  }
+
+  function cardApply(frame) {
+    var z = frame.__zoom;
+    var svg = frame.querySelector('pre.mermaid svg');
+    if (!z || !svg) return;
+    svg.style.width = (z.w * z.scale) + 'px';
+    svg.style.height = (z.h * z.scale) + 'px';
+    svg.style.maxWidth = 'none';
+    z.pct.textContent = Math.round(z.scale * 100) + '%';
+  }
+
+  // The scale at which the whole drawing fits the card, never past natural size.
+  function cardFitScale(frame) {
+    var z = frame.__zoom;
+    var pre = frame.querySelector('pre.mermaid');
+    if (!z || !pre) return 1;
+    var cs = getComputedStyle(pre);
+    var availW = pre.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var cap = parseFloat(cs.maxHeight);
+    var boxH = isFinite(cap) ? cap : pre.clientHeight;
+    var availH = boxH - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (availW <= 0 || availH <= 0) return 1;
+    return Math.min(availW / z.w, availH / z.h, 1);
+  }
+
+  function cardFit(frame) {
+    var z = frame.__zoom;
+    if (!z) return;
+    z.fit = cardFitScale(frame);
+    z.scale = z.fit;
+    cardApply(frame);
+  }
+
+  function cardZoom(frame, f) {
+    var z = frame.__zoom;
+    if (!z) return;
+    z.scale = clamp(z.scale * f, 0.1, 4);
+    cardApply(frame);
+  }
+
+  // A width change re-fits a diagram the reader has not zoomed, and leaves a
+  // zoomed one where they put it.
+  function refitCards() {
+    document.querySelectorAll('.mermaid-frame').forEach(function (frame) {
+      var z = frame.__zoom;
+      if (!z || Math.abs(z.scale - z.fit) > 1e-6) return;
+      cardFit(frame);
+    });
+  }
+  window.addEventListener('resize', refitCards);
 
   // Copy the fence body, not the rendered text: the source is what a reader
   // wants to paste elsewhere. Feedback is the button's own title, so no text
@@ -459,10 +555,11 @@
     var sh = lb.stage.clientHeight || (window.innerHeight - 68);
     var cw = nat.w || 1, ch = nat.h || 1;
     var fit = Math.min((sw / cw) * 0.9, (sh / ch) * 0.86);
-    // Never shrink below natural size: a wide diagram opens at full size and
-    // pans, rather than being scaled down to fit. A diagram smaller than the
-    // stage still zooms up a little, which is the case the viewer is for.
-    var scale = fit >= 1 ? Math.min(fit, 1.25) : 1;
+    // Open on the whole drawing. A diagram larger than the stage is scaled
+    // down to fit, because an edge off-screen is not something a reader knows
+    // to pan for; a smaller one still grows a little, which is the case the
+    // viewer is for. Zooming in and panning is how detail is reached.
+    var scale = Math.min(fit, 1.25);
     state = { scale: scale, tx: (sw - cw * scale) / 2, ty: (sh - ch * scale) / 2, fit: scale };
     lbApply();
   }

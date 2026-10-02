@@ -658,18 +658,17 @@ pre.mermaid {
   text-align: center; overflow-x: auto;
   color: var(--color-text-muted); font-family: var(--font-ui); font-size: var(--text-sm);
 }
-/* Diagrams render at natural width, so a wide one scrolls sideways in its
-   card rather than shrinking its labels to fit. The lightbox clone is sized
-   separately. */
+/* The client sizes the drawing to fit its card, so the stylesheet only centres
+   it. The viewer's clone is sized separately. */
 pre.mermaid svg { height: auto; display: block; margin: 0 auto; }
 pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white-space: pre-wrap; }
 
 /* ---------------------------------------------------------- diagram cards
-   A diagram is a card: a toolbar naming the type and carrying the copy and
-   expand affordances, then the drawing in a scroll area. Diagrams render at
-   natural width, so a wide one scrolls sideways rather than shrinking its
-   labels, and the card caps the height so a tall one scrolls rather than
-   taking the page. */
+   A diagram is a card: a toolbar naming the type and carrying the zoom, copy
+   and expand affordances, then the drawing in a scroll area. The drawing opens
+   fitted to the card, so its whole shape is visible, and the zoom buttons grow
+   it into the scroll area; the card caps the height so a tall one scrolls
+   rather than taking the page. */
 .mermaid-frame {
   position: relative; margin: var(--space-6) 0;
   border: 1px solid var(--color-line); border-radius: var(--radius-lg);
@@ -684,14 +683,31 @@ pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white
 }
 .mermaid-type { color: var(--color-text-muted); font-weight: var(--fw-medium); }
 .mermaid-actions { display: inline-flex; align-items: center; gap: var(--space-1); }
-.mermaid-copy, .mermaid-expand {
+/* Zoom first, a hairline, then copy and expand: two groups rather than five
+   buttons in a row. */
+.mermaid-zoom {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding-right: var(--space-2); border-right: 1px solid var(--color-line);
+}
+.mermaid-copy, .mermaid-expand, .mermaid-zoom-out, .mermaid-zoom-in {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0;
   background: transparent; border: 1px solid transparent; border-radius: var(--radius-md);
   color: var(--color-text-muted); cursor: pointer;
   transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
-.mermaid-copy:hover, .mermaid-expand:hover {
+.mermaid-copy:hover, .mermaid-expand:hover, .mermaid-zoom-out:hover, .mermaid-zoom-in:hover {
+  color: var(--color-accent-text); border-color: var(--color-accent-ring);
+  background: var(--color-bg-elevated);
+}
+.mermaid-zoom-pct {
+  min-width: 44px; height: 30px; padding: 0 var(--space-2);
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--color-text-muted); cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-xs); font-variant-numeric: tabular-nums;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.mermaid-zoom-pct:hover {
   color: var(--color-accent-text); border-color: var(--color-accent-ring);
   background: var(--color-bg-elevated);
 }
@@ -699,8 +715,8 @@ pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white
    and the danger ring on failure. */
 .mermaid-actions[data-copy="ok"] .mermaid-copy { color: var(--color-accent-text); border-color: var(--color-accent-ring); }
 .mermaid-actions[data-copy="fail"] .mermaid-copy { color: var(--status-danger-text); border-color: var(--status-danger-text); }
-/* The drawing's scroll area. Height is capped so a tall diagram stays a card;
-   width scrolls at natural size so a wide diagram keeps its labels legible. */
+/* The drawing's scroll area. Height is capped so a tall diagram stays a card,
+   and it scrolls once a zoomed drawing outgrows it. */
 .mermaid-frame pre.mermaid { margin: 0; max-height: 560px; overflow: auto; }
 .mermaid-frame pre.mermaid svg { display: block; }
 /* One type size across every diagram type. Mermaid's sequence renderer writes
@@ -776,7 +792,10 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 .wiki-lbx-btn:active { transform: translateY(1px); }
 .wiki-lbx-stage { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; }
 .wiki-lbx-stage.is-grabbing { cursor: grabbing; }
-.wiki-lbx-content { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+/* The clone has to lay out at the text size the card rendered at. Mermaid
+   measured every label for the card's 14px, so at the viewer's larger base size
+   a label outgrows the box drawn around it and is clipped. */
+.wiki-lbx-content { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; font-size: var(--text-sm); }
 .wiki-lbx-hint {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: var(--space-3) var(--space-4); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
@@ -958,7 +977,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
      wider than the page is scaled to the paper rather than cut off at its
      edge. On screen it keeps its natural width and scrolls instead. */
   .mermaid-frame pre.mermaid { max-height: none; overflow: visible; }
-  .mermaid-frame pre.mermaid svg { max-width: 100%; height: auto; }
+  .mermaid-frame pre.mermaid svg { max-width: 100% !important; height: auto !important; }
   /* The code surface is dark on screen by design. On paper that is a slab of
      ink, and with background printing off its light syntax colours would be
      invisible, so a printed code block is a light block with ink text. */

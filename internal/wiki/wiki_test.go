@@ -2168,15 +2168,23 @@ func TestDiagramCardContract(t *testing.T) {
 			t.Errorf("diagrams.js does not contain %q", want)
 		}
 	}
-	// The toolbar carries a type label and two glyph buttons, no text.
-	for _, want := range []string{"mermaid-toolbar", "mermaid-type", "mermaid-copy", "mermaid-expand"} {
+	// The toolbar carries a type label, a zoom group and two glyph buttons, no text.
+	for _, want := range []string{
+		"mermaid-toolbar", "mermaid-type", "mermaid-zoom-out", "mermaid-zoom-in",
+		"mermaid-zoom-pct", "mermaid-copy", "mermaid-expand",
+	} {
 		if !strings.Contains(client, want) {
 			t.Errorf("diagrams.js does not contain %q", want)
 		}
 	}
-	// The lightbox must not shrink a wide diagram below its natural size.
-	if !strings.Contains(client, "fit >= 1 ? Math.min(fit, 1.25) : 1") {
-		t.Error("lightbox fit can scale a wide diagram below natural size")
+	// The viewer opens on the whole drawing: one larger than the stage is
+	// scaled down to fit, so an edge is not already off screen.
+	if !strings.Contains(client, "Math.min(fit, 1.25)") {
+		t.Error("the lightbox does not fit a diagram larger than the stage")
+	}
+	// The card opens fitted to its box, and steps the scale from there.
+	if !strings.Contains(client, "cardFitScale") {
+		t.Error("the card has no fit-to-box scale")
 	}
 	// Clicking outside must close, and a drag must not.
 	if !strings.Contains(client, "downAt") {
@@ -2204,6 +2212,11 @@ func TestDiagramCardContract(t *testing.T) {
 	if !strings.Contains(sheet, ".mermaid-frame .messageText") ||
 		!strings.Contains(sheet, "font-size: 14px !important") {
 		t.Error("wiki.css does not pin the sequence diagram font size")
+	}
+	// The viewer's clone lays out at the card's text size, or mermaid's labels
+	// outgrow the boxes they were measured for.
+	if !strings.Contains(sheet, "will-change: transform; font-size: var(--text-sm);") {
+		t.Error("the lightbox clone does not pin the diagram text size")
 	}
 	// The failure card must read as a card, not a stray block.
 	if !strings.Contains(sheet, "var(--status-danger-tint)") {

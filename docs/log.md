@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-02
 
+* **Update**: `design/rendering.md` and `reference/themes.md` describe the
+  diagram card's own zoom. A diagram now opens fitted to its card and to the
+  full-screen viewer rather than at natural size with its edges cut off, and the
+  viewer's clone lays out at the card's text size, which stops mermaid's labels
+  outgrowing the boxes they were measured for.
 * **Update**: Each page now ships its Markdown source beside its HTML and offers
   it from a Download Markdown control under the title, and printing produces a
   single-column document with the controls hidden, headings kept with their
