@@ -3,6 +3,13 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-02
+
+* **Update**: `design/rendering.md` documents both in-bundle link forms, relative
+  to the page and from the bundle root, and `testbed/blocks.md` carries a
+  bundle-relative link. A root-relative link now resolves from the bundle root
+  rather than from the page, so it survives the page moving.
+
 ## 2026-10-01
 
 * **Update**: A `--nav-links` flag (and `OKF_WIKI_NAV_LINKS`), plus a `nav-links`

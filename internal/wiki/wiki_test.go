@@ -26,8 +26,13 @@ func TestLinkPath(t *testing.T) {
 		want string
 	}{
 		{"internal top-level", withRepo, "index", "usage/cli.md", "/wiki/usage/cli.html"},
+		{"bundle-relative", withRepo, "index", "/usage/cli.md", "/wiki/usage/cli.html"},
+		{"bundle-relative from nested", withRepo, "usage/cli", "/design/index.md", "/wiki/design/index.html"},
+		{"bundle-relative with fragment", withRepo, "usage/cli", "/design/index.md#x", "/wiki/design/index.html#x"},
 		{"internal sibling", withRepo, "usage/cli", "../design/index.md", "/wiki/design/index.html"},
 		{"internal with fragment", withRepo, "usage/cli", "../design/index.md#x", "/wiki/design/index.html#x"},
+		{"bundle-relative asset", withRepo, "usage/cli", "/assets/diagram.png", "/wiki/assets/diagram.png"},
+		{"protocol-relative stays", withRepo, "usage/cli", "//example.com/a", "//example.com/a"},
 		{"pure fragment", withRepo, "index", "#top", "#top"},
 		{"external http", withRepo, "index", "https://example.com/a", "https://example.com/a"},
 		{"mailto", withRepo, "index", "mailto:a@b.c", "mailto:a@b.c"},

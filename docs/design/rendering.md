@@ -77,11 +77,13 @@ a theme change reach the browser. See
 
 ## Links
 
-A relative link that stays inside the bundle becomes a link to the rendered
-page. A relative link to a file that is not Markdown, such as an image, becomes a
-link to that file: every non-Markdown file in the bundle is copied into the site
-under the same path, so an asset resolves the way a page does. Dotfiles and
-dot-directories are not copied.
+A link that stays inside the bundle becomes a link to the rendered page. It may
+be written relative to the page, `../design/rendering.md`, or from the bundle
+root, `/design/rendering.md`. The root form is preferred, because it does not
+move when the page does. A link to a file that is not Markdown, such as an image,
+becomes a link to that file: every non-Markdown file in the bundle is copied into
+the site under the same path, so an asset resolves the way a page does. Dotfiles
+and dot-directories are not copied.
 
 A link that escapes the bundle (for example `../../roles/x.yml`) becomes a
 `/repo/...` link when `--repo` is set, served from a read-only mount of the

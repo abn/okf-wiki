@@ -440,13 +440,16 @@ func splitFrontmatter(data []byte) (frontmatter, []byte) {
 	return fm, data[4+end+5:]
 }
 
-// linkPath resolves a markdown link from a page slug into a wiki URL. Links that
-// stay inside the bundle and end in .md map to rendered HTML pages. Anything
-// else, in-bundle or not, maps to /repo/, which only resolves when a
-// repository root was supplied; with none, a non-.md href should stay relative
-// rather than become a dead /repo/ URL.
+// linkPath resolves a markdown link from a page slug into a wiki URL. A link
+// that stays inside the bundle and ends in .md maps to a rendered HTML page. An
+// in-bundle link is written either from the bundle root, "/section/page.md",
+// which the authoring convention prefers because it survives the page moving, or
+// relative to the page. A target that climbs out of the bundle maps to /repo/,
+// which only resolves when a repository root was supplied; with none, the href
+// stays as written rather than becoming a dead /repo/ URL.
 func (r *Renderer) linkPath(fromSlug, href string) string {
 	if strings.Contains(href, "://") || strings.HasPrefix(href, "#") ||
+		strings.HasPrefix(href, "//") ||
 		strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
 		return href
 	}
@@ -459,8 +462,15 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 	if target == "" {
 		return href
 	}
-	dir := path.Dir(fromSlug)
-	clean := path.Clean(path.Join(dir, target))
+	// A leading slash counts from the bundle root, so it does not move with the
+	// page. Anything else is relative to the page. Clean clamps a root-relative
+	// target at the root, so one can never climb out through a leading slash.
+	var clean string
+	if strings.HasPrefix(target, "/") {
+		clean = strings.TrimPrefix(path.Clean(target), "/")
+	} else {
+		clean = path.Clean(path.Join(path.Dir(fromSlug), target))
+	}
 
 	// A target that climbs out of the bundle is not ours to publish. It can
 	// only be reached through a repository mount, so without one the href is

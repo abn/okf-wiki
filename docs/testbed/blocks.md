@@ -75,7 +75,9 @@ Three kinds, and each resolves differently.
 
 **Inside the bundle.** [A sibling page](code.md) and a
 [page in another section](../design/rendering.md) both become links to rendered
-HTML, under the base path.
+HTML, under the base path. The
+[same page written from the bundle root](/design/rendering.md) resolves the same
+way, and would keep resolving if this page moved.
 
 **With a fragment.** [Back to the top of this page](#blocks) keeps the anchor
 and points at the heading id rather than the file.
