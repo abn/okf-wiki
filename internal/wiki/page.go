@@ -79,6 +79,12 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 
 	name, tail := splitWordmark(r.cfg.Brand.Name)
 	base := r.cfg.base()
+	// A synthetic page has no file in the bundle, so there is nothing to
+	// download; a real one points at the source the render copied beside it.
+	markdown := ""
+	if !p.Synthetic {
+		markdown = base + p.Slug + ".md"
+	}
 	data := shellData{
 		Title:          title,
 		Kicker:         p.Kicker,
@@ -100,7 +106,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		TopNav:         template.HTML(r.topNavHTML()),
 		TopNavInternal: template.HTML(r.topNavMatching(false)),
 		TopNavExternal: template.HTML(r.topNavMatching(true)),
-		Meta:           template.HTML(r.buildMeta(p)),
+		Meta:           template.HTML(r.buildMeta(p, markdown)),
 		TOC:            template.HTML(buildTOC(p)),
 		TOCList:        template.HTML(buildTOCList(p)),
 		PrevNext:       template.HTML(r.prevNextHTML(p)),
@@ -254,11 +260,13 @@ func (r *Renderer) prevNextHTML(p Page) string {
 	return b.String()
 }
 
-// buildMeta renders the type and tag chips under the title. The type stays a
-// span, since it names the page rather than pointing anywhere. Each tag links
-// to its tag page, which lists every page carrying it. A tag with no URL form
-// stays a span, so it never points at a page that was never written.
-func (r *Renderer) buildMeta(p Page) string {
+// buildMeta renders the row under the title: the type and tag chips, and the
+// page's own download link. The type stays a span, since it names the page
+// rather than pointing anywhere. Each tag links to its tag page, which lists
+// every page carrying it. A tag with no URL form stays a span, so it never
+// points at a page that was never written. A page with neither chips nor a
+// source still renders no row.
+func (r *Renderer) buildMeta(p Page, markdown string) string {
 	var chips []string
 	if p.Type != "" {
 		chips = append(chips, fmt.Sprintf(`<span class="chip chip-type">%s</span>`, template.HTMLEscapeString(p.Type)))
@@ -275,11 +283,20 @@ func (r *Renderer) buildMeta(p Page) string {
 		}
 		chips = append(chips, tagLink(r.cfg.base(), slug, name))
 	}
-	if len(chips) == 0 {
+	if len(chips) == 0 && markdown == "" {
 		return ""
 	}
-	return `<div class="page-meta">` + strings.Join(chips, "") + `</div>`
+	row := `<div class="page-meta">` + strings.Join(chips, "")
+	if markdown != "" {
+		row += fmt.Sprintf(`<a class="page-download" href="%s" download>%s<span>Download Markdown</span></a>`,
+			template.HTMLEscapeString(markdown), downloadArrow)
+	}
+	return row + `</div>`
 }
+
+// downloadArrow is the download glyph on the per-page Markdown link. It is
+// decorative; the link's own text names the action.
+const downloadArrow = `<svg class="page-download-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3-3-3M3 13h10"/></svg>`
 
 func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 	var b strings.Builder

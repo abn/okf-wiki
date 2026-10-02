@@ -131,8 +131,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 - `.active`, on the current page's sidebar link and on the current section's
   title, which is how a theme marks position
 - `.breadcrumb`, `.crumb-sep`, `.crumb-cur`
-- `.prose`, `.page-lead`, `.page-meta`, `.chip`, `.chip-type`, `.tag-link`, and
-  `.source-ref` on a citation that resolves to a sources entry
+- `.prose`, `.page-lead`, `.page-meta`, `.chip`, `.chip-type`, `.tag-link`,
+  `.source-ref` on a citation that resolves to a sources entry, and
+  `.page-download` on the per-page Markdown download
 - Tag pages: `.kicker`, `.tag-hash`, `.tag-often`, `.tag-all-link`,
   `.tag-controls`, `.seg` with `aria-pressed` buttons, `.tag-check`,
   `.tag-group`, `.tag-row` with `.tag-row-head`, `.tag-badges` and

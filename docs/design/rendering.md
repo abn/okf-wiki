@@ -60,7 +60,8 @@ flowchart LR
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
-   bundle's own non-Markdown files, the resolved theme's assets (stylesheet,
+   bundle's own files under their own paths, so an image resolves and each page
+   has its Markdown source beside it, the resolved theme's assets (stylesheet,
    fonts, tokens, the search and diagram clients, favicon), the Mermaid vendor
    bundle when the bundle has a diagram, `search-index.json`, `tags.json`, and
    a `theme.json` recording which theme produced the output. The output
@@ -152,6 +153,21 @@ keeps goldmark's own number and definition. Because the two number
 independently, a page mixing them can show one numeral twice. Both links still
 resolve; only the numerals collide. [Blocks](../testbed/blocks.md) exercises
 every case on one page.
+
+## Print and download
+
+Every page carries its own Markdown as a file beside its HTML, the source the
+render read, and links to it from a Download Markdown control under the title.
+A synthetic page, such as a tag listing, has no source and no control.
+
+Printing drops to one column and hides what is a control or a jump: the header,
+the sidebar, the table of contents, the previous and next cards, the diagram
+toolbar and the download link. What reads badly split stays together: a heading
+moves to the next page rather than sitting alone at the foot of one, and a
+callout, a code block or a diagram stays whole. A table breaks, but its header
+repeats on each page, so the columns stay named. A dark screen still prints the
+light document, and a printed code block is light with ink text rather than the
+on-screen dark surface.
 
 ## Caching
 

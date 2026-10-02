@@ -259,7 +259,7 @@
    ground: ink at 16.72:1, muted at 7.63:1, faint at 5.71:1, and a raised
    surface that is genuinely lighter than the ground so elevation reads without
    a shadow. */
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
@@ -342,81 +342,84 @@
 
 /* The explicit toggle, for readers who pinned a ground rather than following
    the OS. Mirrors the block above; a pinned dark must beat prefers-color-scheme
-   in both directions. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
+   in both directions. Screen only, like the block above: a printed page is
+   always the light document, so a dark ground never reaches paper. */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
 
-  --color-bg: #0C0C0D;
-  --color-surface: #0C0C0D;
-  --color-surface-sunken: #101012;
-  --color-surface-sunken-deep: #08080A;
-  --color-bg-elevated: #17171A;
+    --color-bg: #0C0C0D;
+    --color-surface: #0C0C0D;
+    --color-surface-sunken: #101012;
+    --color-surface-sunken-deep: #08080A;
+    --color-bg-elevated: #17171A;
 
-  --color-text: #EDEDEF;
-  --color-heading: #FAFAFA;
-  --color-text-muted: #A1A1AA;
-  --color-text-faint: #8A8A93;
+    --color-text: #EDEDEF;
+    --color-heading: #FAFAFA;
+    --color-text-muted: #A1A1AA;
+    --color-text-faint: #8A8A93;
 
-  --color-line: #2A2A2E;
-  --color-line-strong: #3A3A40;
-  --color-line-control: #6B6B73;
+    --color-line: #2A2A2E;
+    --color-line-strong: #3A3A40;
+    --color-line-control: #6B6B73;
 
-  --color-accent: #FAFAFA;
-  --color-on-accent: #0A0A0A;
-  --color-accent-text: #5FD68C;
-  --color-accent-soft: #1B1B1E;
-  --color-accent-ring: #2E5C41;
-  --color-current-tint: #16281D;
+    --color-accent: #FAFAFA;
+    --color-on-accent: #0A0A0A;
+    --color-accent-text: #5FD68C;
+    --color-accent-soft: #1B1B1E;
+    --color-accent-ring: #2E5C41;
+    --color-current-tint: #16281D;
 
-  --focus-ring: #A1A1AA;
+    --focus-ring: #A1A1AA;
 
-  --status-success-tint: #10231A;
-  --status-success-line: #1E3A2A;
-  --status-success-text: #6EE7A8;
-  --status-info-tint: #101A2E;
-  --status-info-line: #1E2E4A;
-  --status-info-text: #93C5FD;
-  --status-warn-tint: #241C0C;
-  --status-warn-line: #3D3016;
-  --status-warn-text: #FCD34D;
-  --status-danger-tint: #2A1710;
-  --status-danger-line: #4A2418;
-  --status-danger-text: #FCA5A5;
-  --status-neutral-tint: #1B1B1E;
-  --status-neutral-line: #2A2A2E;
-  --status-neutral-text: #A1A1AA;
+    --status-success-tint: #10231A;
+    --status-success-line: #1E3A2A;
+    --status-success-text: #6EE7A8;
+    --status-info-tint: #101A2E;
+    --status-info-line: #1E2E4A;
+    --status-info-text: #93C5FD;
+    --status-warn-tint: #241C0C;
+    --status-warn-line: #3D3016;
+    --status-warn-text: #FCD34D;
+    --status-danger-tint: #2A1710;
+    --status-danger-line: #4A2418;
+    --status-danger-text: #FCA5A5;
+    --status-neutral-tint: #1B1B1E;
+    --status-neutral-line: #2A2A2E;
+    --status-neutral-text: #A1A1AA;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
 
-  --color-scrim: rgba(0, 0, 0, 0.62);
-  --color-inline-code-bg: #1B1B1E;
-  --color-inline-code-fg: #EDEDEF;
-  --color-selection-bg: #2E5C41;
-  --color-selection-fg: #FAFAFA;
-  --color-mark: #2E5C41;
-  --color-mark-ink: #D6F5E3;
+    --color-scrim: rgba(0, 0, 0, 0.62);
+    --color-inline-code-bg: #1B1B1E;
+    --color-inline-code-fg: #EDEDEF;
+    --color-selection-bg: #2E5C41;
+    --color-selection-fg: #FAFAFA;
+    --color-mark: #2E5C41;
+    --color-mark-ink: #D6F5E3;
 
-  /* ---- diagram palette, dark ground ---------------------------------------
-     Mirrors the OS-following block above. */
-  --diagram-ground: #0C0C0D;
-  --diagram-surface: #17171A;
-  --diagram-surface-alt: #101012;
-  --diagram-ink: #EDEDEF;
-  --diagram-muted: #8A8A93;
-  --diagram-line: #3A3A40;
-  --diagram-accent: #5FD68C;
-  --diagram-accent-soft: #1E3A2A;
-  --diagram-accent-ink: #6EE7A8;
-  --diagram-accent-2: #86EFAC;
-  --diagram-accent-3: #A7F3C4;
-  --diagram-yellow: #F3C83D;
-  --diagram-cyan: #67E8F9;
-  --diagram-red: #FCA5A5;
-  --diagram-amber: #FCD34D;
-  --diagram-green: #86EFAC;
-  --diagram-blue: #93C5FD;
-  --diagram-violet: #C4B5FD;
-  --diagram-pink: #F9A8D4;
+    /* ---- diagram palette, dark ground ---------------------------------------
+       Mirrors the OS-following block above. */
+    --diagram-ground: #0C0C0D;
+    --diagram-surface: #17171A;
+    --diagram-surface-alt: #101012;
+    --diagram-ink: #EDEDEF;
+    --diagram-muted: #8A8A93;
+    --diagram-line: #3A3A40;
+    --diagram-accent: #5FD68C;
+    --diagram-accent-soft: #1E3A2A;
+    --diagram-accent-ink: #6EE7A8;
+    --diagram-accent-2: #86EFAC;
+    --diagram-accent-3: #A7F3C4;
+    --diagram-yellow: #F3C83D;
+    --diagram-cyan: #67E8F9;
+    --diagram-red: #FCA5A5;
+    --diagram-amber: #FCD34D;
+    --diagram-green: #86EFAC;
+    --diagram-blue: #93C5FD;
+    --diagram-violet: #C4B5FD;
+    --diagram-pink: #F9A8D4;
+  }
 }

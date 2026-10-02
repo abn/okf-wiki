@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-02
 
+* **Update**: Each page now ships its Markdown source beside its HTML and offers
+  it from a Download Markdown control under the title, and printing produces a
+  single-column document with the controls hidden, headings kept with their
+  content, tables broken with a repeated header, and diagrams fitted to the
+  page. `design/rendering.md` describes both, and `reference/themes.md` and
+  `usage/cli.md` list the class and the output.
 * **Update**: `design/rendering.md` documents both in-bundle link forms, relative
   to the page and from the bundle root, and `testbed/blocks.md` carries a
   bundle-relative link. A root-relative link now resolves from the bundle root

@@ -34,8 +34,12 @@ type Section struct {
 type Page struct {
 	Section string
 	Slug    string // relative path without extension, e.g. hosts/example
-	Title   string
-	Kicker  string
+	// Synthetic is set on a page the renderer builds itself, such as a tag
+	// listing. It has no Markdown source in the bundle, so it offers nothing to
+	// download.
+	Synthetic bool
+	Title     string
+	Kicker    string
 	// TitleHTML is trusted H1 markup, set only by synthetic pages the
 	// renderer builds itself. Frontmatter titles stay plain strings.
 	TitleHTML    string
@@ -178,7 +182,7 @@ func (r *Renderer) RenderAll(out string) error {
 	if err := r.theme.WriteTo(site); err != nil {
 		return err
 	}
-	if err := copyBundleAssets(r.cfg.Content, site); err != nil {
+	if err := copyBundleFiles(r.cfg.Content, site); err != nil {
 		return err
 	}
 	// Only a bundle that actually has a diagram needs the runtime. A missing
@@ -619,14 +623,16 @@ func markdownFiles(root string) ([]string, error) {
 	return out, nil
 }
 
-// copyBundleAssets copies every non-Markdown file in the bundle into the site,
-// keeping its path. Without this an image in a page is a link to a file the
-// render never wrote, so the page ships with a broken image and no error.
+// copyBundleFiles copies the bundle's files into the site, keeping their paths:
+// every non-Markdown file, so an image in a page resolves, and every Markdown
+// file, so a page can offer its own source for download. The first is load
+// bearing because without it an image ships as a broken link and no error; the
+// second is what a reader downloads when they want the Markdown.
 //
 // Dotfiles and dot-directories are skipped: a bundle directory is a real
 // working tree as often as not, and nothing in a wiki should be able to publish
 // a .git directory or a .env.
-func copyBundleAssets(root, dest string) error {
+func copyBundleFiles(root, dest string) error {
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -646,9 +652,6 @@ func copyBundleAssets(root, dest string) error {
 			return nil
 		}
 		if d.IsDir() {
-			return nil
-		}
-		if strings.EqualFold(filepath.Ext(name), ".md") {
 			return nil
 		}
 		return copyFile(p, filepath.Join(dest, rel))

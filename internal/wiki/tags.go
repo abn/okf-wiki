@@ -96,6 +96,7 @@ func (r *Renderer) RenderTagPage(t tagListing, all []tagListing) (string, error)
 	return r.RenderPage(Page{
 		Section:     "",
 		Slug:        "tags/" + t.Slug,
+		Synthetic:   true,
 		Title:       "#" + t.Display,
 		Kicker:      "Tag",
 		TitleHTML:   `<span class="tag-hash">#</span>` + template.HTMLEscapeString(t.Display),

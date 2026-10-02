@@ -457,6 +457,40 @@ func TestTopNavLinks(t *testing.T) {
 	}
 }
 
+// TestMarkdownDownload covers the per-page source: the render copies each page's
+// Markdown beside its HTML, the page links to it, and a synthetic page with no
+// file in the bundle offers nothing.
+func TestMarkdownDownload(t *testing.T) {
+	out := t.TempDir()
+	r, err := New(Config{Content: docsDir(t), Base: "/wiki/", Brand: Brand{Name: "okf-wiki"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+
+	if _, err := os.Stat(filepath.Join(site, "design", "rendering.md")); err != nil {
+		t.Fatalf("the page source was not copied beside its HTML: %v", err)
+	}
+	page, err := os.ReadFile(filepath.Join(site, "design", "rendering.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(page), `class="page-download" href="/wiki/design/rendering.md" download`) {
+		t.Error("a page does not offer its own Markdown for download")
+	}
+
+	tag, err := os.ReadFile(filepath.Join(site, "tags", "design.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(tag), "page-download") {
+		t.Error("a synthetic tag page offered a download it has no source for")
+	}
+}
+
 // TestRenderAtRootBaseKeepsTheHomePage guards the case where the site is served
 // from the output root. There is no room for a redirect there, so writing one
 // would overwrite the wiki's own index.html with a self-redirect.

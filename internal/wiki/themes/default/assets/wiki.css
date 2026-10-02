@@ -298,6 +298,21 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 }
 
 .page-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0 0 var(--space-6); }
+/* The page's own Markdown, offered for download. Pushed to the end of the meta
+   row and dressed like a chip, so it reads as page metadata rather than a
+   second run of controls under the title. Scoped under .prose to outrank the
+   prose link style, like the chip links. */
+.prose a.page-download {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-left: auto;
+  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
+  padding: 3px var(--space-3); border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line); background: var(--color-surface);
+  color: var(--color-text-muted); text-decoration: none;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.prose a.page-download:hover { color: var(--color-accent-text); border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
+.page-download-icon { flex-shrink: 0; }
 /* Tags in the page head are raw text, not pills: the type chip already
    carries the pill, so the tags read as trailing metadata. Scoped under
    .prose to outrank the prose link style, like the chip links. */
@@ -918,10 +933,35 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 
 /* ------------------------------------------------------------------- print */
+/* The page as a document: one column, ink on paper. Hidden here are the
+   controls, the jumps and the links out of the page; kept together are the
+   things that read badly when split: a heading and what follows it, a callout,
+   a code block, a diagram, a table row. */
 @media print {
   .site-header, .breadcrumb-bar, .sidebar, .search-modal-backdrop,
-  .theme-toggle, .skip-link, .toc, .mermaid-expand { display: none !important; }
-  .layout { display: block; }
+  .theme-toggle, .skip-link, .toc, .toc-aside, .toc-btn, .toc-panel,
+  .mermaid-actions, .heading-anchor, .prevnext, .page-download, .tag-controls {
+    display: none !important;
+  }
+  .layout, .content { display: block; max-width: none; min-height: 0; }
   .prose a { text-decoration: underline; }
-  .callout, pre.code, table { break-inside: avoid; }
+
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; break-inside: avoid; }
+  p, li, dd { orphans: 3; widows: 3; }
+  .callout, pre.code, figure, .mermaid-frame, tr, img { break-inside: avoid; }
+  /* A table longer than a page still breaks, but its header repeats, so the
+     columns stay named. The old rule kept whole tables together, which pushed
+     a long one onto a fresh page and stranded the heading above it. */
+  table { break-inside: auto; }
+  thead { display: table-header-group; }
+  /* The on-screen height cap is for scrolling, not for paper, and a diagram
+     wider than the page is scaled to the paper rather than cut off at its
+     edge. On screen it keeps its natural width and scrolls instead. */
+  .mermaid-frame pre.mermaid { max-height: none; overflow: visible; }
+  .mermaid-frame pre.mermaid svg { max-width: 100%; height: auto; }
+  /* The code surface is dark on screen by design. On paper that is a slab of
+     ink, and with background printing off its light syntax colours would be
+     invisible, so a printed code block is a light block with ink text. */
+  .prose pre.code { background: #F7F7F8 !important; border-color: #D4D4D4 !important; color: #1A1A1A !important; }
+  .prose pre.code * { background: transparent !important; color: inherit !important; }
 }
