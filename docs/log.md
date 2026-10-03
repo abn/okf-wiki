@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Update**: `--multi-site` follows a directory symlink, including a content
+  directory that is itself a symlink, and `serve --watch` sees a change inside a
+  linked bundle, so a tree can be assembled by linking bundles in from their
+  checkouts. `usage/multi-site.md` says so, including that a directory already
+  walked is not walked again and that a container render needs the link targets
+  mounted at the same absolute paths.
 * **Creation**: Added `usage/multi-site.md`, a guide to publishing a directory of
   wikis as one site: what makes a directory a wiki, the generated group indexes,
   the metadata that names them, the search index, and how watching fits.

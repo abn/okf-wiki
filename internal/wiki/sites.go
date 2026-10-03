@@ -30,7 +30,20 @@ func isWikiRoot(dir string) bool {
 
 // scanSites builds the tree under dir. A wiki is not descended into: its
 // sub-directories are the wiki's own sections, not other sites.
-func scanSites(dir, rel string) (*siteNode, error) {
+//
+// os.Stat decides whether an entry is a directory, rather than the type the
+// directory read reported, so a symlink to a directory counts as a directory:
+// a tree is assembled by linking bundles in from elsewhere. seen holds the
+// resolved path of every directory already entered, so a link back into the
+// tree is walked once instead of expanding until the operating system refuses
+// the path length. An entry already seen yields no node.
+func scanSites(dir, rel string, seen map[string]bool) (*siteNode, error) {
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		if seen[real] {
+			return nil, nil
+		}
+		seen[real] = true
+	}
 	n := &siteNode{rel: rel, abs: dir, wiki: isWikiRoot(dir)}
 	if n.wiki {
 		return n, nil
@@ -40,14 +53,21 @@ func scanSites(dir, rel string) (*siteNode, error) {
 		return nil, err
 	}
 	for _, e := range entries {
-		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+		if strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		child, err := scanSites(filepath.Join(dir, e.Name()), path.Join(rel, e.Name()))
+		childAbs := filepath.Join(dir, e.Name())
+		fi, err := os.Stat(childAbs)
+		if err != nil || !fi.IsDir() {
+			continue
+		}
+		child, err := scanSites(childAbs, path.Join(rel, e.Name()), seen)
 		if err != nil {
 			return nil, err
 		}
-		n.children = append(n.children, child)
+		if child != nil {
+			n.children = append(n.children, child)
+		}
 	}
 	sort.Slice(n.children, func(i, j int) bool { return n.children[i].rel < n.children[j].rel })
 	return n, nil
@@ -69,7 +89,7 @@ func siteBase(base, rel string) string {
 // groups directly inside it. The output mirrors the tree, so the same layout
 // serves from a static host or from `serve`.
 func (r *Renderer) RenderSites(out string) (int, error) {
-	root, err := scanSites(r.cfg.Content, "")
+	root, err := scanSites(r.cfg.Content, "", map[string]bool{})
 	if err != nil {
 		return 0, err
 	}

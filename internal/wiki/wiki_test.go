@@ -2359,3 +2359,71 @@ func TestMultiSiteRendersTree(t *testing.T) {
 		t.Error("the output root does not redirect to the base")
 	}
 }
+
+// TestMultiSiteFollowsSymlinkedBundles covers a tree assembled by linking
+// bundles in from elsewhere: a directory symlink counts as a directory, a change
+// inside a linked bundle is a change to the site, and a link back into the tree
+// is walked once rather than expanding.
+func TestMultiSiteFollowsSymlinkedBundles(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "content")
+
+	mustMkdir(t, filepath.Join(dir, "home"))
+	mustWrite(t, filepath.Join(dir, "home", "index.md"),
+		"---\ntype: Overview\ntitle: Home\n---\n# Home\n")
+
+	linked := filepath.Join(root, "elsewhere")
+	mustMkdir(t, linked)
+	mustWrite(t, filepath.Join(linked, "index.md"),
+		"---\ntype: Overview\ntitle: Linked\n---\n# Linked\n")
+
+	if err := os.Symlink(linked, filepath.Join(dir, "linked")); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+	// A link back to the tree itself would expand until the operating system
+	// refused the path length without the visited guard.
+	if err := os.Symlink(dir, filepath.Join(dir, "loop")); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+
+	// The watcher has to see a change inside a linked bundle, or a tree renders
+	// once and never updates.
+	before := watchSignature([]string{dir})
+	mustWrite(t, filepath.Join(linked, "extra.md"),
+		"---\ntype: Guide\ntitle: Extra\n---\n# Extra\n")
+	if after := watchSignature([]string{dir}); after == before {
+		t.Error("a change inside a linked bundle did not change the watch signature")
+	}
+
+	// The content root itself may be a symlink. WalkDir does not follow its
+	// own root, so the signature would never change unless it is resolved.
+	rootLink := filepath.Join(root, "content-link")
+	if err := os.Symlink(dir, rootLink); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+	beforeRoot := watchSignature([]string{rootLink})
+	mustWrite(t, filepath.Join(dir, "home", "index.md"),
+		"---\ntype: Overview\ntitle: Home\n---\n# Home, edited\n")
+	if afterRoot := watchSignature([]string{rootLink}); afterRoot == beforeRoot {
+		t.Error("a change under a symlinked content root did not change the signature")
+	}
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wikis != 2 {
+		t.Fatalf("rendered %d wikis, want 2 for a local bundle and a linked one", wikis)
+	}
+	if _, err := os.Stat(filepath.Join(out, "linked", "index.html")); err != nil {
+		t.Errorf("a linked bundle was not rendered: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "loop")); err == nil {
+		t.Error("a link back into the tree was walked again instead of stopping")
+	}
+}

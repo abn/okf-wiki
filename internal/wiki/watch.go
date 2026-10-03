@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -79,35 +80,64 @@ func Watch(ctx context.Context, opts WatchOptions) {
 // watchSignature hashes the path, size and modification time of every file under
 // each root. Dotfiles and dot-directories are left out, matching what a render
 // publishes, so a change inside .git is not a change to the site and does not
-// trigger a render. Directories are left out too: adding a file changes the
-// parent's modification time, so hashing the directory would make a skipped
-// dotfile a change. A new or removed file changes its own entry either way, and
-// a root that cannot be read contributes nothing, so a theme directory that
-// appears later is a change rather than a permanent difference.
+// trigger a render. A directory symlink is followed, because a tree assembled by
+// linking bundles in is what this watches. A root that cannot be read
+// contributes nothing, so a theme directory that appears later is a change
+// rather than a permanent difference.
 func watchSignature(roots []string) string {
 	h := sha256.New()
 	for _, root := range roots {
-		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-			if err != nil || p == root {
-				return nil
-			}
-			if strings.HasPrefix(d.Name(), ".") {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-			info, ierr := d.Info()
-			if ierr != nil {
-				return nil
-			}
-			fmt.Fprintf(h, "%s\x00%d\x00%d\x00", p, info.Size(), info.ModTime().UnixNano())
-			return nil
-		})
+		// The root itself may be a symlink, which WalkDir does not follow, and
+		// a watch that skipped it would never see a change under the tree. A
+		// render does follow it, because reading a directory does.
+		real, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			real = root
+		}
+		hashTree(h, real, map[string]bool{real: true})
 		fmt.Fprintf(h, "%s\x00", root)
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// hashTree writes an entry for every file under root into h, following a
+// directory symlink as the tree scan does. Directories themselves are left out:
+// adding a file changes the parent's modification time, so hashing the directory
+// would make a skipped dotfile a change, and a new or removed file changes its
+// own entry either way. seen holds the resolved paths already walked, so a link
+// back into the tree stops instead of expanding.
+func hashTree(h io.Writer, root string, seen map[string]bool) {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || p == root {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			target, terr := filepath.EvalSymlinks(p)
+			if terr != nil {
+				return nil
+			}
+			fi, serr := os.Stat(target)
+			if serr != nil || !fi.IsDir() || seen[target] {
+				return nil
+			}
+			seen[target] = true
+			hashTree(h, target, seen)
+			return nil
+		}
+		info, ierr := d.Info()
+		if ierr != nil {
+			return nil
+		}
+		fmt.Fprintf(h, "%s\x00%d\x00%d\x00", p, info.Size(), info.ModTime().UnixNano())
+		return nil
+	})
 }
