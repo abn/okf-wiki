@@ -25,8 +25,10 @@
        system twice.
      - Focus is always visible, on every control, as a 2px ring at a 2px offset.
    ========================================================================== */
-@import url("tokens.css");
-@import url("fonts.css");
+/* The token and font layers are linked before this file rather than @import-ed
+   here: an @import is discovered only after this stylesheet parses, which made
+   the browser wait on two serial round trips before it could paint. See the
+   template's link tags. */
 
 * { box-sizing: border-box; }
 

@@ -7,6 +7,11 @@
 <meta name="description" content="{{.Description}}">
 {{.Slot "head"}}
 <link rel="icon" type="image/svg+xml" href="{{.Base}}favicon.svg">
+<!-- Three stylesheets, linked rather than @import-ed: an @import is only
+     discovered after its parent parses, so the token and font layer would cost
+     two serial round trips before first paint. Links fetch in parallel. -->
+<link rel="stylesheet" href="{{.Base}}tokens.css?v={{.AssetVersion}}">
+<link rel="stylesheet" href="{{.Base}}fonts.css?v={{.AssetVersion}}">
 <link rel="stylesheet" href="{{.Base}}wiki.css?v={{.AssetVersion}}">
 <script>
   // Apply the saved theme before first paint to avoid a flash. A pinned theme
