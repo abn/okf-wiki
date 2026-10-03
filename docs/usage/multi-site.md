@@ -21,9 +21,11 @@ is never both.
 A directory symlink counts as a directory, so a tree is assembled by linking
 bundles in from wherever their checkouts live rather than copying them, and the
 content directory itself may be a symlink. A directory already walked is not
-walked again, so a link cycle stops rather than expanding. The link is resolved
-where the render runs, so a render inside a container needs the link targets
-reachable there as well, mounted at the same absolute paths.
+walked again, so a link cycle stops rather than expanding. A linked bundle's
+non-Markdown files travel with it: a wiki linked in from its own checkout still
+serves its images and downloads. The link is resolved where the render runs, so a
+render inside a container needs the link targets reachable there as well, mounted
+at the same absolute paths.
 
 ```text
 content/

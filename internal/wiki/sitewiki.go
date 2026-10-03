@@ -618,15 +618,24 @@ func (r *Renderer) hasMermaid() bool {
 
 // markdownFiles lists the Markdown files under root, at any depth, as paths
 // relative to root. Dotfiles and dot-directories are skipped, for the same
-// reason copyBundleAssets skips them.
+// reason copyBundleFiles skips them.
+//
+// The root is resolved first: WalkDir does not follow a symlink it is handed as
+// its starting point, so a bundle directory that is itself a symlink would
+// otherwise yield nothing. Links under the root are followed by the walk as
+// usual.
 func markdownFiles(root string) ([]string, error) {
+	real, err := resolveRoot(root)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(real, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		name := d.Name()
-		if p != root && strings.HasPrefix(name, ".") {
+		if p != real && strings.HasPrefix(name, ".") {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -635,7 +644,7 @@ func markdownFiles(root string) ([]string, error) {
 		if d.IsDir() || !strings.EqualFold(filepath.Ext(name), ".md") {
 			return nil
 		}
-		rel, err := filepath.Rel(root, p)
+		rel, err := filepath.Rel(real, p)
 		if err != nil {
 			return err
 		}
@@ -658,12 +667,21 @@ func markdownFiles(root string) ([]string, error) {
 // Dotfiles and dot-directories are skipped: a bundle directory is a real
 // working tree as often as not, and nothing in a wiki should be able to publish
 // a .git directory or a .env.
+//
+// The root is resolved first, for the same reason as markdownFiles: WalkDir
+// treats a symlinked starting point as a file, so a bundle reached through a
+// link would copy nothing, which is how a linked wiki came to serve pages with
+// every image broken.
 func copyBundleFiles(root, dest string) error {
-	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	real, err := resolveRoot(root)
+	if err != nil {
+		return err
+	}
+	return filepath.WalkDir(real, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, relErr := filepath.Rel(root, p)
+		rel, relErr := filepath.Rel(real, p)
 		if relErr != nil {
 			return relErr
 		}
@@ -682,6 +700,19 @@ func copyBundleFiles(root, dest string) error {
 		}
 		return copyFile(p, filepath.Join(dest, rel))
 	})
+}
+
+// resolveRoot returns the path a walk should start from, following a symlink at
+// the root. filepath.WalkDir does not follow the root it is handed, so a bundle
+// directory that is itself a symlink would be seen as a single non-directory
+// entry. Resolving once makes a linked bundle walk like a real one; links below
+// the root are followed by the walk itself.
+func resolveRoot(root string) (string, error) {
+	real, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	return real, nil
 }
 
 // copyVendor copies the mermaid bundle directory into the output, if present.

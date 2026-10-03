@@ -2440,6 +2440,11 @@ func TestMultiSiteFollowsSymlinkedBundles(t *testing.T) {
 	mustMkdir(t, linked)
 	mustWrite(t, filepath.Join(linked, "index.md"),
 		"---\ntype: Overview\ntitle: Linked\n---\n# Linked\n")
+	// A non-Markdown file under the linked bundle, so the copy step is covered:
+	// a linked bundle's assets must reach the output, or its pages render with
+	// every image broken.
+	mustMkdir(t, filepath.Join(linked, "assets", "demos"))
+	mustWrite(t, filepath.Join(linked, "assets", "demos", "shot.png"), "png")
 
 	if err := os.Symlink(linked, filepath.Join(dir, "linked")); err != nil {
 		t.Skipf("symlinks are unavailable here: %v", err)
@@ -2486,6 +2491,9 @@ func TestMultiSiteFollowsSymlinkedBundles(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "linked", "index.html")); err != nil {
 		t.Errorf("a linked bundle was not rendered: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "linked", "assets", "demos", "shot.png")); err != nil {
+		t.Errorf("a linked bundle's asset was not copied: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(out, "loop")); err == nil {
 		t.Error("a link back into the tree was walked again instead of stopping")
