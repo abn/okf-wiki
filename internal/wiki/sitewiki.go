@@ -71,6 +71,10 @@ type Renderer struct {
 	specs        []sectionSpec
 	generatedAt  string
 	assetVersion string
+	// nested marks a renderer for one wiki inside a multi-site tree. It shares
+	// the tree's theme, and it does not write the root redirect, which would
+	// otherwise point the whole tree at whichever wiki rendered last.
+	nested bool
 }
 
 // New builds a renderer for the bundle described by cfg.
@@ -100,8 +104,13 @@ func New(cfg Config) (*Renderer, error) {
 		generatedAt:  time.Now().UTC().Format("2006-01-02"),
 		assetVersion: theme.AssetVersion(),
 	}
-	if err := r.load(cfg.Content); err != nil {
-		return nil, err
+	// In multi-site mode the content directory is a tree, not a bundle: the
+	// tree is walked and each wiki loaded as it is rendered, so loading the
+	// root as one bundle here would splice every wiki into one site.
+	if !cfg.MultiSite {
+		if err := r.load(cfg.Content); err != nil {
+			return nil, err
+		}
 	}
 	return r, nil
 }
@@ -221,12 +230,21 @@ func (r *Renderer) RenderAll(out string) error {
 
 	// A root-level redirect, so serving the output directory lands on the wiki
 	// whatever the base is.
-	//
-	// Skipped when the site is already the output root, which is what base "/"
-	// produces: the wiki's own index.html sits at this path, so writing the
-	// redirect would replace the home page with a self-redirect.
+	return r.writeRootRedirect(out)
+}
+
+// writeRootRedirect points the output root at the base, so serving the output
+// directory lands on the wiki. It is skipped when the site is already the output
+// root, which is what base "/" produces: the wiki's own index.html sits there,
+// and a redirect would replace the home page with a self-redirect. A wiki nested
+// in a multi-site tree never writes it either: the tree owns the output root.
+func (r *Renderer) writeRootRedirect(out string) error {
 	base := r.cfg.base()
-	if filepath.Clean(site) == filepath.Clean(out) {
+	site, err := r.cfg.SiteDir(out)
+	if err != nil {
+		return err
+	}
+	if r.nested || filepath.Clean(site) == filepath.Clean(out) {
 		return nil
 	}
 	redirect := `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +

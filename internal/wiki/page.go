@@ -299,6 +299,19 @@ func (r *Renderer) buildMeta(p Page, markdown string) string {
 const downloadArrow = `<svg class="page-download-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3-3-3M3 13h10"/></svg>`
 
 func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
+	// A renderer with no sections, which is what a multi-site group index uses,
+	// has no sidebar to show. Empty rather than an empty nav, so the template
+	// can drop the column instead of reserving a blank rail.
+	hasPages := false
+	for _, sec := range r.sections {
+		if len(sec.Pages) > 0 {
+			hasPages = true
+			break
+		}
+	}
+	if !hasPages {
+		return ""
+	}
 	var b strings.Builder
 	base := r.cfg.base()
 	b.WriteString(`<nav class="side" aria-label="Documentation navigation">`)

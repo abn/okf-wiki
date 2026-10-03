@@ -70,6 +70,10 @@ type Config struct {
 	VendorDir string // directory holding the mermaid bundle (optional)
 	ThemeDir  string // theme override directory (optional)
 	Brand     Brand
+	// MultiSite treats Content as a tree of wikis rather than a single bundle:
+	// each directory holding an index.md is rendered at its own path, and every
+	// other directory is a group given a generated index of its children.
+	MultiSite bool
 }
 
 // base returns the URL prefix, normalised to a leading and a trailing slash so

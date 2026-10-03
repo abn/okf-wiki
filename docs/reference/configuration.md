@@ -11,7 +11,8 @@ Resolution order is flag, then environment variable, then default.
 
 | Flag | Environment | Default | Purpose |
 | :--- | :--- | :--- | :--- |
-| `--content` | `OKF_WIKI_CONTENT` | auto-detect | OKF bundle directory |
+| `--content` | `OKF_WIKI_CONTENT` | auto-detect | OKF bundle directory, or a tree of them with `--multi-site` |
+| `--multi-site` | `OKF_WIKI_MULTI_SITE` | `false` | Treat the content directory as a tree of wikis |
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--repo` | `OKF_WIKI_REPO` | empty | Repository root served at `/repo/` |
@@ -26,6 +27,13 @@ Resolution order is flag, then environment variable, then default.
 | `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
 | `--watch` | `OKF_WIKI_WATCH` | `false` | Re-render when the bundle or theme changes (serve only) |
+
+`--multi-site` turns the content directory from one bundle into a tree of
+them. A directory holding an `index.md` is a wiki and is rendered at the path
+it sits at under the base; every other directory is a group and is given a
+generated index of the wikis and groups directly inside it. The output mirrors
+the tree, so one render publishes the whole collection and one `serve` serves
+it from one port.
 
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server

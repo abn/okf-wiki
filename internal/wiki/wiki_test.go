@@ -2288,3 +2288,74 @@ func TestWatchRendersOnChange(t *testing.T) {
 		t.Fatal("Watch did not return when its context was cancelled")
 	}
 }
+
+// TestMultiSiteRendersTree covers the tree mode: each directory holding an
+// index.md is a wiki rendered at its own path under the base, a directory
+// without one is a group given an index of its children, and the output root
+// still points at the tree.
+func TestMultiSiteRendersTree(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "clients"))
+	mustWrite(t, filepath.Join(dir, "clients", ".meta.json"),
+		`{"title": "Clients", "description": "Engagement wikis."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "sprind", "operations"))
+	mustWrite(t, filepath.Join(dir, "clients", "sprind", "operations", "index.md"),
+		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n")
+	mustMkdir(t, filepath.Join(dir, "homelab"))
+	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
+		"---\ntype: Overview\ntitle: Homelab\n---\n# Homelab\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wikis != 2 {
+		t.Fatalf("rendered %d wikis, want 2", wikis)
+	}
+	site := filepath.Join(out, "family")
+
+	// A group is given an index of its children, badged wiki or folder.
+	root, err := os.ReadFile(filepath.Join(site, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(root), `href="/family/clients/"><span class="site-name">Clients</span><span class="site-badge site-badge-folder">Folder</span>`) {
+		t.Error("the root index does not list the clients group as a folder")
+	}
+	if !strings.Contains(string(root), `site-badge-wiki">Wiki</span>`) {
+		t.Error("the root index does not badge a wiki")
+	}
+	// A group names itself from its own metadata.
+	clients, err := os.ReadFile(filepath.Join(site, "clients", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(clients), "<h1>Clients</h1>") ||
+		!strings.Contains(string(clients), "Engagement wikis.") {
+		t.Error("the group index does not use its .meta.json name and description")
+	}
+	// A wiki is rendered at its own path under the base, with its own assets.
+	ops, err := os.ReadFile(filepath.Join(site, "clients", "sprind", "operations", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(ops), `href="/family/clients/sprind/operations/wiki.css`) {
+		t.Error("a tree wiki's assets are not under its own path")
+	}
+	if !strings.Contains(string(ops), "<h1>Operations</h1>") {
+		t.Error("a tree wiki does not render its own home page")
+	}
+	// The output root still points at the tree.
+	redirect, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(redirect), "url=/family/") {
+		t.Error("the output root does not redirect to the base")
+	}
+}

@@ -62,6 +62,9 @@ usage:
 
 flags (render):
   --content DIR      OKF bundle to render (auto-detected if omitted)
+  --multi-site       treat the content directory as a tree of wikis: each
+                     directory holding an index.md is a wiki and the rest get
+                     a generated index of their children
   --out DIR          output directory (default: .scratch/wiki)
   --base PATH        URL prefix the wiki is served under (default "/wiki/")
   --repo DIR         repository root exposed read-only at /repo/ (optional)
@@ -87,7 +90,7 @@ rather than cut.
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
   OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
-  OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH
+  OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_MULTI_SITE
 `)
 }
 
@@ -147,6 +150,10 @@ func reRender(cfg wiki.Config) error {
 	if err != nil {
 		return err
 	}
+	if cfg.MultiSite {
+		_, err := r.RenderSites(cfg.Out)
+		return err
+	}
 	return r.RenderAll(cfg.Out)
 }
 
@@ -174,6 +181,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Brand.Title, "title", env("OKF_WIKI_TITLE", "Wiki"), "document title suffix")
 	fs.StringVar(&c.Brand.Sections, "sections", env("OKF_WIKI_SECTIONS", ""), "section order as id:Title pairs")
 	fs.StringVar(&c.Brand.NavLinks, "nav-links", env("OKF_WIKI_NAV_LINKS", ""), "header links as Label=URL pairs")
+	fs.BoolVar(&c.MultiSite, "multi-site", envBool("OKF_WIKI_MULTI_SITE", false), "treat the content directory as a tree of wikis")
 	return c
 }
 
@@ -193,17 +201,26 @@ func doRender(cfg *wiki.Config) error {
 	if err != nil {
 		return err
 	}
+	theme := r.Theme()
+	site, err := cfg.SiteDir(cfg.Out)
+	if err != nil {
+		return err
+	}
+	if cfg.MultiSite {
+		wikis, err := r.RenderSites(cfg.Out)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("okf-wiki: rendered %d wikis from %s -> %s\n", wikis, cfg.Content, site)
+		fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)
+		return nil
+	}
 	if err := r.RenderAll(cfg.Out); err != nil {
 		return err
 	}
 	total := 0
 	for _, s := range r.Sections() {
 		total += len(s.Pages)
-	}
-	theme := r.Theme()
-	site, err := cfg.SiteDir(cfg.Out)
-	if err != nil {
-		return err
 	}
 	fmt.Printf("okf-wiki: rendered %d pages from %s -> %s\n", total, cfg.Content, site)
 	fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)

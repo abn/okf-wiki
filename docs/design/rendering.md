@@ -169,6 +169,17 @@ repeats on each page, so the columns stay named. A dark screen still prints the
 light document, and a printed code block is light with ink text rather than the
 on-screen dark surface.
 
+## Trees of wikis
+
+`--multi-site` makes the content directory a tree rather than one bundle. A
+directory holding an `index.md` is a wiki, rendered at the path it sits at under
+the base; any other directory is a group, and the render writes it an index of
+the wikis and groups directly inside it. A wiki's sub-directories are its
+sections, so the tree stops at a wiki. A group index renders through the theme
+with no sections of its own, so it keeps the header and the styling but has no
+sidebar, no contents and nothing to search. The output mirrors the tree, which
+is what lets one render and one `serve` publish a whole collection.
+
 ## Caching
 
 Every page links its stylesheet and scripts with a content-hash `?v=` query, and

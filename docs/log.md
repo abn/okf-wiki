@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Update**: `usage/cli.md`, `reference/configuration.md`, `design/rendering.md`
+  and `reference/themes.md` document `--multi-site` (or `OKF_WIKI_MULTI_SITE`),
+  which reads the content directory as a tree: each directory with an `index.md`
+  is a wiki rendered at its own path, and every other directory is a group given
+  a generated index of its children.
 * **Update**: `usage/cli.md` and `reference/configuration.md` document
   `serve --watch`, and `OKF_WIKI_WATCH`, which re-render the site when the bundle
   or a layered theme changes. An edit is live on the next page load, and a

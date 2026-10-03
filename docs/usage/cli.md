@@ -65,6 +65,31 @@ looks like, is reported and the last good render keeps serving until the
 next change, so the server does not have to be restarted by hand.
 `OKF_WIKI_WATCH=true` is the same thing for a container.
 
+## Multi-site trees
+
+`--multi-site` reads the content directory as a tree of wikis rather than one
+bundle. A directory holding an `index.md` is a wiki, rendered at the path it
+sits at under `--base`; every other directory is a group, given a generated
+index of the wikis and groups directly inside it. A wiki's own sub-directories
+are its sections, so the tree stops at a wiki.
+
+```text
+content/
+  clients/         a group, named by its .meta.json
+    sprind/        a group
+      operations/  a wiki: an index.md at its root
+      strategy/    a wiki
+  homelab/         a wiki at the top level
+```
+
+Rendered with `--multi-site --base /`, that publishes `/` and `/clients/` as the
+group indexes, `/homelab/` as a wiki, and the two SPRIND wikis under
+`/clients/sprind/`. The layout on disk mirrors the tree, so a `render` and a
+`serve` publish the same thing, and `--watch` re-renders the whole tree on a
+change. A group takes its name and summary from a `.meta.json`
+(`{"title": ..., "description": ...}`) or a `README.md` in that directory, a
+wiki's from its own frontmatter, and a directory with neither from its name.
+
 ## Installing it
 
 There are no tagged releases, so there is no release tarball to download and no
