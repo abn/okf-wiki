@@ -157,6 +157,24 @@ func TestDefaultThemeAvoidsADarkFlash(t *testing.T) {
 	if !(css < script && script < body) {
 		t.Error("the theme must be resolved after the stylesheet and before the body")
 	}
+	// The wordmark's mark is an <img> the browser would discover only after the
+	// stylesheets and the body, so it paints a step late. It is preloaded from
+	// the head, and the <img> must request the same URL the preload names, or
+	// the hint is a second fetch rather than a cache hit.
+	pre := strings.Index(shell, `rel="preload"`)
+	logo := strings.Index(shell, `class="brand-mark"`)
+	if pre < 0 || logo < 0 {
+		t.Fatal("the shell is missing the brand-mark preload or the img")
+	}
+	if pre > logo {
+		t.Error("the brand-mark preload must come before the img it warms")
+	}
+	if !strings.Contains(shell, `href="{{.Base}}brand-mark.svg?v={{.AssetVersion}}"`) {
+		t.Error("the preload does not carry the asset version")
+	}
+	if !strings.Contains(shell, `src="{{.Base}}brand-mark.svg?v={{.AssetVersion}}"`) {
+		t.Error("the img does not request the preloaded URL, so the preload is wasted")
+	}
 }
 
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
@@ -2478,6 +2496,64 @@ func TestMultiSiteRendersTree(t *testing.T) {
 	}
 	if !strings.Contains(string(redirect), "url=/family/") {
 		t.Error("the output root does not redirect to the base")
+	}
+}
+
+// TestMultiSiteSkipsABrokenWiki covers a tree where one wiki cannot be read: a
+// stale link in a linked checkout, a directory that vanished. The tree still
+// renders, the bad wiki is reported through SkippedSites, its partial output is
+// removed so nothing serves it, and no catalog card links to it.
+func TestMultiSiteSkipsABrokenWiki(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "good"))
+	mustWrite(t, filepath.Join(dir, "good", "index.md"),
+		"---\ntype: Overview\ntitle: Good\n---\n# Good\n")
+	mustMkdir(t, filepath.Join(dir, "broken"))
+	mustWrite(t, filepath.Join(dir, "broken", "index.md"),
+		"---\ntype: Overview\ntitle: Broken\n---\n# Broken\n")
+	// A link that resolves to nothing, which is what a moved checkout leaves.
+	if err := os.Symlink("/nonexistent/elsewhere", filepath.Join(dir, "broken", "docs")); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatalf("a broken wiki failed the whole tree: %v", err)
+	}
+	if wikis != 1 {
+		t.Errorf("rendered %d wikis, want 1 for the readable one", wikis)
+	}
+	if _, err := os.Stat(filepath.Join(out, "good", "index.html")); err != nil {
+		t.Errorf("the readable wiki was not rendered: %v", err)
+	}
+	// The skipped wiki must leave nothing behind: a partial directory would be
+	// served as though it had rendered.
+	if _, err := os.Stat(filepath.Join(out, "broken")); err == nil {
+		t.Error("the skipped wiki left output that the server would serve")
+	}
+
+	skipped := r.SkippedSites()
+	if len(skipped) != 1 || skipped[0].Rel != "broken" {
+		t.Fatalf("SkippedSites = %+v, want one entry for broken", skipped)
+	}
+	if skipped[0].Err == nil {
+		t.Error("the skipped wiki carries no reason")
+	}
+
+	root, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(root), `href="/broken/"`) {
+		t.Error("the catalog links to a wiki that was skipped")
+	}
+	if !strings.Contains(string(root), `href="/good/"`) {
+		t.Error("the catalog is missing the wiki that rendered")
 	}
 }
 
