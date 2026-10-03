@@ -597,14 +597,26 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   gap: var(--space-4);
 }
 .site-item {
+  position: relative;
   border: 1px solid var(--color-line); border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);
   transition: border-color var(--dur) var(--ease);
 }
 .site-item:hover { border-color: var(--color-accent-ring); }
+.site-item:hover .site-name { color: var(--color-accent-text); }
 .prose a.site-link {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
   text-decoration: none;
+}
+/* The link stretches over the whole card, so a tap anywhere on a phone opens
+   it. The link text stays the title and badge, so a screen reader names the
+   card by its title rather than by the description. The focus ring sits on the
+   overlay, so it circles the card rather than the title row. */
+.prose a.site-link::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); }
+.prose a.site-link:focus-visible { outline: none; }
+.prose a.site-link:focus-visible::after {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 .site-name { font-family: var(--font-ui); font-weight: var(--fw-semibold); color: var(--color-heading); }
 .site-badge {

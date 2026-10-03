@@ -2330,6 +2330,12 @@ func TestMultiSiteRendersTree(t *testing.T) {
 	if !strings.Contains(string(root), `site-badge-wiki">Wiki</span>`) {
 		t.Error("the root index does not badge a wiki")
 	}
+	// The card is clickable across its whole face through the link's overlay,
+	// not by widening the link text: the anchor ends after the badge, so a
+	// screen reader names the card by its title.
+	if !strings.Contains(string(root), `site-badge-folder">Folder</span></a>`) {
+		t.Error("the card link wraps more than the title and badge")
+	}
 	// A group names itself from its own metadata.
 	clients, err := os.ReadFile(filepath.Join(site, "clients", "index.html"))
 	if err != nil {
