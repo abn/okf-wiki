@@ -1099,6 +1099,29 @@ func TestNestedContentPagesRender(t *testing.T) {
 	if !found {
 		t.Error("the nested install page is missing from the search index")
 	}
+
+	// The sidebar respects one level of the folder structure: a sub-directory of
+	// a section nests its pages under its own disclosure rather than running them
+	// flat. guide/intro.md has no sub-directory, so it stays a loose item; the
+	// pages under guide/setup and guide/deep/deeper collapse into their top
+	// group, and the group is labelled from the directory when it has no index.
+	nav := r.sidebarHTML("guide", "guide/setup/install")
+	if !strings.Contains(nav, `<details class="side-sub" open><summary class="side-subsum"><span>Setup</span>`) {
+		t.Errorf("the setup sub-directory is not a nested group:\n%s", nav)
+	}
+	if !strings.Contains(nav, `<li class="active"><a href="/wiki/guide/setup/install.html">Install</a></li>`) {
+		t.Errorf("the active page is not inside the setup group:\n%s", nav)
+	}
+	if !strings.Contains(nav, `<summary class="side-subsum"><span>Deep</span>`) {
+		t.Errorf("a three-deep group did not collapse to its top directory:\n%s", nav)
+	}
+	if !strings.Contains(nav, `<li><a href="/wiki/guide/intro.html">Intro</a></li>`) {
+		t.Errorf("a page directly under the section is not a loose item:\n%s", nav)
+	}
+	if strings.Contains(nav, `<li><a href="/wiki/guide/setup/install.html">`) &&
+		!strings.Contains(nav, `<details class="side-sub"`) {
+		t.Error("a nested page was rendered flat outside its group")
+	}
 }
 
 // A dot-directory is not content, and must not become a page or an asset.

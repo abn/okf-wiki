@@ -128,6 +128,10 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `side-title-link` or `side-title-text`, and `side-chevron`. A section with no
   child pages is emitted as `side-leaf` rather than a `details`, so it carries no
   disclosure triangle.
+- `details.side-sub` with `summary.side-subsum`, a nested group one level down
+  for pages that share a sub-directory under their section, wrapping a `ul` of
+  the group's pages. A group holding only its `index.md` is a plain
+  `li.side-leaf` link instead, the way a section with no child pages is.
 - `.active`, on the current page's sidebar link and on the current section's
   title, which is how a theme marks position
 - `.breadcrumb`, `.crumb-sep`, `.crumb-cur`

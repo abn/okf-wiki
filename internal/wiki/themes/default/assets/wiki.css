@@ -279,6 +279,31 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   font-weight: var(--fw-semibold);
 }
 
+/* A sub-directory of a section, one level deep: a disclosure inside the
+   section's list, so a bundle two directories deep reads as its folders rather
+   than as a flat run of pages. Quieter than a section: a smaller summary and no
+   extra indent on the summary itself, so it stays aligned with its siblings. */
+.side details.side-sub { margin: 1px 0; }
+details.side-sub summary.side-subsum {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  list-style: none; cursor: pointer; user-select: none;
+  padding: 6px var(--space-3); border-radius: var(--radius-sm);
+  transition: background var(--dur) var(--ease);
+}
+details.side-sub summary.side-subsum::-webkit-details-marker { display: none; }
+details.side-sub summary.side-subsum:hover { background: var(--color-accent-soft); }
+.side-subsum a, .side-subsum span {
+  flex: 1; font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.side-subsum a:hover { color: var(--color-heading); }
+.side-subsum a.active { color: var(--color-accent-text); }
+details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
+/* The group's pages indent one small step past the group summary, so the
+   hierarchy is visible without a deep staircase. */
+.side details.side-sub ul { padding-left: var(--space-3); }
+.side li.side-leaf a { color: var(--color-text-muted); }
+
 /* The header's outbound links, carried in the drawer on a phone where the
    header has no room for a row of them. Hidden on desktop, which shows them in
    the header instead, so only one copy is ever in the accessibility tree. */

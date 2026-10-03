@@ -368,21 +368,143 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 		b.WriteString(`<span class="side-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></span>`)
 		b.WriteString(`</summary>`)
 		b.WriteString(`<ul>`)
-		for _, page := range childPages {
-			active := ""
-			if page.Slug == activeSlug {
-				active = ` class="active"`
-			}
-			title := page.Title
-			if title == "" {
-				title = page.Slug
-			}
-			fmt.Fprintf(&b, `<li%s><a href="%s%s.html">%s</a></li>`, active, base, page.Slug, template.HTMLEscapeString(title))
-		}
+		r.writeSidebarEntries(&b, base, sec, childPages, activeSlug)
 		b.WriteString(`</ul></details>`)
 	}
 	b.WriteString(`</nav>`)
 	return b.String()
+}
+
+// sidebarGroup is the pages of a section that share a first sub-directory under
+// the section. dir is that sub-directory's name, root its index.md if it has
+// one, and pages the rest.
+type sidebarGroup struct {
+	dir   string
+	root  *Page
+	pages []Page
+}
+
+// childBase is the path the first segment of a slug is measured against: the
+// section's own path for a named section, and nothing for the bundle root,
+// whose pages carry no section prefix.
+func childBase(secID string) string {
+	if secID == "" {
+		return ""
+	}
+	return secID + "/"
+}
+
+// groupChildren splits a section's child pages by the first path segment below
+// the section, so a page at mods/acp-agents/architecture belongs to the
+// acp-agents group. A page directly under the section has no second segment and
+// is returned as a loose page. The group's own index.md is pulled out as the
+// group root rather than left among its pages.
+//
+// One extra level is deliberate: a docs bundle is usually two deep, and a rail
+// that nests every directory arbitrarily is tall and busy. Deeper paths collapse
+// into their top group.
+func groupChildren(secID string, pages []Page) (loose []Page, groups []sidebarGroup) {
+	base := childBase(secID)
+	byDir := map[string]*sidebarGroup{}
+	var order []string
+	for _, p := range pages {
+		rest := strings.TrimPrefix(p.Slug, base)
+		dir, tail, hasDir := strings.Cut(rest, "/")
+		if !hasDir {
+			loose = append(loose, p)
+			continue
+		}
+		g, ok := byDir[dir]
+		if !ok {
+			g = &sidebarGroup{dir: dir}
+			byDir[dir] = g
+			order = append(order, dir)
+		}
+		if tail == "index" {
+			p := p
+			g.root = &p
+			continue
+		}
+		g.pages = append(g.pages, p)
+	}
+	for _, dir := range order {
+		groups = append(groups, *byDir[dir])
+	}
+	return loose, groups
+}
+
+// writeSidebarEntries writes the items of one section: its loose pages first,
+// then a nested disclosure per sub-directory group. A group with no pages of its
+// own beyond its index is a leaf, like a section with only a home page.
+func (r *Renderer) writeSidebarEntries(b *strings.Builder, base string, sec Section, pages []Page, activeSlug string) {
+	loose, groups := groupChildren(sec.ID, pages)
+	for _, page := range loose {
+		r.writeSidebarItem(b, base, page, activeSlug)
+	}
+	for _, g := range groups {
+		r.writeSidebarGroup(b, base, g, activeSlug)
+	}
+}
+
+// writeSidebarItem writes one page as a list item.
+func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, activeSlug string) {
+	active := ""
+	if page.Slug == activeSlug {
+		active = ` class="active"`
+	}
+	title := page.Title
+	if title == "" {
+		title = page.Slug
+	}
+	fmt.Fprintf(b, `<li%s><a href="%s%s.html">%s</a></li>`, active, base, page.Slug, template.HTMLEscapeString(title))
+}
+
+// writeSidebarGroup writes a sub-directory of a section as its own list item: a
+// nested disclosure when it holds pages, and a plain link when it holds only its
+// index. The disclosure's summary is the group's index page when it has one, so
+// the heading is a link the way a section heading is.
+func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarGroup, activeSlug string) {
+	label := titleCase(g.dir)
+	href := ""
+	if g.root != nil {
+		href = base + g.root.Slug + ".html"
+		if g.root.Title != "" {
+			label = g.root.Title
+		}
+	}
+
+	if len(g.pages) == 0 && g.root != nil {
+		active := ""
+		if g.root.Slug == activeSlug {
+			active = ` class="active"`
+		}
+		fmt.Fprintf(b, `<li class="side-leaf"><a%s href="%s">%s</a></li>`, active, href, template.HTMLEscapeString(label))
+		return
+	}
+
+	open := ""
+	for i := range g.pages {
+		if g.pages[i].Slug == activeSlug {
+			open = " open"
+			break
+		}
+	}
+	if g.root != nil && g.root.Slug == activeSlug {
+		open = " open"
+	}
+
+	b.WriteString(`<li><details class="side-sub"` + open + `><summary class="side-subsum">`)
+	if href != "" {
+		fmt.Fprintf(b, `<a href="%s">%s</a>`, href, template.HTMLEscapeString(label))
+	} else {
+		fmt.Fprintf(b, `<span>%s</span>`, template.HTMLEscapeString(label))
+	}
+	b.WriteString(`<span class="side-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></span>`)
+	b.WriteString(`</summary><ul>`)
+	for _, page := range g.pages {
+		r.writeSidebarItem(b, base, page, activeSlug)
+	}
+	b.WriteString(`</ul></details></li>`)
 }
 
 // navExtArrow marks a link that leaves the wiki. It is decorative: the

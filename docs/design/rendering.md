@@ -29,7 +29,12 @@ flowchart LR
    itself correctly. A directory inside a section is not a section of its own:
    its pages belong to the section above and keep the path in their slug, so
    `guide/setup/install.md` in a `guide` section is served at
-   `/wiki/guide/setup/install.html`. Markdown is collected at any depth. Files
+   `/wiki/guide/setup/install.html`. The sidebar follows one level of that
+   structure: pages that share a first sub-directory under their section are
+   grouped under a nested disclosure named from that sub-directory, and its
+   `index.md` becomes the group's own heading link. Deeper paths collapse into
+   their top group, so the rail stays flat while the tree it shows is two deep.
+   Markdown is collected at any depth. Files
    and directories whose name begins with a dot are skipped, so a bundle that is
    also a working tree does not render its own `.git`.
 2. **Parse.** Each file is split into frontmatter and body. The body is parsed

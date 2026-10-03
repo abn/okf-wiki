@@ -5,6 +5,10 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Update**: The sidebar follows one level of the folder structure: pages that
+  share a sub-directory under their section are grouped under a nested
+  disclosure, named from the sub-directory or its `index.md`. `design/rendering.md`
+  and `reference/themes.md` say so.
 * **Fix**: A linked bundle's non-Markdown files reach the output. Both walks
   now resolve their root, since `WalkDir` treats a symlinked starting point as a
   file, so a wiki assembled by linking a checkout in served its pages with every
