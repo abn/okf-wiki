@@ -3,6 +3,7 @@ package wiki
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -2253,6 +2254,53 @@ func TestWatchSignatureTracksChanges(t *testing.T) {
 // changes and returns when its context is done. That a dotfile is not a change
 // is asserted on the signature itself, in the test above, because asserting it
 // through the live loop makes the test race the poll interval.
+// TestSwapDirReplacesAtomically covers the swap: a built tree becomes dest, a
+// build that fails leaves the previous tree in place, and no temporary or set-
+// aside directory is left behind either way.
+func TestSwapDirReplacesAtomically(t *testing.T) {
+	parent := t.TempDir()
+	dest := filepath.Join(parent, "site")
+	mustMkdir(t, dest)
+	mustWrite(t, filepath.Join(dest, "old.html"), "old\n")
+
+	if err := swapDir(dest, func(tmp string) error {
+		mustWrite(t, filepath.Join(tmp, "new.html"), "new\n")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "new.html")); err != nil {
+		t.Errorf("the built tree did not reach dest: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "old.html")); err == nil {
+		t.Error("the previous tree survived the swap, so it was updated rather than replaced")
+	}
+
+	// A build that fails must not disturb what is being served.
+	before, err := os.ReadFile(filepath.Join(dest, "new.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("render failed")
+	if err := swapDir(dest, func(tmp string) error { return wantErr }); !errors.Is(err, wantErr) {
+		t.Fatalf("swapDir error = %v, want %v", err, wantErr)
+	}
+	after, err := os.ReadFile(filepath.Join(dest, "new.html"))
+	if err != nil || string(after) != string(before) {
+		t.Errorf("a failed build changed dest: %v, %q", err, after)
+	}
+
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "site" {
+			t.Errorf("swap left %q behind in the output parent", e.Name())
+		}
+	}
+}
+
 func TestWatchRendersOnChange(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")

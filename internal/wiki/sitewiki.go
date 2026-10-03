@@ -129,16 +129,24 @@ func (r *Renderer) Theme() *Theme { return r.theme }
 func (r *Renderer) Sections() []Section { return r.sections }
 
 // RenderAll renders every page into <out>/<base>/ and writes the resolved theme.
+//
+// The site is built beside its destination and renamed into place, so a render
+// never exposes a directory with files missing. Only a single bundle swaps its
+// own directory; a multi-site tree swaps the output root through RenderSites.
 func (r *Renderer) RenderAll(out string) error {
 	site, err := r.cfg.SiteDir(out)
 	if err != nil {
 		return err
 	}
-	// Start clean so removed pages, renamed sections, or an outdated vendor
-	// bundle never linger in the output.
-	if err := os.RemoveAll(site); err != nil {
-		return err
-	}
+	return swapDir(site, func(tmp string) error {
+		return r.renderInto(out, tmp)
+	})
+}
+
+// renderInto builds the site into site, which is a temporary directory the swap
+// helper will rename. out is kept for the root redirect, which belongs to the
+// output root rather than to the site directory.
+func (r *Renderer) renderInto(out, site string) error {
 	if err := os.MkdirAll(site, 0o755); err != nil {
 		return err
 	}
