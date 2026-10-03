@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Creation**: Added `adr/0004-watch-rerenders-the-whole-tree.md`, which
+  records that `serve --watch` re-renders every wiki on any change rather than
+  the page that moved, the measured cost at 1, 5 and 20 wikis, and the decision
+  to defer incremental rendering until a tree is big enough to feel it.
+  `usage/cli.md` and `adr/index.md` link to it.
 * **Update**: A multi-site group card is clickable across its whole face: the
   link stretches over the card, so a tap anywhere opens it while its text stays
   the title and badge. `reference/themes.md` says so.
