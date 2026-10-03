@@ -9,12 +9,20 @@
 <link rel="icon" type="image/svg+xml" href="{{.Base}}favicon.svg">
 <link rel="stylesheet" href="{{.Base}}wiki.css?v={{.AssetVersion}}">
 <script>
-  // Apply the saved theme before first paint to avoid a flash.
+  // Apply the saved theme before first paint to avoid a flash. A pinned theme
+  // wins; with none pinned the OS preference decides, so color-scheme is set
+  // here too and the browser's own canvas is dark before the stylesheet lands
+  // rather than painting white under a dark page during navigation.
   (function () {
-    try {
-      var t = localStorage.getItem('wiki-theme');
-      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
-    } catch (e) {}
+    var pinned = null;
+    try { pinned = localStorage.getItem('wiki-theme'); } catch (e) {}
+    if (pinned === 'light' || pinned === 'dark') {
+      document.documentElement.setAttribute('data-theme', pinned);
+      document.documentElement.style.colorScheme = pinned;
+      return;
+    }
+    var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   })();
 </script>
 </head>
@@ -275,6 +283,7 @@
     toggle.addEventListener('click', function () {
       var next = current() === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
+      document.documentElement.style.colorScheme = next;
       try { localStorage.setItem('wiki-theme', next); } catch (e) {}
     });
   })();

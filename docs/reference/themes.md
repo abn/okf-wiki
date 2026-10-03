@@ -120,6 +120,14 @@ The three behaviours above, the drawer, the theme toggle and the pre-paint
 restore that avoids a flash of the wrong ground, are **inline in the template**,
 not in a client file. A theme that replaces `template.html` takes on all three.
 
+Two things a theme must keep for the pre-paint restore to hold. It paints the
+ground on `html` as well as `body`, because the canvas a browser shows between
+documents is the root background; setting only `body` lets a dark page paint
+white for an instant during navigation. And the restore sets `color-scheme` on
+the root beside `data-theme`, so the browser's own default canvas is dark before
+the stylesheet applies, which covers a reader who has pinned nothing and follows
+the OS.
+
 ### Classes the renderer writes
 
 Go emits these, so a theme's stylesheet is the only thing that styles them:

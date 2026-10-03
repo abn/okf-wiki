@@ -125,6 +125,40 @@ func TestDefaultThemeResolves(t *testing.T) {
 	}
 }
 
+// TestDefaultThemeAvoidsADarkFlash guards the two things that stop a dark page
+// from painting white during a cross-document navigation: the ground is set on
+// html as well as body, because the canvas the browser paints between documents
+// is the root background, and the theme is resolved before the body rather than
+// after first paint.
+func TestDefaultThemeAvoidsADarkFlash(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets := map[string]string{}
+	for _, f := range th.files {
+		assets[f.Path] = string(f.Data)
+	}
+	shell := th.templateText
+	if !strings.Contains(assets["wiki.css"], "html { scroll-behavior: smooth; background: var(--color-bg); }") {
+		t.Error("html must paint the ground, not only body, or the canvas flashes white")
+	}
+	// The pre-paint script sets color-scheme so the browser's own default canvas
+	// is dark before the stylesheet applies, for a reader with nothing pinned.
+	if !strings.Contains(shell, "style.colorScheme =") {
+		t.Error("the pre-paint script must set color-scheme on the root")
+	}
+	css := strings.Index(shell, "wiki.css?v=")
+	script := strings.Index(shell, "wiki-theme")
+	body := strings.Index(shell, "<body>")
+	if css < 0 || script < 0 || body < 0 {
+		t.Fatal("the shell is missing the stylesheet, the theme script or the body")
+	}
+	if !(css < script && script < body) {
+		t.Error("the theme must be resolved after the stylesheet and before the body")
+	}
+}
+
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,

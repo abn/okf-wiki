@@ -5,6 +5,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+## 2026-10-04
+
+* **Fix**: A dark page no longer flashes white between pages. The ground is
+  painted on `html` as well as `body`, since the canvas a browser shows during a
+  cross-document navigation is the root background, and the pre-paint restore
+  sets `color-scheme` so the browser's default canvas is dark before the
+  stylesheet applies. `reference/themes.md` says so.
 * **Update**: The sidebar follows one level of the folder structure: pages that
   share a sub-directory under their section are grouped under a nested
   disclosure, named from the sub-directory or its `index.md`. `design/rendering.md`

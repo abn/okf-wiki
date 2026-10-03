@@ -30,7 +30,7 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: var(--color-bg); }
 
 body {
   margin: 0;
