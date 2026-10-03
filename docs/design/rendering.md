@@ -206,3 +206,16 @@ Every response also carries an `ETag` from the file's bytes, beside the
 moves every file's modification time; without an `ETag` an unchanged asset would
 be answered with a full `200` on the next request. The content hash does not move
 when only the time did, so an unchanged file revalidates to a `304`.
+
+The wordmark's mark is an `<img>` in the header, so the browser would discover it
+only after the stylesheets and the body parse and it would paint a step behind
+everything else. A `rel="preload"` in the head starts it beside the CSS, at high
+priority, and the `<img>` requests the same versioned URL so the hint is a cache
+hit rather than a second fetch.
+
+A wiki of a tree that cannot be read is skipped and reported, not fatal. A tree
+assembled from linked checkouts is exactly where a link goes stale, and taking
+every wiki down for one is worse than publishing the rest. The skipped wiki
+leaves no output, so nothing serves it, and its card is left off the group index
+rather than linking to a page that is not there. The reason names the wiki and
+the failure; `render` and the reload path both print it.

@@ -7,6 +7,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-04
 
+* **Fix**: A wiki of a tree that cannot be read is skipped and reported instead
+  of failing the whole render, so one stale link in a linked checkout no longer
+  takes every wiki offline. The skipped wiki leaves no output and no catalog
+  card. `design/rendering.md` says so.
+* **Fix**: The wordmark's mark is preloaded from the head at high priority and
+  requested at the same versioned URL, so it no longer paints a step behind the
+  rest of the header. `design/rendering.md` says so.
 * **Fix**: Every response carries an `ETag` from the file's bytes beside
   `Last-Modified`, so a re-render, which moves every file's modification time,
   no longer turns an unchanged asset's next request into a full `200`.
