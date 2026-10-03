@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,39 @@ import (
 )
 
 // The route table and the file server work end to end over a real listener.
+// An index.html link must not cost a redirect. A nav link is written as slug
+// plus ".html", so the home page of a section is requested as .../index.html,
+// which http.FileServer and http.ServeFile both answer with a 301 to "./".
+// That is a whole extra round trip before the document on every index link, so
+// the handler serves the file in place; the canonical directory URL still works.
+func TestServeServesIndexHTMLWithoutARedirect(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "wiki", "guide"))
+	mustWrite(t, filepath.Join(dir, "wiki", "index.html"), "HOME")
+	mustWrite(t, filepath.Join(dir, "wiki", "guide", "index.html"), "GUIDE")
+	mustWrite(t, filepath.Join(dir, "wiki", "guide", "page.html"), "PAGE")
+
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+	for _, tc := range []struct{ path, want string }{
+		{"/wiki/index.html", "HOME"},
+		{"/wiki/guide/index.html", "GUIDE"},
+		{"/wiki/", "HOME"},
+		{"/wiki/guide/", "GUIDE"},
+		{"/wiki/guide/page.html", "PAGE"},
+	} {
+		req := httptest.NewRequest("GET", tc.path, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("GET %s = %d, want 200 (a redirect here is the extra round trip)", tc.path, w.Code)
+			continue
+		}
+		if got := w.Body.String(); got != tc.want {
+			t.Errorf("GET %s body = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+}
+
 func TestServeServesOverARealListener(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.html"), "<h1>hi</h1>")

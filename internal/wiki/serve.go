@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -51,7 +53,7 @@ func handler(opts ServeOptions) http.Handler {
 	base := Config{Base: opts.Base}.base()
 
 	mux := http.NewServeMux()
-	site := noCache(http.FileServer(http.Dir(opts.OutDir)))
+	site := noCache(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir))
 	mux.Handle(base, site)
 	// A base of "/" is the whole site, so there is no prefix to redirect and
 	// nothing left for a catch-all: TrimSuffix would give "", which ServeMux
@@ -157,6 +159,37 @@ func init() {
 	// ELK layout ships .mjs chunk files.
 	_ = mime.AddExtensionType(".mjs", "text/javascript")
 	_ = mime.AddExtensionType(".js", "text/javascript")
+}
+
+// indexDirect serves a request for a page's index.html in place, instead of
+// letting http.FileServer answer it with a 301 to "./".
+//
+// A nav link is written as slug + ".html", so the home page of a section is
+// requested as .../index.html. FileServer treats that as a directory and
+// redirects, which costs a whole extra round trip before the document on every
+// index link a reader clicks. http.ServeFile has the same rule for any path
+// ending in /index.html, so the path is rewritten to the file before serving;
+// the canonical directory URL still resolves through next unchanged.
+func indexDirect(next http.Handler, outDir string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/index.html") {
+			clean := path.Clean(r.URL.Path)
+			// A path that escapes the output dir is left to next, which will
+			// clean or refuse it rather than this serving an arbitrary file.
+			if !strings.Contains(clean, "..") {
+				file := filepath.Join(outDir, filepath.FromSlash(clean))
+				if st, err := os.Stat(file); err == nil && !st.IsDir() {
+					// Copy the request so the caller's URL is untouched, and
+					// drop the trailing /index.html that ServeFile redirects on.
+					r2 := r.Clone(r.Context())
+					r2.URL.Path = strings.TrimSuffix(clean, "index.html")
+					http.ServeFile(w, r2, file)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // noCache forces revalidation on every request. http.FileServer otherwise lets
