@@ -7,6 +7,10 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-04
 
+* **Fix**: Every response carries an `ETag` from the file's bytes beside
+  `Last-Modified`, so a re-render, which moves every file's modification time,
+  no longer turns an unchanged asset's next request into a full `200`.
+  `design/rendering.md` says so.
 * **Fix**: A dark page no longer flashes white between pages. The ground is
   painted on `html` as well as `body`, since the canvas a browser shows during a
   cross-document navigation is the root background, and the pre-paint restore

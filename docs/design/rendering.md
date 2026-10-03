@@ -200,3 +200,9 @@ before it could paint. A page link is written as `slug + ".html"`, so a section'
 home page is requested as `.../index.html`; the server serves that file in place
 rather than answering with the 301 that `http.FileServer` would, so an index link
 does not cost a redirect before the document.
+
+Every response also carries an `ETag` from the file's bytes, beside the
+`Last-Modified` the file server sends. A re-render rewrites the whole tree and so
+moves every file's modification time; without an `ETag` an unchanged asset would
+be answered with a full `200` on the next request. The content hash does not move
+when only the time did, so an unchanged file revalidates to a `304`.
