@@ -157,9 +157,19 @@ func reRender(cfg wiki.Config) error {
 	}
 	if cfg.MultiSite {
 		_, err := r.RenderSites(cfg.Out)
+		reportSkipped(r)
 		return err
 	}
 	return r.RenderAll(cfg.Out)
+}
+
+// reportSkipped names each wiki a tree render left out and why. A skipped wiki
+// means a stale link or unreadable bundle somewhere in the tree, which the
+// operator needs to see; the render itself still succeeded.
+func reportSkipped(r *wiki.Renderer) {
+	for _, s := range r.SkippedSites() {
+		fmt.Fprintf(os.Stderr, "okf-wiki: skipped %s: %v\n", s.Rel, s.Err)
+	}
 }
 
 func runDetect(args []string) {
@@ -218,6 +228,7 @@ func doRender(cfg *wiki.Config) error {
 		}
 		fmt.Printf("okf-wiki: rendered %d wikis from %s -> %s\n", wikis, cfg.Content, site)
 		fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)
+		reportSkipped(r)
 		return nil
 	}
 	if err := r.RenderAll(cfg.Out); err != nil {

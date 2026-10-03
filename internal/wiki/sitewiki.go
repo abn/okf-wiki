@@ -71,10 +71,23 @@ type Renderer struct {
 	specs        []sectionSpec
 	generatedAt  string
 	assetVersion string
+	// skipped records wikis in a tree that could not be read, so one bad bundle
+	// is reported and left out rather than failing the whole render. A tree
+	// assembled from linked checkouts is exactly where a stale link lands, and
+	// taking every wiki down for one is worse than publishing the rest.
+	skipped []SkippedSite
 	// nested marks a renderer for one wiki inside a multi-site tree. It shares
 	// the tree's theme, and it does not write the root redirect, which would
 	// otherwise point the whole tree at whichever wiki rendered last.
 	nested bool
+}
+
+// SkippedSite is one wiki a tree render left out, with the reason.
+type SkippedSite struct {
+	// Rel is the wiki's path under the tree root.
+	Rel string
+	// Err is why it could not be read.
+	Err error
 }
 
 // New builds a renderer for the bundle described by cfg.

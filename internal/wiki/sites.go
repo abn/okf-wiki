@@ -122,7 +122,7 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 
 func (r *Renderer) renderSites(root string, n *siteNode) (int, error) {
 	if n.wiki {
-		return 1, r.renderSite(root, n)
+		return r.renderSite(root, n)
 	}
 	total := 0
 	for _, c := range n.children {
@@ -141,7 +141,12 @@ func (r *Renderer) renderSites(root string, n *siteNode) (int, error) {
 // renderSite renders one wiki of the tree. It shares the resolved theme with the
 // tree renderer, and its own base is the tree base plus its path, so its links
 // and assets sit under it. root is the tree root being written into.
-func (r *Renderer) renderSite(root string, n *siteNode) error {
+//
+// A wiki that cannot be read is recorded and skipped rather than returned as an
+// error: one stale link in a tree of linked checkouts should not take the whole
+// wiki offline. The failure is kept on the tree renderer so the caller can
+// report it; the wiki is simply absent from the output and the count.
+func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 	cfg := r.cfg
 	cfg.Content = n.abs
 	cfg.Base = siteBase(r.cfg.base(), n.rel)
@@ -154,12 +159,40 @@ func (r *Renderer) renderSite(root string, n *siteNode) error {
 		nested:       true,
 	}
 	if err := sub.load(cfg.Content); err != nil {
-		return err
+		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
+		return 0, nil
 	}
 	// A wiki of the tree writes into the tree root at its own path, not into a
 	// directory of its own to swap: the group indexes and the tree-root assets
 	// share this directory, so only the whole tree turns over.
-	return sub.renderInto(root, cfg.sitePath(root))
+	site := cfg.sitePath(root)
+	if err := sub.renderInto(root, site); err != nil {
+		// The bundle loaded but a page or an asset failed. The partial output is
+		// removed, so a skipped wiki leaves nothing behind for the server to
+		// serve as though it had rendered.
+		if rmErr := os.RemoveAll(site); rmErr != nil {
+			return 0, fmt.Errorf("skipping %s: %w (and removing its partial output: %v)", n.rel, err, rmErr)
+		}
+		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
+		return 0, nil
+	}
+	return 1, nil
+}
+
+// SkippedSites returns the wikis a tree render left out, in the order they were
+// met. Empty for a single-bundle render, and empty for a tree where every wiki
+// read.
+func (r *Renderer) SkippedSites() []SkippedSite { return r.skipped }
+
+// wasSkipped reports whether a node was left out of the tree render, so its
+// catalog card is not written and nothing links to a page that is not there.
+func (r *Renderer) wasSkipped(n *siteNode) bool {
+	for _, s := range r.skipped {
+		if s.Rel == n.rel {
+			return true
+		}
+	}
+	return false
 }
 
 // writeSiteRoot places the theme's assets and an empty search catalogue at the
@@ -186,11 +219,18 @@ func (r *Renderer) writeSiteRoot(root string) error {
 // writeCatalog writes the index for a group directory: its direct children,
 // grouped so the wikis read first and the folders that hold them follow.
 // root is the tree root the tree is being written into.
+//
+// A child that was skipped is left off the cards: it has no page to link to, and
+// a card that 404s is worse than the wiki being absent. The failure is reported
+// by the caller through SkippedSites, not silently dropped here.
 func (r *Renderer) writeCatalog(root string, n *siteNode) error {
 	base := r.cfg.base()
 	var b strings.Builder
 	var wikis, folders []*siteNode
 	for _, c := range n.children {
+		if r.wasSkipped(c) {
+			continue
+		}
 		if c.wiki {
 			wikis = append(wikis, c)
 			continue
