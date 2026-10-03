@@ -46,6 +46,68 @@ func TestServeServesIndexHTMLWithoutARedirect(t *testing.T) {
 	}
 }
 
+// An ETag from the file's content keeps revalidation cheap after a re-render.
+// Last-Modified is the file's mtime, and a re-render rewrites every file in the
+// tree, so an unchanged asset would take a fresh mtime and be answered with a
+// full 200. A content hash does not move when only the time did.
+func TestServeEtagFromContent(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "wiki", "wiki.css")
+	mustMkdir(t, filepath.Join(dir, "wiki"))
+	mustWrite(t, file, "body { color: red }")
+
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+	get := func(headers map[string]string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("GET", "/wiki/wiki.css", nil)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		return w
+	}
+
+	first := get(nil)
+	if first.Code != http.StatusOK {
+		t.Fatalf("plain GET = %d, want 200", first.Code)
+	}
+	tag := first.Header().Get("ETag")
+	if tag == "" {
+		t.Fatal("no ETag on the response")
+	}
+	if cc := first.Header().Get("Cache-Control"); cc != "no-cache, must-revalidate" {
+		t.Errorf("Cache-Control = %q, want the revalidate pair", cc)
+	}
+
+	if got := get(map[string]string{"If-None-Match": tag}); got.Code != http.StatusNotModified {
+		t.Errorf("If-None-Match with the tag = %d, want 304", got.Code)
+	}
+	if got := get(map[string]string{"If-None-Match": `"other"`}); got.Code != http.StatusOK {
+		t.Errorf("If-None-Match with another tag = %d, want 200", got.Code)
+	}
+	if got := get(map[string]string{"If-None-Match": "*"}); got.Code != http.StatusNotModified {
+		t.Errorf("If-None-Match: * = %d, want 304", got.Code)
+	}
+
+	// Rewriting the file with the same bytes but a new mtime must not change the
+	// tag: this is the re-render case the header exists for.
+	time.Sleep(10 * time.Millisecond)
+	mustWrite(t, file, "body { color: red }")
+	if got := get(map[string]string{"If-None-Match": tag}); got.Code != http.StatusNotModified {
+		t.Errorf("after a same-bytes rewrite = %d, want 304", got.Code)
+	}
+
+	// A changed byte is a new tag, and the old one no longer matches.
+	mustWrite(t, file, "body { color: blue }")
+	changed := get(nil).Header().Get("ETag")
+	if changed == tag {
+		t.Error("the ETag did not move when the bytes did")
+	}
+	if got := get(map[string]string{"If-None-Match": tag}); got.Code != http.StatusOK {
+		t.Errorf("stale If-None-Match after an edit = %d, want 200", got.Code)
+	}
+}
+
 func TestServeServesOverARealListener(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.html"), "<h1>hi</h1>")

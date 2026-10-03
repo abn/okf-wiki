@@ -2,7 +2,10 @@ package wiki
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -53,7 +56,7 @@ func handler(opts ServeOptions) http.Handler {
 	base := Config{Base: opts.Base}.base()
 
 	mux := http.NewServeMux()
-	site := noCache(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir))
+	site := noCache(etag(opts.OutDir)(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir)))
 	mux.Handle(base, site)
 	// A base of "/" is the whole site, so there is no prefix to redirect and
 	// nothing left for a catch-all: TrimSuffix would give "", which ServeMux
@@ -194,12 +197,93 @@ func indexDirect(next http.Handler, outDir string) http.Handler {
 
 // noCache forces revalidation on every request. http.FileServer otherwise lets
 // browsers heuristically cache scripts/styles, serving a stale diagram runtime
-// or stylesheet after a re-render.
+// or stylesheet after a re-render. The ETag beside it is what makes that
+// revalidation cheap: Last-Modified is the file's mtime, and a re-render
+// rewrites every file in the tree, so an otherwise unchanged asset would take a
+// fresh mtime and be answered with a full 200. A content hash does not move
+// when only the time did, so an unchanged file revalidates to a 304.
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// etag sets an ETag from the file's content so a conditional request is answered
+// with a 304 even after a re-render moved its modification time.
+//
+// The hash is computed from the bytes on disk at request time. On the output of
+// a dev server that is a handful of small files, and a render already rewrites
+// them, so this costs one read of a file the request is about to read anyway.
+// A body that is not a whole file, a 304 already, or an error is left alone:
+// the header means nothing there and would be wrong to send.
+func etag(outDir string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			clean := path.Clean(r.URL.Path)
+			if strings.Contains(clean, "..") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			file := filepath.Join(outDir, filepath.FromSlash(clean))
+			st, err := os.Stat(file)
+			if err != nil || st.IsDir() {
+				next.ServeHTTP(w, r)
+				return
+			}
+			// A range request or a conditional PUT is not a plain GET, so a full
+			// content hash says nothing useful and the header is not set.
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				next.ServeHTTP(w, r)
+				return
+			}
+			sum, err := fileSHA256(file)
+			if err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+			tag := `"` + sum + `"`
+			w.Header().Set("ETag", tag)
+			// If-None-Match wins over If-Modified-Since (RFC 9110), so a match
+			// here is answered before the handler can send a 200 body.
+			if match := r.Header.Get("If-None-Match"); match != "" && etagMatches(match, tag) {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// fileSHA256 returns the hex SHA-256 of a file's contents.
+func fileSHA256(name string) (string, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// etagMatches reports whether an If-None-Match header names the given tag.
+// The header is a comma-separated list, "*" matches anything, and a weak tag
+// ("W/...") is compared without its prefix, which is what makes a weak
+// validator usable for a conditional GET.
+func etagMatches(header, tag string) bool {
+	for _, part := range strings.Split(header, ",") {
+		part = strings.TrimSpace(part)
+		if part == "*" {
+			return true
+		}
+		if strings.TrimPrefix(part, "W/") == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // repoFileServer serves the repository root read-only, refusing dotfiles so
