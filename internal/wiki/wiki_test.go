@@ -1,6 +1,7 @@
 package wiki
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -2221,5 +2222,69 @@ func TestDiagramCardContract(t *testing.T) {
 	// The failure card must read as a card, not a stray block.
 	if !strings.Contains(sheet, "var(--status-danger-tint)") {
 		t.Error("failure card carries no danger tint")
+	}
+}
+
+// TestWatchSignatureTracksChanges covers the reload trigger: an edit to the
+// bundle changes the signature, a dotfile does not, and a missing theme root is
+// not a permanent difference.
+func TestWatchSignatureTracksChanges(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")
+	base := watchSignature([]string{dir})
+
+	if again := watchSignature([]string{dir}); again != base {
+		t.Error("the signature changed with no change on disk")
+	}
+	mustWrite(t, filepath.Join(dir, ".hidden"), "secret")
+	if withDot := watchSignature([]string{dir}); withDot != base {
+		t.Error("a dotfile changed the signature, so a .git write would re-render")
+	}
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home, edited\n")
+	if after := watchSignature([]string{dir}); after == base {
+		t.Error("an edit did not change the signature")
+	}
+	if missing := watchSignature([]string{filepath.Join(dir, "nope")}); missing == "" {
+		t.Error("a missing root produced no signature")
+	}
+}
+
+// TestWatchRendersOnChange covers the reload loop: it renders when a file
+// changes and returns when its context is done. That a dotfile is not a change
+// is asserted on the signature itself, in the test above, because asserting it
+// through the live loop makes the test race the poll interval.
+func TestWatchRendersOnChange(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	renders := make(chan struct{}, 8)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Watch(ctx, WatchOptions{
+			Content:  dir,
+			Interval: 20 * time.Millisecond,
+			Render:   func() error { renders <- struct{}{}; return nil },
+			Logf:     func(string, ...any) {},
+		})
+	}()
+
+	// The watcher takes its baseline before the first tick, so a change after a
+	// short pause is seen as a change.
+	time.Sleep(100 * time.Millisecond)
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home, edited\n")
+	select {
+	case <-renders:
+	case <-time.After(3 * time.Second):
+		t.Fatal("a change did not trigger a render")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Watch did not return when its context was cancelled")
 	}
 }

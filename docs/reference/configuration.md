@@ -25,6 +25,7 @@ Resolution order is flag, then environment variable, then default.
 | `--nav-links` | `OKF_WIKI_NAV_LINKS` | empty | Header links, `Label=URL` pairs |
 | `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
+| `--watch` | `OKF_WIKI_WATCH` | `false` | Re-render when the bundle or theme changes (serve only) |
 
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server

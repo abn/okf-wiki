@@ -12,6 +12,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -77,6 +78,7 @@ flags (render):
 flags (serve adds):
   --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)
   --open           open a browser (default false; off in containers)
+  --watch          re-render when the bundle or theme changes
 
 serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
 what a container stop sends. A request part way through a body is finished
@@ -85,7 +87,7 @@ rather than cut.
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
   OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
-  OKF_WIKI_ADDR, OKF_WIKI_OPEN
+  OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH
 `)
 }
 
@@ -94,7 +96,7 @@ func runRender(args []string) {
 	cfg := bindCommon(fs)
 	fs.Parse(reorderArgs(args, fs))
 	applyPositional(fs, cfg)
-	if err := doRender(*cfg); err != nil {
+	if err := doRender(cfg); err != nil {
 		fatal(err)
 	}
 }
@@ -104,10 +106,23 @@ func runServe(args []string) {
 	cfg := bindCommon(fs)
 	addr := fs.String("addr", env("OKF_WIKI_ADDR", wiki.DefaultAddr), "listen address")
 	open := fs.Bool("open", envBool("OKF_WIKI_OPEN", false), "open a browser")
+	watch := fs.Bool("watch", envBool("OKF_WIKI_WATCH", false), "re-render when the bundle or theme changes")
 	fs.Parse(reorderArgs(args, fs))
 	applyPositional(fs, cfg)
-	if err := doRender(*cfg); err != nil {
+	if err := doRender(cfg); err != nil {
 		fatal(err)
+	}
+	if *watch {
+		// The server reads from disk on every request and asks for
+		// revalidation, so a re-render is live on the next load with nothing
+		// restarted. The goroutine lives as long as the process; serve blocks
+		// until a signal, and the process ends after it.
+		go wiki.Watch(context.Background(), wiki.WatchOptions{
+			Content:  cfg.Content,
+			ThemeDir: cfg.ThemeDir,
+			Render:   func() error { return reRender(*cfg) },
+		})
+		fmt.Println("okf-wiki: watching the bundle and theme for changes")
 	}
 	absRepo := ""
 	if cfg.Repo != "" {
@@ -122,6 +137,17 @@ func runServe(args []string) {
 	}); err != nil {
 		fatal(err)
 	}
+}
+
+// reRender renders the configured bundle again into its output directory. It is
+// the reload path, so it stays quiet on success: the next request shows the
+// result, and Watch reports a failure.
+func reRender(cfg wiki.Config) error {
+	r, err := wiki.New(cfg)
+	if err != nil {
+		return err
+	}
+	return r.RenderAll(cfg.Out)
 }
 
 func runDetect(args []string) {
@@ -151,7 +177,10 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	return c
 }
 
-func doRender(cfg wiki.Config) error {
+// doRender renders the configured bundle into its output directory. It resolves
+// the content directory when none was given and records it back on cfg, so a
+// caller that then watches the bundle knows what to watch.
+func doRender(cfg *wiki.Config) error {
 	if cfg.Content == "" {
 		detected, err := wiki.DetectContent(nil)
 		if err != nil {
@@ -160,7 +189,7 @@ func doRender(cfg wiki.Config) error {
 		fmt.Printf("okf-wiki: auto-detected content at %s\n", detected)
 		cfg.Content = detected
 	}
-	r, err := wiki.New(cfg)
+	r, err := wiki.New(*cfg)
 	if err != nil {
 		return err
 	}

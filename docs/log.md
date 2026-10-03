@@ -3,6 +3,13 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-03
+
+* **Update**: `usage/cli.md` and `reference/configuration.md` document
+  `serve --watch`, and `OKF_WIKI_WATCH`, which re-render the site when the bundle
+  or a layered theme changes. An edit is live on the next page load, and a
+  re-render that fails keeps the last good one serving.
+
 ## 2026-10-02
 
 * **Update**: `design/rendering.md` and `reference/themes.md` describe the

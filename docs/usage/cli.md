@@ -49,6 +49,22 @@ have environment equivalents, `OKF_WIKI_THEME` and `OKF_WIKI_BASE`. See
 under `--out`, so the rendered directory can be served by any static file server
 unchanged. The default is `/wiki/`.
 
+## Live reload
+
+`serve --watch` re-renders when the bundle changes, so an edit is live on the
+next page load and nothing is restarted:
+
+```bash
+okf-wiki serve --content ./docs --out .scratch/wiki --watch
+```
+
+It polls the bundle once a second, and the theme when one is layered over
+the default, and re-renders into the same output directory the server reads
+from. A re-render that fails, which is what saving part way through an edit
+looks like, is reported and the last good render keeps serving until the
+next change, so the server does not have to be restarted by hand.
+`OKF_WIKI_WATCH=true` is the same thing for a container.
+
 ## Installing it
 
 There are no tagged releases, so there is no release tarball to download and no
