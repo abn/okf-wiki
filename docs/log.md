@@ -12,6 +12,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
   cross-document navigation is the root background, and the pre-paint restore
   sets `color-scheme` so the browser's default canvas is dark before the
   stylesheet applies. `reference/themes.md` says so.
+* **Fix**: The theme's three stylesheets are linked from the head rather than
+  `@import`-ed into one, so they load in parallel instead of as a serial chain,
+  and an `index.html` request is served in place rather than answered with a 301
+  to `./`, so an index link does not cost a redirect before the document.
+  `design/rendering.md` says so.
 * **Update**: The sidebar follows one level of the folder structure: pages that
   share a sub-directory under their section are grouped under a nested
   disclosure, named from the sub-directory or its `index.md`. `design/rendering.md`

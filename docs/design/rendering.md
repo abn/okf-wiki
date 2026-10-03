@@ -192,3 +192,11 @@ the server sends `Cache-Control: no-cache, must-revalidate`. A re-render
 therefore always reaches the browser, which matters while authoring. The hash
 covers the resolved theme's bytes, so an override that changes a stylesheet
 busts the cache even though the file name is the same.
+
+The theme's token, font and layout layers are three stylesheets linked from the
+head rather than `@import`-ed into one: an `@import` is discovered only after its
+parent stylesheet parses, so the browser would wait on two serial round trips
+before it could paint. A page link is written as `slug + ".html"`, so a section's
+home page is requested as `.../index.html`; the server serves that file in place
+rather than answering with the 301 that `http.FileServer` would, so an index link
+does not cost a redirect before the document.
