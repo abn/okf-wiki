@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/abn/okf-wiki/internal/wiki"
 )
@@ -82,6 +83,7 @@ flags (serve adds):
   --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)
   --open           open a browser (default false; off in containers)
   --watch          re-render when the bundle or theme changes
+  --watch-interval DURATION  how often --watch polls for changes (default 1s)
 
 serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
 what a container stop sends. A request part way through a body is finished
@@ -90,7 +92,8 @@ rather than cut.
 environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
   OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
   OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
-  OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_MULTI_SITE
+  OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_WATCH_INTERVAL,
+  OKF_WIKI_MULTI_SITE
 `)
 }
 
@@ -110,6 +113,7 @@ func runServe(args []string) {
 	addr := fs.String("addr", env("OKF_WIKI_ADDR", wiki.DefaultAddr), "listen address")
 	open := fs.Bool("open", envBool("OKF_WIKI_OPEN", false), "open a browser")
 	watch := fs.Bool("watch", envBool("OKF_WIKI_WATCH", false), "re-render when the bundle or theme changes")
+	watchInterval := fs.Duration("watch-interval", envDuration("OKF_WIKI_WATCH_INTERVAL", time.Second), "how often to poll for changes with --watch")
 	fs.Parse(reorderArgs(args, fs))
 	applyPositional(fs, cfg)
 	if err := doRender(cfg); err != nil {
@@ -123,6 +127,7 @@ func runServe(args []string) {
 		go wiki.Watch(context.Background(), wiki.WatchOptions{
 			Content:  cfg.Content,
 			ThemeDir: cfg.ThemeDir,
+			Interval: *watchInterval,
 			Render:   func() error { return reRender(*cfg) },
 		})
 		fmt.Println("okf-wiki: watching the bundle and theme for changes")
@@ -270,6 +275,22 @@ func envBool(key string, def bool) bool {
 	default:
 		return false
 	}
+}
+
+// envDuration reads a Go duration ("500ms", "2s") from the environment, falling
+// back to the default when unset or unparseable. An unparseable value is not an
+// error here: the flag default was already validated by the flag package when it
+// was set on the command line, and an environment variable is a convenience.
+func envDuration(key string, def time.Duration) time.Duration {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return def
+	}
+	return d
 }
 
 func fatal(err error) {

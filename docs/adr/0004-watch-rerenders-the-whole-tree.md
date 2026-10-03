@@ -17,22 +17,18 @@ bundle again, and under `--multi-site` walks the tree and rebuilds every wiki,
 each with its own pages, tag pages, theme assets and copied bundle files, and
 then every group index.
 
-The poll is also the coalescing window. The digest is taken once per tick, and
-the render runs on the goroutine that reads it, so a burst of writes inside one
-tick is a single render however many files moved, a render never overlaps the
-poll or queues behind another, and a stream of changes that never stops renders
-about once a second rather than once per change. The exception is a tree whose
-render outlasts the interval, which renders back to back, still one at a time.
-
 So a change anywhere re-renders everything, and the question this record answers
 is whether it should become incremental instead.
 
-Two things make the current shape defensible. The poll is cheap, because it
-reads metadata rather than contents. And a full render cannot keep stale output:
-a renamed section, a removed page or an outdated vendor bundle does not survive
-a rebuild, and the outputs that are not pages, the navigation, the previous and
-next chain, the search index and the tag pages, are derived from the whole
-bundle rather than from one file.
+Two properties of the loop bound the damage. The poll is the coalescing window:
+the digest is taken once per tick and the render runs on the goroutine that
+reads it, so a burst of writes inside one tick is a single render however many
+files moved, renders never overlap or queue, and a stream of changes that never
+stops renders about once per interval rather than once per change. The exception
+is a tree whose render outlasts the interval, which renders back to back, still
+one at a time. And the built tree is swapped into place rather than written over
+the live output, so a reader during a re-render sees the old tree or the new one
+and never a file missing.
 
 Measured on the development machine, with the docs bundle as one wiki of 27
 pages:
@@ -45,7 +41,10 @@ pages:
 
 The poll costs about 3 ms over 540 files, roughly 0.3% of a core, and an idle
 tree produces no renders at all. A burst of 200 or of 540 changed files produced
-one render, and 50 changes spread over five seconds produced five or six.
+one render, and 50 changes spread over five seconds produced five or six. Before
+the swap, twelve renders under a hammering client produced a handful of 404s and
+500s, a request landing in the window where the output directory had been
+emptied; after it, zero across twenty renders.
 
 ## Decision
 
@@ -55,6 +54,12 @@ big enough that the reload is felt.
 The threshold is not a page count but whether a re-render is noticeable against
 the editing loop it serves. A few hundred pages is about half a second; that is
 the scale to revisit, and not before.
+
+Two smaller decisions come with it. The interval is a flag, `--watch-interval`
+(or `OKF_WIKI_WATCH_INTERVAL`), default one second, because it is a real
+preference: how soon an edit appears against how much work a burst of saves
+causes. And the render builds beside the output and swaps it in, so a live-viewed
+storm cannot serve a file that is missing.
 
 ## Consequences
 
@@ -66,11 +71,17 @@ The cost is paid on every change and scales with the tree rather than the change
 For a bundle of the size okf-wiki targets that is tens of milliseconds and
 invisible; a tree in the hundreds of pages would make it felt.
 
-Two limits are worth stating. The digest is size and modification time, not
-content, so a change that preserves both, which in practice means a hand-set
-time, goes unnoticed. And a bundle that fails to parse mid-edit is rejected
-before anything is rewritten, so the last good render keeps serving; a failure
-later in a render would leave a partial output.
+The swap means the output directory is replaced, not updated, so the directory
+inode changes on every render. A reader holding an open directory listing across
+a swap keeps the old tree until it is removed a moment later; nothing depends on
+the inode staying the same, and the server reads from disk per request.
+
+Three limits are worth stating. The digest is size and modification time, not
+content, so a change that preserves both, in practice a hand-set time, goes
+unnoticed. A bundle that fails to parse mid-edit is rejected before the swap, so
+the last good render keeps serving. And a failure after the swap has begun is
+narrow: the build happens first, and the two renames that follow are the only
+steps that touch the live tree.
 
 ## Alternatives considered
 
@@ -92,6 +103,12 @@ poll avoids. The case is rare enough to leave open.
 **Watch the filesystem rather than poll.** Rejected when the reload was built. A
 bundle is small, an editor save arrives as several events that need coalescing,
 and a poll needs no bookkeeping for the directories a new section introduces.
+
+**Write into the live output directory rather than swapping.** What the first
+implementation did, and it exposes a window where a page is absent: an unlucky
+request gets a 404 or Go's `Error reading directory`, and a large file could be
+read truncated. The swap removes the window for two renames and a temporary
+directory, at the cost of the output directory's inode changing on every render.
 
 ## See also
 

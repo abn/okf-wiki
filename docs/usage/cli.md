@@ -65,7 +65,17 @@ looks like, is reported and the last good render keeps serving until the
 next change, so the server does not have to be restarted by hand.
 `OKF_WIKI_WATCH=true` is the same thing for a container.
 
-Every change rebuilds the whole site, not only the page that moved. That is deliberate and cheap at a bundle's scale; [ADR 0004](../adr/0004-watch-rerenders-the-whole-tree.md) records why, and the measured cost.
+Every change rebuilds the whole site, not only the page that moved. That is
+deliberate and cheap at a bundle's scale; [ADR 0004](../adr/0004-watch-rerenders-the-whole-tree.md) records why, and the measured cost.
+
+`--watch-interval` changes how often the bundle is polled, as a Go duration
+(`--watch-interval 2s`, or `OKF_WIKI_WATCH_INTERVAL`). It is how soon an edit
+appears, and how often a stream of changes re-renders; the default is one
+second. See [`reference/configuration.md`](../reference/configuration.md).
+
+The render is swapped into place rather than written over the output, so a page
+loaded while a change re-renders never sees a half-written site or a missing
+file.
 
 ## Multi-site trees
 

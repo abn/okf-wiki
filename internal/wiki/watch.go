@@ -20,7 +20,10 @@ type WatchOptions struct {
 	// ThemeDir is a theme directory layered over the embedded default, watched
 	// as well when one is in use.
 	ThemeDir string
-	// Interval is the poll interval. It defaults to a second.
+	// Interval is the poll interval. It defaults to a second. It bounds how
+	// often a change is noticed and re-rendered: a burst of writes inside one
+	// interval is one render, and a stream that never stops renders about once
+	// per interval. A render that outlasts the interval runs back to back.
 	Interval time.Duration
 	// Render is called once per detected change. It runs on the watch
 	// goroutine, so a slow render delays the next poll rather than overlapping

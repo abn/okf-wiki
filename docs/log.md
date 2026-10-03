@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Update**: `serve --watch` takes an interval, `--watch-interval` (or
+  `OKF_WIKI_WATCH_INTERVAL`, default `1s`), and renders into a directory built
+  beside the output that is swapped into place, so a page loaded during a
+  re-render is never missing or half-written. `usage/cli.md`,
+  `reference/configuration.md` and `adr/0004-watch-rerenders-the-whole-tree.md`
+  carry it.
 * **Creation**: Added `adr/0004-watch-rerenders-the-whole-tree.md`, which
   records that `serve --watch` re-renders every wiki on any change rather than
   the page that moved, the measured cost at 1, 5 and 20 wikis, and the decision

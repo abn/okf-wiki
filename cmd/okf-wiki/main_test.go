@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/abn/okf-wiki/internal/wiki"
 )
@@ -106,6 +108,7 @@ func TestReorderArgs(t *testing.T) {
 		fs.Bool("open", false, "")
 		fs.Bool("multi-site", false, "")
 		fs.Bool("watch", false, "")
+		fs.Duration("watch-interval", time.Second, "")
 		fs.String("out", "", "")
 		fs.String("base", "", "")
 		return fs
@@ -123,6 +126,7 @@ func TestReorderArgs(t *testing.T) {
 		{name: "a boolean does not eat the next flag", in: []string{"--multi-site", "--base", "/"}, want: []string{"--multi-site", "--base", "/"}},
 		{name: "a path that looks like a flag is a value", in: []string{"--out", "-weird", "dir"}, want: []string{"--out", "-weird", "dir"}},
 		{name: "two positionals", in: []string{"c", "o", "--open"}, want: []string{"--open", "c", "o"}},
+		{name: "a duration is a value, not a flag", in: []string{"--watch-interval", "2s", "dir"}, want: []string{"--watch-interval", "2s", "dir"}},
 		{name: "empty", in: nil, want: nil},
 	}
 
@@ -145,6 +149,7 @@ func TestIsBoolFlag(t *testing.T) {
 	fs := flag.NewFlagSet("t", flag.ContinueOnError)
 	fs.Bool("multi-site", false, "")
 	fs.Bool("watch", false, "")
+	fs.Duration("watch-interval", time.Second, "")
 	fs.String("base", "", "")
 
 	for _, name := range []string{"--multi-site", "-multi-site", "--watch"} {
@@ -155,8 +160,42 @@ func TestIsBoolFlag(t *testing.T) {
 	if isBoolFlag(fs, "--base") {
 		t.Error("isBoolFlag(--base) = true, but it takes a value")
 	}
+	if isBoolFlag(fs, "--watch-interval") {
+		t.Error("isBoolFlag(--watch-interval) = true, but it takes a value")
+	}
 	// The help flags are answered by the flag package rather than declared.
 	if !isBoolFlag(fs, "--help") || !isBoolFlag(fs, "-h") {
 		t.Error("the help flags are not recognised as boolean")
+	}
+}
+
+// TestEnvDuration covers the environment fallback for --watch-interval: a valid
+// duration is taken, and an unset or unparseable value falls back to the default
+// rather than failing the process.
+func TestEnvDuration(t *testing.T) {
+	tests := []struct {
+		name string
+		set  bool
+		val  string
+		want time.Duration
+	}{
+		{name: "unset uses the default", set: false, want: time.Second},
+		{name: "empty uses the default", set: true, val: "", want: time.Second},
+		{name: "valid duration", set: true, val: "250ms", want: 250 * time.Millisecond},
+		{name: "seconds", set: true, val: "5s", want: 5 * time.Second},
+		{name: "unparseable uses the default", set: true, val: "soon", want: time.Second},
+		{name: "a bare number is not a duration", set: true, val: "2", want: time.Second},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.set {
+				t.Setenv("OKF_WIKI_WATCH_INTERVAL", tc.val)
+			} else {
+				os.Unsetenv("OKF_WIKI_WATCH_INTERVAL")
+			}
+			if got := envDuration("OKF_WIKI_WATCH_INTERVAL", time.Second); got != tc.want {
+				t.Errorf("envDuration = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

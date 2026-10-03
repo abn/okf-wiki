@@ -27,6 +27,7 @@ Resolution order is flag, then environment variable, then default.
 | `--addr` | `OKF_WIKI_ADDR` | `127.0.0.1:8080` | Listen address (serve only) |
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
 | `--watch` | `OKF_WIKI_WATCH` | `false` | Re-render when the bundle or theme changes (serve only) |
+| `--watch-interval` | `OKF_WIKI_WATCH_INTERVAL` | `1s` | How often `--watch` polls for changes (serve only) |
 
 `--multi-site` turns the content directory from one bundle into a tree of
 them. A directory holding an `index.md` is a wiki and is rendered at the path
@@ -53,6 +54,12 @@ resolves exactly as a body link does, from the bundle root, so
 same tab. A pair missing its label or its target is skipped. On a phone the
 links move into the navigation drawer, the in-wiki ones under "On this wiki" and
 the rest under "Elsewhere".
+
+`--watch-interval` sets how often `serve --watch` polls for changes, as a Go
+duration (`500ms`, `2s`). It trades how soon an edit appears against how much
+work a page is doing: a change is noticed within one interval, and a stream of
+changes renders about once per interval rather than once per change, so a longer
+interval is quieter on a large tree. The default of one second suits authoring.
 
 ## Endpoints
 
