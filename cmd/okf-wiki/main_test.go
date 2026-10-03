@@ -98,16 +98,29 @@ func TestApplyPositional(t *testing.T) {
 // value happens to look like a path, or a value that is itself a flag, has to
 // survive it.
 func TestReorderArgs(t *testing.T) {
+	// The flag set is declared, because reorderArgs asks it which flags are
+	// boolean rather than keeping a list, and a list drifted: --watch and
+	// --multi-site were boolean and each ate the argument that followed it.
+	newFlags := func() *flag.FlagSet {
+		fs := flag.NewFlagSet("t", flag.ContinueOnError)
+		fs.Bool("open", false, "")
+		fs.Bool("multi-site", false, "")
+		fs.Bool("watch", false, "")
+		fs.String("out", "", "")
+		fs.String("base", "", "")
+		return fs
+	}
 	tests := []struct {
 		name string
 		in   []string
 		want []string
 	}{
-		{name: "already ordered", in: []string{"--a", "1", "--b", "2"}, want: []string{"--a", "1", "--b", "2"}},
+		{name: "already ordered", in: []string{"--out", "1", "--base", "2"}, want: []string{"--out", "1", "--base", "2"}},
 		{name: "positional first", in: []string{"dir", "--out", "o"}, want: []string{"--out", "o", "dir"}},
-		{name: "positional in the middle", in: []string{"--a", "1", "dir", "--b", "2"}, want: []string{"--a", "1", "--b", "2", "dir"}},
+		{name: "positional in the middle", in: []string{"--out", "1", "dir", "--base", "2"}, want: []string{"--out", "1", "--base", "2", "dir"}},
 		{name: "equals form", in: []string{"--out=o", "dir"}, want: []string{"--out=o", "dir"}},
 		{name: "boolean takes no value", in: []string{"--open", "dir"}, want: []string{"--open", "dir"}},
+		{name: "a boolean does not eat the next flag", in: []string{"--multi-site", "--base", "/"}, want: []string{"--multi-site", "--base", "/"}},
 		{name: "a path that looks like a flag is a value", in: []string{"--out", "-weird", "dir"}, want: []string{"--out", "-weird", "dir"}},
 		{name: "two positionals", in: []string{"c", "o", "--open"}, want: []string{"--open", "c", "o"}},
 		{name: "empty", in: nil, want: nil},
@@ -115,7 +128,7 @@ func TestReorderArgs(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := reorderArgs(tc.in, flag.NewFlagSet("t", flag.ContinueOnError))
+			got := reorderArgs(tc.in, newFlags())
 			if len(got) != len(tc.want) {
 				t.Fatalf("reorderArgs(%q) = %q, want %q", tc.in, got, tc.want)
 			}
@@ -125,5 +138,25 @@ func TestReorderArgs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIsBoolFlag(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.Bool("multi-site", false, "")
+	fs.Bool("watch", false, "")
+	fs.String("base", "", "")
+
+	for _, name := range []string{"--multi-site", "-multi-site", "--watch"} {
+		if !isBoolFlag(fs, name) {
+			t.Errorf("isBoolFlag(%q) = false, want true", name)
+		}
+	}
+	if isBoolFlag(fs, "--base") {
+		t.Error("isBoolFlag(--base) = true, but it takes a value")
+	}
+	// The help flags are answered by the flag package rather than declared.
+	if !isBoolFlag(fs, "--help") || !isBoolFlag(fs, "-h") {
+		t.Error("the help flags are not recognised as boolean")
 	}
 }

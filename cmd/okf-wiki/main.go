@@ -267,7 +267,7 @@ func reorderArgs(args []string, fs *flag.FlagSet) []string {
 		a := args[i]
 		if len(a) > 0 && a[0] == '-' {
 			flags = append(flags, a)
-			if !strings.ContainsRune(a, '=') && i+1 < len(args) && !isBoolFlag(a) {
+			if !strings.ContainsRune(a, '=') && i+1 < len(args) && !isBoolFlag(fs, a) {
 				flags = append(flags, args[i+1])
 				i++
 			}
@@ -278,12 +278,21 @@ func reorderArgs(args []string, fs *flag.FlagSet) []string {
 	return append(flags, positional...)
 }
 
-func isBoolFlag(a string) bool {
-	switch a {
-	case "-open", "--open", "-h", "--help":
-		return true
+// isBoolFlag reports whether a flag takes no value, so the argument after it is
+// a positional rather than its value. It asks the flag set rather than keeping a
+// list: the list drifted, and --watch and --multi-site were boolean flags it did
+// not know, so each ate the argument that followed it.
+func isBoolFlag(fs *flag.FlagSet, a string) bool {
+	name := strings.TrimLeft(a, "-")
+	if f := fs.Lookup(name); f != nil {
+		if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok {
+			return b.IsBoolFlag()
+		}
+		return false
 	}
-	return false
+	// -h and --help are answered by the flag package itself rather than
+	// declared, and take no value.
+	return name == "h" || name == "help"
 }
 
 func absPath(p string) (string, error) {
