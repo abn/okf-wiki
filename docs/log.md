@@ -5,6 +5,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Creation**: Added `usage/multi-site.md`, a guide to publishing a directory of
+  wikis as one site: what makes a directory a wiki, the generated group indexes,
+  the metadata that names them, the search index, and how watching fits.
 * **Update**: `usage/cli.md`, `reference/configuration.md`, `design/rendering.md`
   and `reference/themes.md` document `--multi-site` (or `OKF_WIKI_MULTI_SITE`),
   which reads the content directory as a tree: each directory with an `index.md`
