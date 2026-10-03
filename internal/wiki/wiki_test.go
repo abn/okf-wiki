@@ -2367,21 +2367,31 @@ func TestMultiSiteRendersTree(t *testing.T) {
 	}
 	site := filepath.Join(out, "family")
 
-	// A group is given an index of its children, badged wiki or folder.
+	// A group is given an index of its children: the wikis lead as cards and
+	// the folders follow in their own section.
 	root, err := os.ReadFile(filepath.Join(site, "index.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(root), `href="/family/clients/"><span class="site-name">Clients</span><span class="site-badge site-badge-folder">Folder</span>`) {
+	rootHTML := string(root)
+	if !strings.Contains(rootHTML, `href="/family/clients/">`) ||
+		!strings.Contains(rootHTML, `<span class="folder-name">Clients</span>`) {
 		t.Error("the root index does not list the clients group as a folder")
 	}
-	if !strings.Contains(string(root), `site-badge-wiki">Wiki</span>`) {
+	if !strings.Contains(rootHTML, `site-badge-wiki">Wiki</span>`) {
 		t.Error("the root index does not badge a wiki")
 	}
-	// The card is clickable across its whole face through the link's overlay,
-	// not by widening the link text: the anchor ends after the badge, so a
-	// screen reader names the card by its title.
-	if !strings.Contains(string(root), `site-badge-folder">Folder</span></a>`) {
+	// A folder is a compact row under its own heading, not a wiki card.
+	if !strings.Contains(rootHTML, `<div class="site-group"><h2 class="site-group-title">Folders</h2><ul class="folder-list">`) {
+		t.Error("the folders are not grouped under their own heading")
+	}
+	if strings.Contains(rootHTML, `site-badge-folder`) {
+		t.Error("a folder still renders as a badge-carrying card rather than a row")
+	}
+	// The wiki card is clickable across its whole face through the link's
+	// overlay, not by widening the link text: the anchor ends after the badge, so
+	// a screen reader names the card by its title.
+	if !strings.Contains(rootHTML, `site-badge-wiki">Wiki</span></a>`) {
 		t.Error("the card link wraps more than the title and badge")
 	}
 	// A group names itself from its own metadata.

@@ -43,7 +43,9 @@ okf-wiki serve  --content ./content --out .scratch/wiki --multi-site --base /
 
 The output mirrors the tree. Each wiki is written at its path under the base,
 with its own assets and links, and each group is given an `index.html` listing
-the wikis and groups directly inside it:
+the wikis and groups directly inside it. The wikis lead as cards; the folders
+follow under a "Folders" heading as compact rows, because a folder is a
+container on the way to a wiki rather than a destination in itself:
 
 ```text
 _site/
@@ -67,7 +69,7 @@ layout from one port, and the group indexes are the pages that follow the tree.
 
 ## Naming a group
 
-A card on a group index is named from, in order:
+An entry on a group index is named from, in order:
 
 - a `.meta.json` in the directory, `{"title": ..., "description": ...}`
 - the frontmatter of the entry's own `index.md`, when the entry is a wiki

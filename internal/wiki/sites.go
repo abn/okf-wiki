@@ -183,27 +183,51 @@ func (r *Renderer) writeSiteRoot(root string) error {
 	return nil
 }
 
-// writeCatalog writes the index for a group directory: its direct children, each
-// a card linking to the child's path and badged a wiki or a folder. root is the
-// tree root the tree is being written into.
+// writeCatalog writes the index for a group directory: its direct children,
+// grouped so the wikis read first and the folders that hold them follow.
+// root is the tree root the tree is being written into.
 func (r *Renderer) writeCatalog(root string, n *siteNode) error {
 	base := r.cfg.base()
 	var b strings.Builder
-	b.WriteString(`<ul class="site-list">`)
+	var wikis, folders []*siteNode
 	for _, c := range n.children {
-		title, desc := r.siteMeta(c)
-		badge, cls := "Folder", "site-badge-folder"
 		if c.wiki {
-			badge, cls = "Wiki", "site-badge-wiki"
+			wikis = append(wikis, c)
+			continue
 		}
-		fmt.Fprintf(&b, `<li class="site-item"><a class="site-link" href="%s">`+
-			`<span class="site-name">%s</span><span class="site-badge %s">%s</span></a>`+
-			`<p class="site-desc">%s</p></li>`,
-			template.HTMLEscapeString(siteBase(base, c.rel)),
-			template.HTMLEscapeString(title), cls, badge,
-			template.HTMLEscapeString(desc))
+		folders = append(folders, c)
 	}
-	b.WriteString(`</ul>`)
+
+	if len(wikis) > 0 {
+		fmt.Fprintf(&b, `<ul class="site-list">`)
+		for _, c := range wikis {
+			title, desc := r.siteMeta(c)
+			fmt.Fprintf(&b, `<li class="site-item"><a class="site-link" href="%s">`+
+				`<span class="site-name">%s</span><span class="site-badge site-badge-wiki">Wiki</span></a>`+
+				`<p class="site-desc">%s</p></li>`,
+				template.HTMLEscapeString(siteBase(base, c.rel)),
+				template.HTMLEscapeString(title),
+				template.HTMLEscapeString(desc))
+		}
+		b.WriteString(`</ul>`)
+	}
+
+	if len(folders) > 0 {
+		b.WriteString(`<div class="site-group">`)
+		b.WriteString(`<h2 class="site-group-title">Folders</h2>`)
+		b.WriteString(`<ul class="folder-list">`)
+		for _, c := range folders {
+			title, desc := r.siteMeta(c)
+			fmt.Fprintf(&b, `<li class="folder-item"><a class="folder-link" href="%s">`+
+				`<span class="folder-name">%s</span>`+
+				`<span class="folder-arrow" aria-hidden="true">&#8594;</span>`+
+				`<span class="folder-desc">%s</span></a></li>`,
+				template.HTMLEscapeString(siteBase(base, c.rel)),
+				template.HTMLEscapeString(title),
+				template.HTMLEscapeString(desc))
+		}
+		b.WriteString(`</ul></div>`)
+	}
 
 	title, desc := r.siteMeta(n)
 	html, err := r.catalogHTML(n, title, desc, b.String())

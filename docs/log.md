@@ -5,6 +5,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-03
 
+* **Update**: A multi-site group index groups its entries: the wikis lead as
+  cards and the folders follow under a "Folders" heading as compact rows.
+  `usage/multi-site.md` and `reference/themes.md` say so.
 * **Update**: `serve --watch` takes an interval, `--watch-interval` (or
   `OKF_WIKI_WATCH_INTERVAL`, default `1s`), and renders into a directory built
   beside the output that is swapped into place, so a page loaded during a

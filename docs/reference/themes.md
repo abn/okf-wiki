@@ -150,10 +150,12 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   in-wiki `{{.TopNavInternal}}` first, then `{{.TopNavExternal}}`, each under a
   `.side-links-title`.
 - A multi-site group index: `.site-list` with `.site-item`, `.site-link`,
-  `.site-name`, `.site-badge`, `.site-badge-wiki` and `.site-desc`. The link
-  stretches over the whole card, so a tap anywhere opens it while the link text
-  stays the title and badge. Such a page has no sidebar, which the layout marks
-  with `.layout.layout-solo`.
+  `.site-name`, `.site-badge`, `.site-badge-wiki` and `.site-desc` for the wikis
+  of a group, then `.site-group` with `.site-group-title` and `.folder-list`,
+  `.folder-item`, `.folder-link`, `.folder-name`, `.folder-arrow` and
+  `.folder-desc` for its folders. The link stretches over the whole card, so a
+  tap anywhere opens it while the link text stays the title and badge. Such a
+  page has no sidebar, which the layout marks with `.layout.layout-solo`.
 - `.toc`, `.heading-anchor`, and `.callout` with
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,
