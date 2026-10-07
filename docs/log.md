@@ -3,6 +3,14 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-07
+
+* **Fix**: A group index of a tree published under a non-root base no longer
+  points at theme assets and an empty search catalogue written elsewhere. A group
+  index renders with the tree's own base, so its assets and catalogue now sit
+  under the base directory beside it instead of at the output root, which the two
+  paths share only when the base is `/`. `usage/multi-site.md` says so.
+
 ## 2026-10-03
 
 ## 2026-10-04

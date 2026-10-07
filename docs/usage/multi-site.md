@@ -30,7 +30,7 @@ at the same absolute paths.
 ```text
 content/
   clients/           a group, named by its .meta.json
-    sprind/          a group
+    example/         a group
       operations/    a wiki: an index.md at its root
       strategy/      a wiki
   homelab/           a wiki at the top level
@@ -54,8 +54,8 @@ _site/
   index.html                the root group's index
   clients/
     index.html              the clients group
-    sprind/
-      index.html            the sprind group
+    example/
+      index.html            the example group
       operations/           the wiki, unchanged
         index.html
         wiki.css
@@ -68,6 +68,10 @@ _site/
 `--base` prefixes the whole tree, so `--base /family/` publishes the same shapes
 under `/family/` and the output root redirects there. A `serve` serves the same
 layout from one port, and the group indexes are the pages that follow the tree.
+A group has no assets of its own: its pages use the theme and an empty search
+catalogue written at the base, so with `--base /family/` those files sit under
+`_site/family/` rather than at the output root, which the two paths share only
+when the base is `/`.
 
 ## Naming a group
 

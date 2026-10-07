@@ -101,7 +101,7 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	err = swapDir(out, func(tmp string) error {
 		// A group index has no bundle of its own, so it renders through the
 		// theme with the theme's assets and an empty search catalogue at the
-		// tree root. A root that is itself a wiki writes its own.
+		// tree base. A root that is itself a wiki writes its own.
 		if !root.wiki {
 			if err := r.writeSiteRoot(tmp); err != nil {
 				return err
@@ -163,8 +163,8 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 		return 0, nil
 	}
 	// A wiki of the tree writes into the tree root at its own path, not into a
-	// directory of its own to swap: the group indexes and the tree-root assets
-	// share this directory, so only the whole tree turns over.
+	// directory of its own to swap: the group indexes and the tree-base assets
+	// share the tree, so only the whole tree turns over.
 	site := cfg.sitePath(root)
 	if err := sub.renderInto(root, site); err != nil {
 		// The bundle loaded but a page or an asset failed. The partial output is
@@ -196,20 +196,21 @@ func (r *Renderer) wasSkipped(n *siteNode) bool {
 }
 
 // writeSiteRoot places the theme's assets and an empty search catalogue at the
-// tree root, where a group index looks for them. A group has no pages of its
-// own, so the catalogue is empty rather than absent, and the search control on a
-// group index answers instead of failing. root is the tree root the assets are
-// written into, which is the output root for a tree or the temporary directory a
-// swap will rename.
+// tree base, where a group index looks for them: a group page renders with the
+// tree renderer, so its asset URLs carry the base, not the output root. A group
+// has no pages of its own, so the catalogue is empty rather than absent, and the
+// search control on a group index answers instead of failing. root is the output
+// root the tree is being written into.
 func (r *Renderer) writeSiteRoot(root string) error {
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	dir := r.cfg.sitePath(root)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := r.theme.WriteTo(root); err != nil {
+	if err := r.theme.WriteTo(dir); err != nil {
 		return err
 	}
 	for name, body := range map[string]string{"search-index.json": "[]\n", "tags.json": "[]\n"} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			return err
 		}
 	}
@@ -283,7 +284,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode) error {
 
 // catalogHTML renders a group index through the theme, with no sections of its
 // own: an empty sidebar, no contents, no previous or next. The base stays the
-// tree base so the page's assets and search resolve at the tree root.
+// tree base so the page's assets and search resolve at the tree base.
 func (r *Renderer) catalogHTML(n *siteNode, title, desc, body string) (string, error) {
 	shell := &Renderer{
 		md:           r.md,
