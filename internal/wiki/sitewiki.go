@@ -39,7 +39,11 @@ type Page struct {
 	// download.
 	Synthetic bool
 	Title     string
-	Kicker    string
+	// Nav overrides the label the sidebar shows for this page. A body title can
+	// be a full sentence while the rail needs a few words, so frontmatter sets
+	// this without changing the page itself.
+	Nav    string
+	Kicker string
 	// TitleHTML is trusted H1 markup, set only by synthetic pages the
 	// renderer builds itself. Frontmatter titles stay plain strings.
 	TitleHTML    string
@@ -401,6 +405,7 @@ func (r *Renderer) loadSection(dir, id, title string) (Section, error) {
 // block is not an error: the page falls back to its first heading for a title.
 type frontmatter struct {
 	Title       string   `yaml:"title"`
+	Nav         string   `yaml:"nav"`
 	Type        string   `yaml:"type"`
 	Description string   `yaml:"description"`
 	Status      string   `yaml:"status"`
@@ -431,6 +436,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		Sources:     fm.Sources,
 		GeneratedAt: fm.Generated.At,
 		Title:       fm.Title,
+		Nav:         fm.Nav,
 	}
 
 	doc := r.md.Parser().Parse(text.NewReader(body))
