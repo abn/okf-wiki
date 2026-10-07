@@ -591,16 +591,25 @@ func (r *Renderer) topNavMatching(wantExternal bool) string {
 
 func (r *Renderer) breadcrumbHTML(p Page) string {
 	base := r.cfg.base()
-	// Tag pages belong to no section. They read Docs / Tags / #tag, with
-	// Tags as unclassed text since there is no tag index page to point it
-	// at and no theme class for a non-current, non-link crumb. The slug
-	// prefix alone is not enough: a tags/ section holds real pages, so the
-	// empty section marks the synthetic ones. The title already carries
-	// the hash. A tree leaves this untouched: a tag page belongs to its own
-	// wiki, and a trail into the tree would name a wiki the page does not
-	// list.
+	// Tag pages belong to no section. A single bundle reads Docs / Tags / #tag,
+	// with Tags as unclassed text since there is no tag index page to point it
+	// at and no theme class for a non-current, non-link crumb. The slug prefix
+	// alone is not enough: a tags/ section holds real pages, so the empty
+	// section marks the synthetic ones. The title already carries the hash. A
+	// tree keeps the trail of the wiki the tag page belongs to and then appends
+	// Tags / #tag: the page is a page of that wiki, so dropping the trail would
+	// give it a different navigational model from the page the reader came
+	// from.
 	if p.Section == "" && strings.HasPrefix(p.Slug, "tags/") {
-		parts := []string{`<a href="` + base + `">Docs</a>`}
+		sep := `<span class="crumb-sep">/</span>`
+		var parts []string
+		if r.treeBase != "" {
+			// A tag page is never its wiki's home, so the node crumbs are
+			// links: the wiki title points at the wiki home and Tags follows it.
+			parts = r.treeTrailParts(false)
+		} else {
+			parts = append(parts, `<a href="`+base+`">Docs</a>`)
+		}
 		parts = append(parts, `<span>Tags</span>`)
 		title := p.Title
 		if title == "" {
@@ -611,7 +620,7 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 		name := strings.TrimPrefix(title, "#")
 		parts = append(parts, fmt.Sprintf(`<span class="crumb-cur"><span class="tag-hash">#</span>%s</span>`,
 			template.HTMLEscapeString(name)))
-		return strings.Join(parts, `<span class="crumb-sep">/</span>`)
+		return strings.Join(parts, sep)
 	}
 	if r.treeBase != "" {
 		return r.treeBreadcrumbHTML(p)
@@ -643,28 +652,10 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 func (r *Renderer) treeBreadcrumbHTML(p Page) string {
 	base := r.cfg.base()
 	sep := `<span class="crumb-sep">/</span>`
-	var parts []string
-	// A page that is the tree root itself shows the root once as the current
-	// crumb; a deeper page links back to it.
-	if r.siteRel == "" {
-		if r.nodeIsHome(p) {
-			return crumbCur(r.cfg.Brand.Title)
-		}
-		parts = append(parts, crumbLink(r.treeBase, r.cfg.Brand.Title))
-	} else {
-		parts = append(parts, crumbLink(r.treeBase, r.cfg.Brand.Title))
-		for _, c := range r.siteTrail {
-			parts = append(parts, crumbLink(c.Href, c.Title))
-		}
-		nodeTitle := r.siteTitle
-		if nodeTitle == "" {
-			nodeTitle = r.cfg.Brand.Title
-		}
-		if r.nodeIsHome(p) {
-			parts = append(parts, crumbCur(nodeTitle))
-			return strings.Join(parts, sep)
-		}
-		parts = append(parts, crumbLink(siteBase(r.treeBase, r.siteRel), nodeTitle))
+	home := r.nodeIsHome(p)
+	parts := r.treeTrailParts(home)
+	if home {
+		return strings.Join(parts, sep)
 	}
 	if p.Section != "" {
 		for _, s := range r.sections {
@@ -680,6 +671,34 @@ func (r *Renderer) treeBreadcrumbHTML(p Page) string {
 	}
 	parts = append(parts, crumbCur(title))
 	return strings.Join(parts, sep)
+}
+
+// treeTrailParts builds the crumbs from the tree root down to the page's own
+// wiki or group. The tree title links to the tree base, each folder to the group
+// index that lists what is below it, and the node's title to its own home.
+// nodeCurrent marks the node's own crumb as the current page instead of a link
+// to it, which is how a node's home page ends the trail at itself. The tree root
+// has no crumb above it, so its title is returned alone, as the current crumb
+// when the page is the root's home and a link to the tree base otherwise.
+func (r *Renderer) treeTrailParts(nodeCurrent bool) []string {
+	if r.siteRel == "" {
+		if nodeCurrent {
+			return []string{crumbCur(r.cfg.Brand.Title)}
+		}
+		return []string{crumbLink(r.treeBase, r.cfg.Brand.Title)}
+	}
+	parts := []string{crumbLink(r.treeBase, r.cfg.Brand.Title)}
+	for _, c := range r.siteTrail {
+		parts = append(parts, crumbLink(c.Href, c.Title))
+	}
+	nodeTitle := r.siteTitle
+	if nodeTitle == "" {
+		nodeTitle = r.cfg.Brand.Title
+	}
+	if nodeCurrent {
+		return append(parts, crumbCur(nodeTitle))
+	}
+	return append(parts, crumbLink(siteBase(r.treeBase, r.siteRel), nodeTitle))
 }
 
 // nodeIsHome reports whether a page is its node's own home: the wiki's

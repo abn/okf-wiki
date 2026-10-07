@@ -12,8 +12,10 @@ deprecated, or restructured. It is deliberately separate from software releases.
   tree root down to the current wiki and page
   (`Wiki / Clients / Example / Operations / Guides / Setup`), with each folder
   linking to its group index and the wiki title linking to the wiki home; a
-  group index ends at the group name and the tree root shows the title once.
-  A single bundle's header and breadcrumb are byte for byte unchanged.
+  group index ends at the group name and the tree root shows the title once. A
+  tag page in a tree keeps that trail and then reads `Tags / #tag`, since it is
+  a page of its own wiki. A single bundle's header and breadcrumb are byte for
+  byte unchanged.
   `usage/multi-site.md`, `design/branding.md` and `reference/themes.md` say so.
 * **Fix**: A multi-site group index's wiki cards line up when they sit side by
   side. From the 568px width at which the card grid shows two columns, every card
