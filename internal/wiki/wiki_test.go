@@ -1186,7 +1186,7 @@ func TestNestedContentPagesRender(t *testing.T) {
 	// pages under guide/setup and guide/deep/deeper collapse into their top
 	// group, and the group is labelled from the directory when it has no index.
 	nav := r.sidebarHTML("guide", "guide/setup/install")
-	if !strings.Contains(nav, `<details class="side-sub" open><summary class="side-subsum"><span>Setup</span>`) {
+	if !strings.Contains(nav, `<details class="side-sub" name="wiki-sub-guide" open><summary class="side-subsum"><span>Setup</span>`) {
 		t.Errorf("the setup sub-directory is not a nested group:\n%s", nav)
 	}
 	if !strings.Contains(nav, `<li class="active"><a href="/wiki/guide/setup/install.html">Install</a></li>`) {
@@ -1201,6 +1201,70 @@ func TestNestedContentPagesRender(t *testing.T) {
 	if strings.Contains(nav, `<li><a href="/wiki/guide/setup/install.html">`) &&
 		!strings.Contains(nav, `<details class="side-sub"`) {
 		t.Error("a nested page was rendered flat outside its group")
+	}
+}
+
+// TestSidebarLabelShortensGroupPrefix covers the rail's label shortening: a page
+// whose title repeats its group heading drops the shared prefix, and a prefix
+// that does not end on a word boundary is left alone so a short heading cannot
+// slice a longer word.
+func TestSidebarLabelShortensGroupPrefix(t *testing.T) {
+	tests := []struct{ title, prefix, want string }{
+		{"Tape in Agent Hub evidence", "Tape in Agent Hub", "Evidence"},
+		{"Tape in Agent Hub in Simplified Technical English", "Tape in Agent Hub", "In Simplified Technical English"},
+		{"Guide: installation", "Guide", "Installation"},
+		{"AXIOM", "AX", "AXIOM"},
+		{"Tape in Agent Hub", "Tape in Agent Hub", "Tape in Agent Hub"},
+		{"Unrelated page", "Tape in Agent Hub", "Unrelated page"},
+		{"Tape in Agent Hub evidence", "", "Tape in Agent Hub evidence"},
+	}
+	for _, tc := range tests {
+		if got := sidebarLabel(tc.title, tc.prefix); got != tc.want {
+			t.Errorf("sidebarLabel(%q, %q) = %q, want %q", tc.title, tc.prefix, got, tc.want)
+		}
+	}
+}
+
+// TestSidebarNavLabelOverride covers frontmatter nav: a page keeps a long body
+// title while the rail shows the short one the author set.
+func TestSidebarNavLabelOverride(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide", "setup"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "guide", "index.md"), "---\ntitle: Guide\n---\n# Guide\n")
+	mustWrite(t, filepath.Join(dir, "guide", "setup", "install.md"),
+		"---\ntitle: Installing the whole thing on a clean machine\nnav: Install\n---\n# Install\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nav := r.sidebarHTML("guide", "guide/setup/install")
+	if !strings.Contains(nav, `<a href="/wiki/guide/setup/install.html">Install</a>`) {
+		t.Errorf("the nav label did not replace the page title:\n%s", nav)
+	}
+	if strings.Contains(nav, "Installing the whole thing") {
+		t.Errorf("the rail shows the body title instead of nav:\n%s", nav)
+	}
+}
+
+// TestSidebarGroupPrefixFold covers the render path for shortening: a child of a
+// group whose title it repeats loses the shared prefix in the rail.
+func TestSidebarGroupPrefixFold(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "agents", "tape"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "agents", "index.md"), "---\ntitle: Agents\n---\n# Agents\n")
+	mustWrite(t, filepath.Join(dir, "agents", "tape", "index.md"), "---\ntitle: Tape in Agent Hub\n---\n# Tape in Agent Hub\n")
+	mustWrite(t, filepath.Join(dir, "agents", "tape", "report.md"), "---\ntitle: Tape in Agent Hub report\n---\n# Report\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nav := r.sidebarHTML("agents", "agents/tape/report")
+	if !strings.Contains(nav, `<li class="active"><a href="/wiki/agents/tape/report.html">Report</a></li>`) {
+		t.Errorf("the repeating prefix was not shortened in the rail:\n%s", nav)
 	}
 }
 

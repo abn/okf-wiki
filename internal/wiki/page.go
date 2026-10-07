@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"strings"
+	"unicode/utf8"
 )
 
 // shellData is the template payload for a rendered page. It is the contract
@@ -464,37 +465,53 @@ func groupChildren(secID string, pages []Page) (loose []Page, groups []sidebarGr
 func (r *Renderer) writeSidebarEntries(b *strings.Builder, base string, sec Section, pages []Page, activeSlug string) {
 	loose, groups := groupChildren(sec.ID, pages)
 	for _, page := range loose {
-		r.writeSidebarItem(b, base, page, activeSlug)
+		r.writeSidebarItem(b, base, page, activeSlug, "")
 	}
 	for _, g := range groups {
-		r.writeSidebarGroup(b, base, g, activeSlug)
+		r.writeSidebarGroup(b, base, g, activeSlug, sec.ID)
 	}
 }
 
-// writeSidebarItem writes one page as a list item.
-func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, activeSlug string) {
+// writeSidebarItem writes one page as a list item. prefix is the title of the
+// group the page sits in, empty for a loose page, and lets a page drop a name
+// the group heading already carries.
+func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, activeSlug, prefix string) {
 	active := ""
 	if page.Slug == activeSlug {
 		active = ` class="active"`
 	}
-	title := page.Title
+	title := page.Nav
+	if title == "" {
+		title = page.Title
+	}
 	if title == "" {
 		title = page.Slug
 	}
+	title = sidebarLabel(title, prefix)
 	fmt.Fprintf(b, `<li%s><a href="%s%s.html">%s</a></li>`, active, base, page.Slug, template.HTMLEscapeString(title))
 }
 
 // writeSidebarGroup writes a sub-directory of a section as its own list item: a
 // nested disclosure when it holds pages, and a plain link when it holds only its
 // index. The disclosure's summary is the group's index page when it has one, so
-// the heading is a link the way a section heading is.
-func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarGroup, activeSlug string) {
+// the heading is a link the way a section heading is. secID names the disclosure
+// group, so a section opens only one of its own groups at a time and a rail of
+// many groups stays short.
+func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarGroup, activeSlug, secID string) {
+	// label is what the heading shows, honouring a page's nav override; prefix
+	// is the group's own title, so a child that repeats it is shortened in the
+	// rail whichever label the heading ends up carrying.
 	label := titleCase(g.dir)
+	prefix := label
 	href := ""
 	if g.root != nil {
 		href = base + g.root.Slug + ".html"
 		if g.root.Title != "" {
 			label = g.root.Title
+			prefix = g.root.Title
+		}
+		if g.root.Nav != "" {
+			label = g.root.Nav
 		}
 	}
 
@@ -518,7 +535,7 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 		open = " open"
 	}
 
-	b.WriteString(`<li><details class="side-sub"` + open + `><summary class="side-subsum">`)
+	fmt.Fprintf(b, `<li><details class="side-sub" name="wiki-sub-%s"%s><summary class="side-subsum">`, template.HTMLEscapeString(secID), open)
 	if href != "" {
 		fmt.Fprintf(b, `<a href="%s">%s</a>`, href, template.HTMLEscapeString(label))
 	} else {
@@ -527,9 +544,47 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 	b.WriteString(`<span class="side-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></span>`)
 	b.WriteString(`</summary><ul>`)
 	for _, page := range g.pages {
-		r.writeSidebarItem(b, base, page, activeSlug)
+		r.writeSidebarItem(b, base, page, activeSlug, prefix)
 	}
 	b.WriteString(`</ul></details></li>`)
+}
+
+// sidebarLabel shortens a page label for the rail by dropping a group prefix the
+// group heading already shows, so a folder's pages read as its leaves rather
+// than repeating the folder name on every row. The prefix must end on a word
+// boundary: without that guard "AX" would turn "AXIOM" into "IOM".
+func sidebarLabel(title, prefix string) string {
+	title = strings.TrimSpace(title)
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return title
+	}
+	t, p := []rune(title), []rune(prefix)
+	if len(t) <= len(p) || !strings.EqualFold(string(t[:len(p)]), prefix) {
+		return title
+	}
+	rest := t[len(p):]
+	switch rest[0] {
+	case ' ', '\t', ':', '-', '–', '—', '·', ',':
+	default:
+		return title
+	}
+	rest = []rune(strings.TrimLeft(string(rest), " \t:,-–—·"))
+	if len(rest) == 0 {
+		return title
+	}
+	return upperFirst(string(rest))
+}
+
+// upperFirst upper-cases the first rune of a label. It is by rune rather than by
+// byte, so a multi-byte first character is not sliced into a replacement
+// character.
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r, size := utf8.DecodeRuneInString(s)
+	return strings.ToUpper(string(r)) + s[size:]
 }
 
 // navExtArrow marks a link that leaves the wiki. It is decorative: the

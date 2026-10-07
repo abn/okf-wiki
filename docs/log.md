@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-07
 
+* **Update**: The sidebar's third level reads as a group's leaves. A page whose
+  title repeats its group heading drops the shared prefix, so the row fits one
+  line at any rail width, the pages hang off a hairline rule rather than a
+  deeper indent, and a section opens one group at a time so a rail of many
+  groups stays short. A page can override its rail label with `nav` in
+  frontmatter. `design/rendering.md` and `reference/themes.md` say so.
 * **Update**: The command line page's tree sample uses a generic `example` group
   name, so no real client name appears in the published bundle.
 * **Page**: A multi-site tour shows what a tree of wikis looks like, with

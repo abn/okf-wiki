@@ -34,6 +34,12 @@ flowchart LR
    grouped under a nested disclosure named from that sub-directory, and its
    `index.md` becomes the group's own heading link. Deeper paths collapse into
    their top group, so the rail stays flat while the tree it shows is two deep.
+   A group's pages are the rail's third level: they hang off a hairline rule
+   rather than a deeper indent, and a page whose title repeats its group heading
+   drops the shared prefix, so the row fits one line at any rail width. A
+   section opens one of its groups at a time, so a rail of many groups stays
+   short. `nav` in a page's frontmatter overrides the label the rail shows, for
+   a body title too long for the rail.
    Markdown is collected at any depth. Files
    and directories whose name begins with a dot are skipped, so a bundle that is
    also a working tree does not render its own `.git`.
