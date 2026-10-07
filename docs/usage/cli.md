@@ -88,15 +88,15 @@ are its sections, so the tree stops at a wiki.
 ```text
 content/
   clients/         a group, named by its .meta.json
-    sprind/        a group
+    example/       a group
       operations/  a wiki: an index.md at its root
       strategy/    a wiki
   homelab/         a wiki at the top level
 ```
 
 Rendered with `--multi-site --base /`, that publishes `/` and `/clients/` as the
-group indexes, `/homelab/` as a wiki, and the two SPRIND wikis under
-`/clients/sprind/`. The layout on disk mirrors the tree, so a `render` and a
+group indexes, `/homelab/` as a wiki, and the two example wikis under
+`/clients/example/`. The layout on disk mirrors the tree, so a `render` and a
 `serve` publish the same thing, and `--watch` re-renders the whole tree on a
 change. A group takes its name and summary from a `.meta.json`
 (`{"title": ..., "description": ...}`) or a `README.md` in that directory, a
