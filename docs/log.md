@@ -18,6 +18,16 @@ deprecated, or restructured. It is deliberately separate from software releases.
   index renders with the tree's own base, so its assets and catalogue now sit
   under the base directory beside it instead of at the output root, which the two
   paths share only when the base is `/`. `usage/multi-site.md` says so.
+* **Fix**: A multi-site content root that is itself a wiki keeps its own
+  `search-index.json` at the base instead of having it replaced by the labelled
+  aggregate, so its search reads as a single bundle's with no per-wiki headings.
+  `design/rendering.md` and `usage/multi-site.md` say so.
+* **Fix**: The search modal's footer wraps rather than scrolling horizontally on
+  a narrow viewport, and the All wikis / This wiki toggle stays on one line.
+* **Docs**: The tree aggregate is reachable from a group index, so a search there
+  finds hits anywhere in the tree rather than only the wikis below it. Each
+  wiki's own index and tag catalogue sit beside the tree aggregate.
+  `usage/multi-site.md` and `adr/0004-watch-rerenders-the-whole-tree.md` say so.
 
 ## 2026-10-03
 

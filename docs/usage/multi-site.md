@@ -98,15 +98,17 @@ remains a site of its own, and after every wiki has rendered the tree writes one
 aggregate index at its base. Every wiki and group fetches that aggregate, so a
 term that appears in a sibling wiki is found from here and answers with a
 heading naming the wiki it came from. A wiki that could not be read contributes
-nothing to it.
+nothing to it. A content root that is itself a wiki is a tree of one: its own
+index is the one at the base, with no aggregate written over it.
 
 The modal can be narrowed to the current wiki with the All wikis / This wiki
 toggle in its footer. The toggle appears only in a tree, where the aggregate
 lives at the tree base rather than the wiki's own base; on a single wiki the two
 are the same and it is hidden.
 
-A group index has no pages, so a search run from one finds hits in the wikis
-below it. The tag catalogue stays per wiki, and `#tag` searches the current
+A group index has no pages, so a search run from one fetches the tree aggregate
+and reaches every wiki in the tree, a sibling branch as much as the wikis below
+the group. The tag catalogue stays per wiki, and `#tag` searches the current
 wiki's tags, because a tag page is a page of the wiki that carries the tag.
 
 ## What it is not

@@ -67,7 +67,9 @@ flowchart LR
    In a multi-site tree, each wiki keeps its own index and the tree also gets an
    aggregate one at its base: the entries of every wiki that rendered, each
    labelled with the wiki it came from, so a search from any wiki reaches all of
-   them. A wiki that was skipped contributes nothing to the aggregate.
+   them. A wiki that was skipped contributes nothing to the aggregate. A content
+   root that is itself a wiki is a tree of one, whose index already sits at the
+   base; it gets no separate aggregate, so its search reads as one bundle's.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
@@ -191,8 +193,10 @@ render and one `serve` publish a whole collection.
 
 Search is the one thing that spans the tree. Every wiki and every group fetches
 the aggregate index at the tree base, and the client groups the hits under a
-heading per wiki and can narrow to the current wiki. Tags stay per wiki, as does
-the `#tag` namespace, since a tag page is a page of the wiki that carries it.
+heading per wiki and can narrow to the current wiki. A tree of one, whose root
+is itself a wiki, has no aggregate and no per-wiki headings. Tags stay per wiki,
+as does the `#tag` namespace, since a tag page is a page of the wiki that carries
+it.
 
 ## Caching
 
