@@ -965,7 +965,10 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 .search-modal-icon { color: var(--color-text-faint); flex-shrink: 0; }
 .search-input {
-  flex: 1; border: none; outline: none; background: transparent;
+  /* A flex item's min-width defaults to auto, so an input's intrinsic size would
+     floor the header and push the close control past the modal edge on a narrow
+     viewport. */
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
   color: var(--color-heading); font-family: var(--font-ui); font-size: var(--text-body);
 }
 .search-input::placeholder { color: var(--color-text-faint); }

@@ -177,6 +177,34 @@ func TestDefaultThemeAvoidsADarkFlash(t *testing.T) {
 	}
 }
 
+// TestDefaultThemeSearchInputCanShrink pins the CSS that keeps the search modal
+// inside a phone viewport. The header is a flex row, and a flex item's
+// min-width defaults to auto, so without min-width: 0 the input's intrinsic
+// width floors the row and the close control is laid out past the modal edge.
+// Go tests cannot measure browser layout, so this asserts the rule's text.
+func TestDefaultThemeSearchInputCanShrink(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var css string
+	for _, f := range th.files {
+		if f.Path == "wiki.css" {
+			css = string(f.Data)
+		}
+	}
+	if css == "" {
+		t.Fatal("the default theme has no wiki.css")
+	}
+	rule := regexp.MustCompile(`\.search-input\s*\{([^}]*)\}`).FindStringSubmatch(css)
+	if rule == nil {
+		t.Fatal("wiki.css has no .search-input rule")
+	}
+	if !regexp.MustCompile(`min-width:\s*0(?:px)?\b`).MatchString(rule[1]) {
+		t.Error("the .search-input rule must set min-width: 0 so the flex item can shrink and the modal header fits a phone viewport")
+	}
+}
+
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,

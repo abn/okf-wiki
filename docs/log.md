@@ -51,6 +51,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
   finds hits anywhere in the tree rather than only the wikis below it. Each
   wiki's own index and tag catalogue sit beside the tree aggregate.
   `usage/multi-site.md` and `adr/0004-watch-rerenders-the-whole-tree.md` say so.
+* **Fix**: The search modal fits a phone viewport. The search input can shrink
+  below its intrinsic width, so the header's close control stays inside the
+  modal at widths under 390px.
 
 ## 2026-10-03
 
