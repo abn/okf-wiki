@@ -68,6 +68,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
 | `{{.Base}}` | the URL prefix, with a leading and trailing slash |
+| `{{.SearchBase}}` | the URL prefix the search index is fetched from: the same as `Base` for a single bundle, the tree base for a wiki of a multi-site tree |
 | `{{.AssetVersion}}` | the resolved theme's content hash |
 | `{{.BrandName}}` `{{.BrandTail}}` `{{.BrandSub}}` `{{.BrandTitle}}` | the configured brand |
 | `{{.VersionTag}}` | a freeform version label beside the wordmark, empty when unset |
@@ -77,7 +78,11 @@ Set by flag or environment variable, and independent of the theme:
 
 A theme never hardcodes `/wiki/`. Every asset and page link hangs off
 `{{.Base}}`, and the clients read the same value from `window.__WIKI_BASE`, so
-`--base` relocates the whole site rather than only its markup.
+`--base` relocates the whole site rather than only its markup. The search client
+reads its index location from `window.__WIKI_SEARCH`, which equals
+`window.__WIKI_BASE` for a single bundle and is the tree base for a wiki of a
+multi-site tree, where one aggregate index spans every wiki. A theme that keeps
+the default template gets both for free.
 
 ## Two accessibility fixes, deliberately not reproduced
 

@@ -17,6 +17,12 @@ type SearchEntry struct {
 	Doc     string `json:"d"` // enclosing page title
 	Section string `json:"s"` // section category (e.g. Architecture)
 	Content string `json:"c"` // extracted plain text
+	// Site is the wiki's display title, set only on a tree's aggregate index so
+	// the client can head a group of results with the wiki they came from.
+	Site string `json:"w,omitempty"`
+	// SiteKey is the wiki's path under the tree root: a stable grouping key,
+	// since the display title can change without the path moving.
+	SiteKey string `json:"k,omitempty"`
 }
 
 // rawSearchChunk is an unresolved text section extracted from a page's AST.
@@ -143,4 +149,18 @@ func (r *Renderer) BuildSearchIndex() []SearchEntry {
 // SearchIndexJSON returns the JSON representation of the search index.
 func (r *Renderer) SearchIndexJSON() ([]byte, error) {
 	return json.Marshal(r.BuildSearchIndex())
+}
+
+// labelSearchIndex tags a wiki's own index with the wiki's display title and its
+// path under the tree root, so one aggregate index can group rows by wiki. It
+// is deliberately separate from BuildSearchIndex: a single bundle's index stays
+// unlabelled, and its JSON is unchanged.
+func labelSearchIndex(index []SearchEntry, site, key string) []SearchEntry {
+	out := make([]SearchEntry, len(index))
+	for i, e := range index {
+		e.Site = site
+		e.SiteKey = key
+		out[i] = e
+	}
+	return out
 }

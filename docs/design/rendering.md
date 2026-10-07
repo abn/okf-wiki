@@ -64,6 +64,10 @@ flowchart LR
    to `search-index.json`, which the client search modal loads on first use.
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
+   In a multi-site tree, each wiki keeps its own index and the tree also gets an
+   aggregate one at its base: the entries of every wiki that rendered, each
+   labelled with the wiki it came from, so a search from any wiki reaches all of
+   them. A wiki that was skipped contributes nothing to the aggregate.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
@@ -182,8 +186,13 @@ the base; any other directory is a group, and the render writes it an index of
 the wikis and groups directly inside it. A wiki's sub-directories are its
 sections, so the tree stops at a wiki. A group index renders through the theme
 with no sections of its own, so it keeps the header and the styling but has no
-sidebar, no contents and nothing to search. The output mirrors the tree, which
-is what lets one render and one `serve` publish a whole collection.
+sidebar and no contents. The output mirrors the tree, which is what lets one
+render and one `serve` publish a whole collection.
+
+Search is the one thing that spans the tree. Every wiki and every group fetches
+the aggregate index at the tree base, and the client groups the hits under a
+heading per wiki and can narrow to the current wiki. Tags stay per wiki, as does
+the `#tag` namespace, since a tag page is a page of the wiki that carries it.
 
 ## Caching
 

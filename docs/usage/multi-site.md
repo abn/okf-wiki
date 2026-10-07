@@ -68,7 +68,7 @@ _site/
 `--base` prefixes the whole tree, so `--base /family/` publishes the same shapes
 under `/family/` and the output root redirects there. A `serve` serves the same
 layout from one port, and the group indexes are the pages that follow the tree.
-A group has no assets of its own: its pages use the theme and an empty search
+A group has no assets of its own: its pages use the theme and the search
 catalogue written at the base, so with `--base /family/` those files sit under
 `_site/family/` rather than at the output root, which the two paths share only
 when the base is `/`.
@@ -93,13 +93,26 @@ live on the next page load. See [Live reload](cli.md#live-reload).
 
 ## The search index
 
-Each wiki has its own search index and tag catalogue, because each is a site of
-its own. A group index is given an empty one, so the search control on a group
-answers rather than failing; a search there finds nothing, since a group has no
-pages.
+Search spans the whole tree. Each wiki keeps its own `search-index.json`, so it
+remains a site of its own, and after every wiki has rendered the tree writes one
+aggregate index at its base. Every wiki and group fetches that aggregate, so a
+term that appears in a sibling wiki is found from here and answers with a
+heading naming the wiki it came from. A wiki that could not be read contributes
+nothing to it.
+
+The modal can be narrowed to the current wiki with the All wikis / This wiki
+toggle in its footer. The toggle appears only in a tree, where the aggregate
+lives at the tree base rather than the wiki's own base; on a single wiki the two
+are the same and it is hidden.
+
+A group index has no pages, so a search run from one finds hits in the wikis
+below it. The tag catalogue stays per wiki, and `#tag` searches the current
+wiki's tags, because a tag page is a page of the wiki that carries the tag.
 
 ## What it is not
 
-Nothing crosses between wikis. A link inside one wiki resolves inside that wiki,
-and there is no search or tag page spanning the tree. A tree is one place to
-publish many wikis, not one wiki with many sections.
+Links and tags do not cross between wikis. A link inside one wiki resolves
+inside that wiki, and each tag page belongs to its own wiki. Search is the
+exception: one index at the tree base spans every wiki, with results grouped by
+the wiki they came from. A tree is one place to publish many wikis, not one wiki
+with many sections.

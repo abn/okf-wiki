@@ -2774,3 +2774,272 @@ func TestMultiSiteFollowsSymlinkedBundles(t *testing.T) {
 		t.Error("a link back into the tree was walked again instead of stopping")
 	}
 }
+
+// treeSearchFixture writes a three-wiki tree plus one wiki that cannot be read,
+// and returns its content root. Every wiki carries one distinctive phrase so a
+// test can tell which wiki a hit came from.
+func treeSearchFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntype: Overview\ntitle: Alpha\n---\n# Alpha\n\nzephyrquartz lives here.\n")
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
+		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n\nexampleneedle sits in a sibling wiki.\n")
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "strategy"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "strategy", "index.md"),
+		"---\ntype: Overview\ntitle: Strategy\n---\n# Strategy\n")
+	mustMkdir(t, filepath.Join(dir, "homelab"))
+	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
+		"---\ntype: Overview\ntitle: Homelab\n---\n# Homelab\n\nhomelabneedle is here.\n")
+	// A wiki whose bundle cannot be walked: a link that resolves to nothing,
+	// which is what a moved checkout leaves.
+	mustMkdir(t, filepath.Join(dir, "broken"))
+	mustWrite(t, filepath.Join(dir, "broken", "index.md"),
+		"---\ntype: Overview\ntitle: Broken\n---\n# Broken\n")
+	if err := os.Symlink("/nonexistent/elsewhere", filepath.Join(dir, "broken", "docs")); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+	return dir
+}
+
+// TestMultiSiteAggregatesSearchIndex covers the tree's one search index: it sits
+// at the tree base, it holds the labelled entries of every wiki that rendered in
+// visit order, every URL is root-relative under the right wiki, and a wiki that
+// was skipped contributes nothing.
+func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
+	dir := treeSearchFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wikis != 4 {
+		t.Fatalf("rendered %d wikis, want 4 readable ones", wikis)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(out, "family", "search-index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index []SearchEntry
+	if err := json.Unmarshal(raw, &index); err != nil {
+		t.Fatalf("aggregate index is not a search catalogue: %v", err)
+	}
+	if len(index) == 0 {
+		t.Fatal("aggregate search index is empty")
+	}
+
+	// Every entry names its wiki, and its URL is the root-relative page under
+	// that wiki's own base.
+	var order []string
+	for _, e := range index {
+		if e.Site == "" || e.SiteKey == "" {
+			t.Fatalf("aggregate entry is not labelled: %+v", e)
+		}
+		if !strings.HasPrefix(e.URL, "/family/"+e.SiteKey+"/") {
+			t.Errorf("entry URL %q is not under its wiki base /family/%s/", e.URL, e.SiteKey)
+		}
+		if len(order) == 0 || order[len(order)-1] != e.SiteKey {
+			order = append(order, e.SiteKey)
+		}
+	}
+
+	// renderSites visits in sorted rel order, and the aggregate preserves it.
+	wantOrder := []string{"alpha", "clients/example/operations", "clients/example/strategy", "homelab"}
+	if strings.Join(order, ",") != strings.Join(wantOrder, ",") {
+		t.Errorf("aggregate order = %v, want %v", order, wantOrder)
+	}
+
+	// A phrase that exists only in the operations wiki is found under that wiki.
+	found := false
+	for _, e := range index {
+		if !strings.Contains(e.Content, "exampleneedle") {
+			continue
+		}
+		found = true
+		if e.Site != "Operations" || e.SiteKey != "clients/example/operations" {
+			t.Errorf("sibling hit labelled %q/%q, want Operations/clients/example/operations", e.Site, e.SiteKey)
+		}
+		if e.URL != "/family/clients/example/operations/index.html" {
+			t.Errorf("sibling hit URL = %q, want /family/clients/example/operations/index.html", e.URL)
+		}
+	}
+	if !found {
+		t.Error("the operations wiki's distinctive phrase is missing from the aggregate index")
+	}
+
+	// The skipped wiki contributes nothing.
+	for _, e := range index {
+		if e.SiteKey == "broken" || strings.Contains(e.URL, "/broken/") {
+			t.Errorf("a skipped wiki is in the aggregate index: %+v", e)
+		}
+	}
+
+	// Each wiki's own index is still written at its own base, unlabelled, so a
+	// single wiki remains a site of its own.
+	own, err := os.ReadFile(filepath.Join(out, "family", "alpha", "search-index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ownEntries []map[string]json.RawMessage
+	if err := json.Unmarshal(own, &ownEntries); err != nil {
+		t.Fatal(err)
+	}
+	if len(ownEntries) == 0 {
+		t.Fatal("the wiki's own index is empty")
+	}
+	for _, e := range ownEntries {
+		if _, ok := e["w"]; ok {
+			t.Errorf("the wiki's own index gained a site title: %s", own)
+		}
+		if _, ok := e["k"]; ok {
+			t.Errorf("the wiki's own index gained a site key: %s", own)
+		}
+	}
+}
+
+// TestSingleBundleSearchIndexUnchanged pins backward compatibility: a
+// single-bundle index keeps exactly the six fields it had, so the added site
+// fields are omitted and the file's bytes are what the old shape would write.
+func TestSingleBundleSearchIndexUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\nA stable sentence lives here.\n")
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "guide", "intro.md"),
+		"---\ntitle: Intro\n---\n# Intro\n\n## Setup\n\nInstall steps.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "wiki", "search-index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal into the pre-change shape and re-marshal. If any new key leaked
+	// into the file it would be dropped here and the two would differ.
+	type legacyEntry struct {
+		URL     string `json:"u"`
+		PageURL string `json:"p"`
+		Title   string `json:"t"`
+		Doc     string `json:"d"`
+		Section string `json:"s"`
+		Content string `json:"c"`
+	}
+	var legacy []legacyEntry
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	again, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(again) != string(raw) {
+		t.Errorf("single-bundle index bytes changed:\n got: %s\nwant: %s", raw, again)
+	}
+	if strings.Contains(string(raw), `"w"`) || strings.Contains(string(raw), `"k"`) {
+		t.Errorf("single-bundle index carries site fields: %s", raw)
+	}
+}
+
+// TestMultiSiteZeroWikisWritesEmptyAggregate covers a tree whose directories
+// hold no wiki at all: the tree base still gets an empty catalogue, so a group
+// page's search control answers instead of fetching a 404.
+func TestMultiSiteZeroWikisWritesEmptyAggregate(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "empty"))
+	mustWrite(t, filepath.Join(dir, "empty", ".meta.json"), `{"title": "Empty"}`)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wikis != 0 {
+		t.Fatalf("rendered %d wikis, want 0", wikis)
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "family", "search-index.json"))
+	if err != nil {
+		t.Fatalf("the tree base has no catalogue: %v", err)
+	}
+	if strings.TrimSpace(string(raw)) != "[]" {
+		t.Errorf("empty tree catalogue = %q, want []", raw)
+	}
+}
+
+// TestSearchGlobalsPerRenderKind covers the difference the client keys on: a
+// tree wiki points its search at the tree base, while its own base stays the
+// wiki's, and a group index and a single bundle point search at their own base.
+func TestSearchGlobalsPerRenderKind(t *testing.T) {
+	dir := treeSearchFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	// A nested wiki: its assets and links follow its own base, but the search
+	// index it fetches is the tree's.
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "operations", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, `window.__WIKI_BASE = '\/family\/clients\/example\/operations\/'`) {
+		t.Errorf("tree wiki does not carry its own base:\n%s", html)
+	}
+	if !strings.Contains(html, `window.__WIKI_SEARCH = '\/family\/'`) {
+		t.Errorf("tree wiki does not point search at the tree base:\n%s", html)
+	}
+
+	// A group index is rendered with the tree renderer, so both are the tree.
+	group, err := os.ReadFile(filepath.Join(out, "family", "clients", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(group), `window.__WIKI_BASE = '\/family\/'`) ||
+		!strings.Contains(string(group), `window.__WIKI_SEARCH = '\/family\/'`) {
+		t.Errorf("group index bases are not both the tree base:\n%s", group)
+	}
+
+	// A single bundle searches its own base.
+	single := t.TempDir()
+	mustWrite(t, filepath.Join(single, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	sout := t.TempDir()
+	sr, err := New(Config{Content: single, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sr.RenderAll(sout); err != nil {
+		t.Fatal(err)
+	}
+	singleHTML, err := os.ReadFile(filepath.Join(sout, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(singleHTML), `window.__WIKI_BASE = '\/wiki\/'`) ||
+		!strings.Contains(string(singleHTML), `window.__WIKI_SEARCH = '\/wiki\/'`) {
+		t.Errorf("single bundle bases are not both its base:\n%s", singleHTML)
+	}
+}

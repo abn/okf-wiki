@@ -298,7 +298,7 @@
     });
   })();
 </script>
-<script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>
+<script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_SEARCH = '{{.SearchBase}}'; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>
 <script type="module" src="{{.Base}}diagrams.js?v={{.AssetVersion}}"></script>
 <div class="search-modal-backdrop" id="searchBackdrop" aria-hidden="true">
   <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search documentation">
@@ -309,6 +309,7 @@
     </div>
     <div class="search-modal-body" id="searchResults"></div>
     <div class="search-modal-footer">
+      <button type="button" class="search-scope" id="searchScope" aria-pressed="true" hidden>All wikis</button>
       <div class="search-footer-hint"><kbd class="kbd-key">↑</kbd><kbd class="kbd-key">↓</kbd> <span>Navigate</span></div>
       <div class="search-footer-hint"><kbd class="kbd-key">↵</kbd> <span>Select</span></div>
       <div class="search-footer-hint"><kbd class="kbd-key">ESC</kbd> <span>Close</span></div>

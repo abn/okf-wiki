@@ -80,6 +80,14 @@ type Renderer struct {
 	// the tree's theme, and it does not write the root redirect, which would
 	// otherwise point the whole tree at whichever wiki rendered last.
 	nested bool
+	// searchBase is the URL prefix the search index is fetched from. It is the
+	// renderer's own base for a single bundle; for a wiki or a group of a
+	// multi-site tree it is the tree base, where one aggregate index spans every
+	// wiki. The page carries it as window.__WIKI_SEARCH.
+	searchBase string
+	// aggregated collects the labelled search entries of a tree render, in the
+	// order the wikis were visited, so the whole tree gets one index at its base.
+	aggregated []SearchEntry
 }
 
 // SkippedSite is one wiki a tree render left out, with the reason.

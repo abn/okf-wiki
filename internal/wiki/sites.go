@@ -100,8 +100,8 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	wikis := 0
 	err = swapDir(out, func(tmp string) error {
 		// A group index has no bundle of its own, so it renders through the
-		// theme with the theme's assets and an empty search catalogue at the
-		// tree base. A root that is itself a wiki writes its own.
+		// theme with the theme's assets at the tree base. A root that is itself
+		// a wiki writes its own.
 		if !root.wiki {
 			if err := r.writeSiteRoot(tmp); err != nil {
 				return err
@@ -110,6 +110,12 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 		var err error
 		wikis, err = r.renderSites(tmp, root)
 		if err != nil {
+			return err
+		}
+		// The aggregate index is written after the wikis, because it is built
+		// from what each of them produced. It sits at the tree base, where every
+		// wiki of the tree looks for it.
+		if err := r.writeAggregateSearchIndex(tmp); err != nil {
 			return err
 		}
 		return r.writeRootRedirect(tmp)
@@ -157,6 +163,9 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 		generatedAt:  r.generatedAt,
 		assetVersion: r.assetVersion,
 		nested:       true,
+		// A wiki of a tree searches the tree, not itself: the page carries the
+		// tree base so the client fetches the aggregate index written there.
+		searchBase: r.cfg.base(),
 	}
 	if err := sub.load(cfg.Content); err != nil {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
@@ -176,6 +185,11 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
 		return 0, nil
 	}
+	// The wiki rendered, so its entries join the tree's aggregate index, labelled
+	// with the wiki they came from. renderSites visits the wikis in sorted rel
+	// order, and this preserves that order.
+	title, _ := r.siteMeta(n)
+	r.aggregated = append(r.aggregated, labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)...)
 	return 1, nil
 }
 
@@ -195,12 +209,12 @@ func (r *Renderer) wasSkipped(n *siteNode) bool {
 	return false
 }
 
-// writeSiteRoot places the theme's assets and an empty search catalogue at the
+// writeSiteRoot places the theme's assets and an empty tag catalogue at the
 // tree base, where a group index looks for them: a group page renders with the
-// tree renderer, so its asset URLs carry the base, not the output root. A group
-// has no pages of its own, so the catalogue is empty rather than absent, and the
-// search control on a group index answers instead of failing. root is the output
-// root the tree is being written into.
+// tree renderer, so its asset URLs carry the base, not the output root. The
+// search catalogue is not written here: the aggregate one is written once every
+// wiki has rendered, so a group page finds it. root is the output root the tree
+// is being written into.
 func (r *Renderer) writeSiteRoot(root string) error {
 	dir := r.cfg.sitePath(root)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -209,12 +223,32 @@ func (r *Renderer) writeSiteRoot(root string) error {
 	if err := r.theme.WriteTo(dir); err != nil {
 		return err
 	}
-	for name, body := range map[string]string{"search-index.json": "[]\n", "tags.json": "[]\n"} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
-			return err
-		}
+	return os.WriteFile(filepath.Join(dir, "tags.json"), []byte("[]\n"), 0o644)
+}
+
+// writeAggregateSearchIndex writes the tree's one search index at the tree base:
+// the labelled entries of every wiki that rendered, in the order renderSites
+// visited them. A search from any wiki of the tree therefore reaches all of
+// them, and each row says which wiki it came from. A tree with no readable wiki
+// still gets an empty catalogue, so a group page's search control answers
+// instead of fetching a 404. root is the output root the tree was written into.
+func (r *Renderer) writeAggregateSearchIndex(root string) error {
+	entries := r.aggregated
+	if entries == nil {
+		// Marshal an empty slice, not a nil one, so the catalogue is [] rather
+		// than null: the client parses it as a list either way, but a group page
+		// expecting an array should find one.
+		entries = []SearchEntry{}
 	}
-	return nil
+	b, err := json.Marshal(entries)
+	if err != nil {
+		return err
+	}
+	dir := r.cfg.sitePath(root)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "search-index.json"), b, 0o644)
 }
 
 // writeCatalog writes the index for a group directory: its direct children,
