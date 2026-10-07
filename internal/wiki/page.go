@@ -565,11 +565,11 @@ func sidebarLabel(title, prefix string) string {
 	}
 	rest := t[len(p):]
 	switch rest[0] {
-	case ' ', '\t', ':', '-', '–', '—', '·', ',':
+	case ' ', '\t', ':', '-', '\u2013', '\u2014', '·', ',':
 	default:
 		return title
 	}
-	rest = []rune(strings.TrimLeft(string(rest), " \t:,-–—·"))
+	rest = []rune(strings.TrimLeft(string(rest), " \t:,-\u2013\u2014·"))
 	if len(rest) == 0 {
 		return title
 	}
