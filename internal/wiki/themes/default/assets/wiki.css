@@ -668,13 +668,15 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 }
 
 /* A card holds a fixed slice of the row it sits in, so when cards sit side by
-   side the title and the description each reserve two lines whatever they
+   side the title reserves two lines and the description three whatever they
    actually fill. That is what keeps a short card's text on the same lines as
    its taller neighbour's and holds every row to one height. The clamp cuts a
-   longer line rather than letting it grow the card and break the row. The site
-   grid turns to two columns at 568px, measured against the 260px minimum column
-   plus the 1rem gap, so this starts there: at 567px the grid is still one
-   column and a card keeps its full text. */
+   longer line rather than letting it grow the card and break the row; three
+   lines is where the description, the only preview of the wiki, stops looking
+   abandoned and a typical two-to-three line one fits whole. The site grid turns
+   to two columns at 568px, measured against the 260px minimum column plus the
+   1rem gap, so this starts there: at 567px the grid is still one column and a
+   card keeps its full text. */
 @media (min-width: 568px) {
   .site-name {
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
@@ -682,9 +684,9 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
     min-height: calc(2 * var(--lh-normal) * 1em);
   }
   .prose .site-desc {
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
     overflow: hidden;
-    min-height: calc(2 * var(--lh-relaxed) * 1em);
+    min-height: calc(3 * var(--lh-relaxed) * 1em);
   }
 }
 
