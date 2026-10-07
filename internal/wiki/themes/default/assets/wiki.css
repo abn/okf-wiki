@@ -650,9 +650,7 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   outline-offset: var(--focus-ring-offset);
 }
 .site-name {
-  min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden; line-height: var(--lh-normal);
-  min-height: calc(2 * var(--lh-normal) * 1em);
+  min-width: 0; line-height: var(--lh-normal);
   font-family: var(--font-ui); font-weight: var(--fw-semibold); color: var(--color-heading);
 }
 .site-badge {
@@ -661,16 +659,33 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   border-radius: var(--radius-pill); border: 1px solid var(--color-line); color: var(--color-text-muted);
 }
 .site-badge-wiki { color: var(--color-accent-text); border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
-/* A card holds a fixed slice of the row it sits in, so the title and the
-   description each reserve two lines whatever they actually fill. That is what
-   keeps a short card's text on the same lines as its taller neighbour's and
-   holds every row to one height. The clamp cuts a longer line rather than
-   letting it grow the card and break the row. */
+/* In one column a card is a list item with nothing beside it, so its title and
+   description size to their content: no reserved line and no clamp to cut a
+   long one. The reserves and the clamps arrive with the second column, below. */
 .prose .site-desc {
   margin: var(--space-2) 0 0; font-size: 0.95rem; color: var(--color-text-muted); max-width: 100%;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden; line-height: var(--lh-relaxed);
-  min-height: calc(2 * var(--lh-relaxed) * 1em);
+  line-height: var(--lh-relaxed);
+}
+
+/* A card holds a fixed slice of the row it sits in, so when cards sit side by
+   side the title and the description each reserve two lines whatever they
+   actually fill. That is what keeps a short card's text on the same lines as
+   its taller neighbour's and holds every row to one height. The clamp cuts a
+   longer line rather than letting it grow the card and break the row. The site
+   grid turns to two columns at 568px, measured against the 260px minimum column
+   plus the 1rem gap, so this starts there: at 567px the grid is still one
+   column and a card keeps its full text. */
+@media (min-width: 568px) {
+  .site-name {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+    min-height: calc(2 * var(--lh-normal) * 1em);
+  }
+  .prose .site-desc {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+    min-height: calc(2 * var(--lh-relaxed) * 1em);
+  }
 }
 
 /* The folders of a group, below the wikis. A lighter, denser list than the wiki
