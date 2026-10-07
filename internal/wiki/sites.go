@@ -114,9 +114,14 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 		}
 		// The aggregate index is written after the wikis, because it is built
 		// from what each of them produced. It sits at the tree base, where every
-		// wiki of the tree looks for it.
-		if err := r.writeAggregateSearchIndex(tmp); err != nil {
-			return err
+		// wiki of the tree looks for it. A root that is itself a wiki has no tree
+		// beneath it: its own index already sits at the base, and an aggregate
+		// there would replace it with labelled rows that make the client head a
+		// list of one.
+		if !root.wiki {
+			if err := r.writeAggregateSearchIndex(tmp); err != nil {
+				return err
+			}
 		}
 		return r.writeRootRedirect(tmp)
 	})
@@ -187,9 +192,12 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 	}
 	// The wiki rendered, so its entries join the tree's aggregate index, labelled
 	// with the wiki they came from. renderSites visits the wikis in sorted rel
-	// order, and this preserves that order.
-	title, _ := r.siteMeta(n)
-	r.aggregated = append(r.aggregated, labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)...)
+	// order, and this preserves that order. A root that is itself a wiki (rel "")
+	// has no separate aggregate to feed.
+	if n.rel != "" {
+		title, _ := r.siteMeta(n)
+		r.aggregated = append(r.aggregated, labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)...)
+	}
 	return 1, nil
 }
 

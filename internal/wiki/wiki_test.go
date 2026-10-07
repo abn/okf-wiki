@@ -2984,6 +2984,82 @@ func TestMultiSiteZeroWikisWritesEmptyAggregate(t *testing.T) {
 	}
 }
 
+// TestMultiSiteRootWikiKeepsItsOwnIndex covers a tree whose content root is
+// itself a wiki: scanSites stops there, so it is a tree of one whose base equals
+// the wiki's own base. The wiki's own index stays put rather than being replaced
+// by a labelled aggregate, and the base serves the wiki's home page, not a
+// redirect, so its search reads as a single bundle's.
+func TestMultiSiteRootWikiKeepsItsOwnIndex(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntype: Overview\ntitle: Home\n---\n# Home\n\nrootwikitoken lives here.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wikis, err := r.RenderSites(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wikis != 1 {
+		t.Fatalf("rendered %d wikis, want 1", wikis)
+	}
+	base := filepath.Join(out, "family")
+
+	// The base index is the wiki's own: every row is unlabelled, so the client
+	// renders the flat list with no per-wiki headings.
+	raw, err := os.ReadFile(filepath.Join(base, "search-index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		t.Fatalf("base index is not a search catalogue: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("the root wiki's own index is empty")
+	}
+	for _, e := range entries {
+		if _, ok := e["w"]; ok {
+			t.Errorf("the root wiki's own index gained a site title: %s", raw)
+		}
+		if _, ok := e["k"]; ok {
+			t.Errorf("the root wiki's own index gained a site key: %s", raw)
+		}
+	}
+
+	// The base is the wiki's home page, and the only index.html there: an
+	// aggregate or a root redirect at the base would be a second one.
+	home, err := os.ReadFile(filepath.Join(base, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), "<h1>Home</h1>") {
+		t.Error("the base index is not the wiki's home page")
+	}
+	if strings.Contains(string(home), `http-equiv="refresh"`) {
+		t.Error("the base index is a redirect rather than the wiki's home page")
+	}
+	if !strings.Contains(string(home), `window.__WIKI_SEARCH = '\/family\/'`) {
+		t.Error("the root wiki does not search its own base")
+	}
+	dirEntries, err := os.ReadDir(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var indexFiles int
+	for _, e := range dirEntries {
+		if !e.IsDir() && e.Name() == "index.html" {
+			indexFiles++
+		}
+	}
+	if indexFiles != 1 {
+		t.Errorf("the base holds %d index.html files, want 1", indexFiles)
+	}
+}
+
 // TestSearchGlobalsPerRenderKind covers the difference the client keys on: a
 // tree wiki points its search at the tree base, while its own base stays the
 // wiki's, and a group index and a single bundle point search at their own base.

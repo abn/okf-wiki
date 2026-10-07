@@ -986,11 +986,14 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 
 .search-modal-footer {
-  display: flex; gap: var(--space-5); padding: var(--space-3) var(--space-4);
+  /* The scope toggle and the keyboard hints share one row on a wide modal and
+     wrap to two on a phone, so the footer never scrolls horizontally. */
+  display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-line);
 }
 .search-scope {
-  margin-right: auto; align-self: center;
+  margin-right: auto; align-self: center; white-space: nowrap;
   font-family: var(--font-ui); font-size: var(--text-xs);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-line); border-radius: var(--radius-pill);

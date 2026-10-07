@@ -86,10 +86,11 @@ steps that touch the live tree.
 ## Alternatives considered
 
 **Re-render only the wiki that changed.** The natural middle step, rejected for
-now because the non-page outputs still span the tree. The search index and the
-tag pages are per wiki, but the group indexes, the tree-root assets and the
-redirect are not. It removes the largest share of the work on a many-wiki tree
-and adds a per-wiki digest and a mapping from a changed file back to its wiki.
+now because the non-page outputs still span the tree. Each wiki's own search
+index and tag catalogue are per wiki, but the tree's aggregate index, the group
+indexes, the tree-root assets and the redirect are not. It removes the largest
+share of the work on a many-wiki tree and adds a per-wiki digest and a mapping
+from a changed file back to its wiki.
 
 **Re-render only the pages that changed.** The most work to reach and the most
 to get wrong. The navigation, the previous and next chain, the tag pages and the
