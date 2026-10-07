@@ -2421,8 +2421,8 @@ func TestMultiSiteRendersTree(t *testing.T) {
 	mustMkdir(t, filepath.Join(dir, "clients"))
 	mustWrite(t, filepath.Join(dir, "clients", ".meta.json"),
 		`{"title": "Clients", "description": "Engagement wikis."}`)
-	mustMkdir(t, filepath.Join(dir, "clients", "sprind", "operations"))
-	mustWrite(t, filepath.Join(dir, "clients", "sprind", "operations", "index.md"),
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
 		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n")
 	mustMkdir(t, filepath.Join(dir, "homelab"))
 	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
@@ -2479,11 +2479,11 @@ func TestMultiSiteRendersTree(t *testing.T) {
 		t.Error("the group index does not use its .meta.json name and description")
 	}
 	// A wiki is rendered at its own path under the base, with its own assets.
-	ops, err := os.ReadFile(filepath.Join(site, "clients", "sprind", "operations", "index.html"))
+	ops, err := os.ReadFile(filepath.Join(site, "clients", "example", "operations", "index.html"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(ops), `href="/family/clients/sprind/operations/wiki.css`) {
+	if !strings.Contains(string(ops), `href="/family/clients/example/operations/wiki.css`) {
 		t.Error("a tree wiki's assets are not under its own path")
 	}
 	if !strings.Contains(string(ops), "<h1>Operations</h1>") {
@@ -2496,6 +2496,148 @@ func TestMultiSiteRendersTree(t *testing.T) {
 	}
 	if !strings.Contains(string(redirect), "url=/family/") {
 		t.Error("the output root does not redirect to the base")
+	}
+}
+
+// localAssetRefs returns the file references (href/src) in a rendered page that
+// point at a local file rather than a directory or an anchor. Catalog links to
+// wikis and groups end in a slash, so the two are distinguished by shape.
+func localAssetRefs(html string) []string {
+	var refs []string
+	for _, attr := range []string{`href="`, `src="`} {
+		rest := html
+		for {
+			i := strings.Index(rest, attr)
+			if i < 0 {
+				break
+			}
+			rest = rest[i+len(attr):]
+			j := strings.Index(rest, `"`)
+			if j < 0 {
+				break
+			}
+			ref := rest[:j]
+			rest = rest[j:]
+			if ref == "" || strings.HasPrefix(ref, "#") ||
+				strings.Contains(ref, "://") || strings.HasSuffix(ref, "/") {
+				continue
+			}
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+// TestMultiSiteGroupAssetsSitAtTheBase covers a tree published under a non-root
+// base. A group index renders with the tree renderer, so every asset and
+// catalogue it points at carries the base and must sit under the base
+// directory, not at the output root a base of "/" happens to share with it. Get
+// this wrong and every group index is unstyled and its search silently empty
+// while the wikis inside it still render, which is easy to miss.
+func TestMultiSiteGroupAssetsSitAtTheBase(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "clients"))
+	mustWrite(t, filepath.Join(dir, "clients", ".meta.json"),
+		`{"title": "Clients", "description": "Engagement wikis."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
+		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n")
+	mustMkdir(t, filepath.Join(dir, "homelab"))
+	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
+		"---\ntype: Overview\ntitle: Homelab\n---\n# Homelab\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	// The theme's assets and the empty catalogue belong beside the group
+	// indexes that reference them, under the base.
+	baseDir := filepath.Join(out, "family")
+	for _, rel := range []string{
+		"wiki.css", "tokens.css", "fonts.css", "favicon.svg", "search.js",
+		"diagrams.js", "brand-mark.svg", "search-index.json", "tags.json",
+	} {
+		if _, err := os.Stat(filepath.Join(baseDir, rel)); err != nil {
+			t.Errorf("group asset %s is not under the base: %v", rel, err)
+		}
+	}
+	// The output root belongs to the redirect, not to the theme.
+	if _, err := os.Stat(filepath.Join(out, "wiki.css")); err == nil {
+		t.Error("the theme was written to the output root instead of the base")
+	}
+
+	// Every local file the root group index and a nested one references
+	// resolves on disk, and each page carries the tree base it was rendered
+	// with.
+	for _, page := range []string{
+		filepath.Join(baseDir, "index.html"),
+		filepath.Join(baseDir, "clients", "index.html"),
+	} {
+		body, err := os.ReadFile(page)
+		if err != nil {
+			t.Fatal(err)
+		}
+		html := string(body)
+		if !strings.Contains(html, `window.__WIKI_BASE = '\/family\/'`) {
+			t.Errorf("%s does not carry the tree base", page)
+		}
+		if !strings.Contains(html, `href="/family/wiki.css`) {
+			t.Errorf("%s does not reference its stylesheet under the base", page)
+		}
+		for _, ref := range localAssetRefs(html) {
+			rel := strings.TrimPrefix(ref, "/family/")
+			rel = strings.SplitN(rel, "?", 2)[0]
+			if _, err := os.Stat(filepath.Join(out, "family", filepath.FromSlash(rel))); err != nil {
+				t.Errorf("%s references %s but it is not on disk: %v", page, ref, err)
+			}
+		}
+	}
+
+	// The output root still redirects into the base, so a host at / lands on
+	// the tree.
+	redirect, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(redirect), "url=/family/") {
+		t.Error("the output root does not redirect to the base")
+	}
+}
+
+// TestMultiSiteRootBaseKeepsAssetsAtTheRoot pins the base "/" case, where the
+// output root and the site directory are the same: the tree-base assets stay at
+// the output root, and the root group index is the home page rather than a
+// redirect.
+func TestMultiSiteRootBaseKeepsAssetsAtTheRoot(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "homelab"))
+	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
+		"---\ntype: Overview\ntitle: Homelab\n---\n# Homelab\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "okf-wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"wiki.css", "search.js", "search-index.json"} {
+		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
+			t.Errorf("asset %s is not at the output root for base /: %v", rel, err)
+		}
+	}
+	home, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), `href="/homelab/"`) {
+		t.Error("the output root is not the root group index")
 	}
 }
 
