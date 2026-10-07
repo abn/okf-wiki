@@ -261,6 +261,22 @@ are equal for a single bundle, and `SearchBase` is the tree base for a wiki of a
 multi-site tree, where one aggregate index spans every wiki. The client reads
 them as `window.__WIKI_BASE` and `window.__WIKI_SEARCH`.
 
+A page carries a third base for its brand anchor, `{{.HomeHref}}`. It is
+`{{.Base}}` for a single bundle and the tree base for a wiki or group of a
+multi-site tree, so the mark and the wordmark always mean the deployment home.
+The default template links the brand to it while every asset and preload still
+hangs off `{{.Base}}`. A theme that writes `{{.Base}}` for the brand keeps a
+single bundle unchanged but sends a tree reader to the local wiki's home.
+
+The breadcrumb keeps the same markup in both cases, and only a tree adds a
+prefix. A single bundle reads `Docs / section / page`. A tree page reads
+`tree-title / folder / ... / wiki-title / section / page`, where the folder
+crumbs link to the group indexes and the wiki title links to the wiki home; the
+current page is always the last crumb. A group index ends at the group name,
+and the tree root ends at the tree title alone. Every segment uses `.crumb-sep`
+and `.crumb-cur`, so a theme that styles the single-bundle breadcrumb styles the
+tree one too.
+
 ## Provenance
 
 Every render writes a resolved `theme.json` next to the pages, recording the

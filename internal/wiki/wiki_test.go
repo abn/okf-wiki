@@ -3119,3 +3119,285 @@ func TestSearchGlobalsPerRenderKind(t *testing.T) {
 		t.Errorf("single bundle bases are not both its base:\n%s", singleHTML)
 	}
 }
+
+// breadcrumbHTMLOf extracts the breadcrumb nav's inner HTML from a rendered
+// page, so a test can pin the trail without matching a link elsewhere.
+func breadcrumbHTMLOf(t *testing.T, html string) string {
+	t.Helper()
+	const open = `<nav class="breadcrumb" aria-label="Breadcrumb">`
+	i := strings.Index(html, open)
+	if i < 0 {
+		t.Fatalf("no breadcrumb nav in:\n%s", html)
+	}
+	rest := html[i+len(open):]
+	j := strings.Index(rest, `</nav>`)
+	if j < 0 {
+		t.Fatalf("unterminated breadcrumb nav in:\n%s", html)
+	}
+	return rest[:j]
+}
+
+// multiSiteHeaderFixture writes a tree with two nested groups above one wiki
+// and a section page inside it, plus a second wiki at the top level. It is the
+// shape the header and breadcrumb tests share.
+func multiSiteHeaderFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "clients"))
+	mustWrite(t, filepath.Join(dir, "clients", ".meta.json"),
+		`{"title": "Clients", "description": "Engagement wikis."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "example"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", ".meta.json"),
+		`{"title": "Example", "description": "The Example engagement."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations", "guides"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
+		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n")
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "guides", "setup.md"),
+		"---\ntype: Guide\ntitle: Setup\n---\n# Setup\n")
+	mustMkdir(t, filepath.Join(dir, "homelab"))
+	mustWrite(t, filepath.Join(dir, "homelab", "index.md"),
+		"---\ntype: Overview\ntitle: Homelab\n---\n# Homelab\n")
+	return dir
+}
+
+// TestMultiSiteBrandPointsAtTree covers the brand of a page inside a tree: the
+// anchor targets the tree base so the mark and the wordmark are the deployment
+// home from any depth, while the page's assets and preload keep hanging off its
+// own wiki base.
+func TestMultiSiteBrandPointsAtTree(t *testing.T) {
+	dir := multiSiteHeaderFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "operations", "guides", "setup.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, `<a class="brand" href="/family/">`) {
+		t.Errorf("the brand does not point at the tree base:\n%s", html)
+	}
+	if strings.Contains(html, `<a class="brand" href="/family/clients/example/operations/">`) {
+		t.Errorf("the brand still points at the wiki's own base:\n%s", html)
+	}
+	// The wordmark link is the only place HomeHref may change: every asset path
+	// stays on the wiki's own base.
+	if !strings.Contains(html, `href="/family/clients/example/operations/wiki.css`) ||
+		!strings.Contains(html, `href="/family/clients/example/operations/brand-mark.svg`) {
+		t.Errorf("an asset stopped using the wiki's own base:\n%s", html)
+	}
+}
+
+// TestMultiSiteBreadcrumbTrail covers the trail on a deep wiki page: the tree
+// title, each folder in order, the wiki title, then the section and the page,
+// with each link pointing at the right index and the current page last.
+func TestMultiSiteBreadcrumbTrail(t *testing.T) {
+	dir := multiSiteHeaderFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "operations", "guides", "setup.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/">Clients</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/">Example</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/operations/">Operations</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/operations/guides/index.html">Guides</a><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Setup</span>`
+	if got != want {
+		t.Errorf("breadcrumb trail =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestMultiSiteBreadcrumbWikiHome covers a wiki's own home page: the wiki crumb
+// is the current one rather than a link to the page the reader is on, so the
+// trail ends at the wiki and does not repeat its title.
+func TestMultiSiteBreadcrumbWikiHome(t *testing.T) {
+	dir := multiSiteHeaderFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "operations", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/">Clients</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/">Example</a><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Operations</span>`
+	if got != want {
+		t.Errorf("wiki home trail =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestMultiSiteGroupIndexBreadcrumb covers a group index: the trail runs from
+// the tree root to the group, whose own name is current rather than a link to
+// the page the reader is on, and is not duplicated.
+func TestMultiSiteGroupIndexBreadcrumb(t *testing.T) {
+	dir := multiSiteHeaderFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/">Clients</a><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Example</span>`
+	if got != want {
+		t.Errorf("group index trail =\n%s\nwant\n%s", got, want)
+	}
+	if strings.Contains(got, `href="/family/clients/example/">`) {
+		t.Errorf("the group index links to itself:\n%s", got)
+	}
+	if n := strings.Count(got, "Example"); n != 1 {
+		t.Errorf("the group index trail names Example %d times, want 1:\n%s", n, got)
+	}
+}
+
+// TestMultiSiteRootGroupBreadcrumb covers the tree root group index: the tree
+// title shows once as the current crumb, with no link to itself and no repeat.
+func TestMultiSiteRootGroupBreadcrumb(t *testing.T) {
+	dir := multiSiteHeaderFixture(t)
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	if got != `<span class="crumb-cur">Wiki</span>` {
+		t.Errorf("root group trail = %q, want a single current Wiki crumb", got)
+	}
+	if strings.Contains(got, `href="/family/">`) {
+		t.Errorf("the root group links to itself:\n%s", got)
+	}
+	if n := strings.Count(got, "Wiki"); n != 1 {
+		t.Errorf("the root group trail names Wiki %d times, want 1:\n%s", n, got)
+	}
+}
+
+// TestMultiSiteRootWikiHeaderAndTrail covers a tree whose content root is
+// itself a wiki: the brand reaches the tree base, which is the wiki's own home,
+// and the trail shows the tree title once rather than duplicating the wiki's
+// own title above itself.
+func TestMultiSiteRootWikiHeaderAndTrail(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntype: Overview\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "guide", "setup.md"),
+		"---\ntype: Guide\ntitle: Setup\n---\n# Setup\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	home, err := os.ReadFile(filepath.Join(out, "family", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), `<a class="brand" href="/family/">`) {
+		t.Errorf("the root wiki's brand does not reach the tree base:\n%s", home)
+	}
+	if got := breadcrumbHTMLOf(t, string(home)); got != `<span class="crumb-cur">Wiki</span>` {
+		t.Errorf("root wiki home trail = %q, want a single current Wiki crumb", got)
+	} else if strings.Contains(got, "Home") {
+		t.Errorf("root wiki home trail duplicates the wiki title: %s", got)
+	}
+
+	deep, err := os.ReadFile(filepath.Join(out, "family", "guide", "setup.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(deep))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/guide/index.html">Guide</a><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Setup</span>`
+	if got != want {
+		t.Errorf("root wiki deep trail =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestSingleBundleHeaderUnchanged pins a single bundle's header: the brand and
+// the breadcrumb are exactly what they were before a tree existed, with no tree
+// title and no folder crumbs.
+func TestSingleBundleHeaderUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "guide", "setup.md"),
+		"---\ntype: Guide\ntitle: Setup\n---\n# Setup\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t", Title: "Wiki"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "wiki", "guide", "setup.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, `<a class="brand" href="/wiki/">`) {
+		t.Errorf("single bundle brand is not its own base:\n%s", html)
+	}
+	got := breadcrumbHTMLOf(t, html)
+	want := `<a href="/wiki/">Docs</a><span class="crumb-sep">/</span>` +
+		`<a href="/wiki/guide/index.html">Guide</a><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Setup</span>`
+	if got != want {
+		t.Errorf("single bundle trail =\n%s\nwant\n%s", got, want)
+	}
+}

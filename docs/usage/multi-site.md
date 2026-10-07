@@ -85,6 +85,27 @@ An entry on a group index is named from, in order:
 None is required. A folder still lists, named after its directory, so a tree
 needs no metadata to work.
 
+## Brand and breadcrumb
+
+One brand stands for the whole tree. The brand mark and the wordmark link to the
+tree index, not to the wiki the reader is in, so they mean "the deployment home"
+and work from any depth. There is no per-wiki brand and no separate Home control:
+the brand is the home, and the breadcrumb says where the reader is.
+
+The breadcrumb becomes a trail from the tree root down to the current wiki:
+
+```text
+Wiki / Clients / Example / Operations / Guides / Setup
+```
+
+The tree title (`--title`, e.g. "Wiki") links to the tree index, each folder
+links to that group's index, the wiki title links to the wiki's own home, and the
+section and page crumbs follow as they do in a single bundle. The current page is
+always the last crumb. On a group index the trail ends at the group's name, and
+at the tree root it is the tree title alone, never a link to itself. A single
+bundle is unchanged: still `Docs / section / page`, with the brand on its own
+base.
+
 ## Watching
 
 `serve --multi-site --watch` re-renders the whole tree when anything under it

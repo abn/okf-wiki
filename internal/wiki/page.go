@@ -34,6 +34,11 @@ type shellData struct {
 	// Base is the URL prefix every asset and page link hangs off, with a
 	// leading and trailing slash. A theme never hardcodes /wiki/.
 	Base string
+	// HomeHref is the brand anchor's target. It is Base for a single bundle and
+	// the tree base for a page of a multi-site tree, so the brand means the
+	// deployment home and works from any depth. It falls back to Base whenever
+	// no tree base is set.
+	HomeHref string
 	// SearchBase is the URL prefix the search index is fetched from. It equals
 	// Base for a single bundle. In a multi-site tree it is the tree base, since
 	// one index there spans every wiki. The page carries it as
@@ -91,6 +96,12 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	if searchBase == "" {
 		searchBase = base
 	}
+	// The brand points at the deployment home: the page's own base for a single
+	// bundle, the tree base for a wiki or group of a tree.
+	homeHref := base
+	if r.treeBase != "" {
+		homeHref = r.treeBase
+	}
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
@@ -113,6 +124,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		ThemeName:      r.theme.Name,
 		ThemeVersion:   r.theme.Version,
 		Base:           base,
+		HomeHref:       homeHref,
 		SearchBase:     searchBase,
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
@@ -579,14 +591,16 @@ func (r *Renderer) topNavMatching(wantExternal bool) string {
 
 func (r *Renderer) breadcrumbHTML(p Page) string {
 	base := r.cfg.base()
-	parts := []string{`<a href="` + base + `">Docs</a>`}
 	// Tag pages belong to no section. They read Docs / Tags / #tag, with
 	// Tags as unclassed text since there is no tag index page to point it
 	// at and no theme class for a non-current, non-link crumb. The slug
 	// prefix alone is not enough: a tags/ section holds real pages, so the
 	// empty section marks the synthetic ones. The title already carries
-	// the hash.
+	// the hash. A tree leaves this untouched: a tag page belongs to its own
+	// wiki, and a trail into the tree would name a wiki the page does not
+	// list.
 	if p.Section == "" && strings.HasPrefix(p.Slug, "tags/") {
+		parts := []string{`<a href="` + base + `">Docs</a>`}
 		parts = append(parts, `<span>Tags</span>`)
 		title := p.Title
 		if title == "" {
@@ -599,6 +613,10 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 			template.HTMLEscapeString(name)))
 		return strings.Join(parts, `<span class="crumb-sep">/</span>`)
 	}
+	if r.treeBase != "" {
+		return r.treeBreadcrumbHTML(p)
+	}
+	parts := []string{`<a href="` + base + `">Docs</a>`}
 	if p.Section != "" {
 		for _, s := range r.sections {
 			if s.ID == p.Section {
@@ -613,6 +631,75 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 	}
 	parts = append(parts, fmt.Sprintf(`<span class="crumb-cur">%s</span>`, template.HTMLEscapeString(title)))
 	return strings.Join(parts, `<span class="crumb-sep">/</span>`)
+}
+
+// treeBreadcrumbHTML builds the trail of a page in a multi-site tree: the tree
+// title at the root, then a crumb per folder down to the page's own wiki or
+// group, then the same section and page crumbs a single bundle gets. The tree
+// title replaces the hardcoded "Docs" of a single bundle, and a folder links to
+// the group index that lists what is below it. The current node's own crumb is
+// a link on a deeper page and the current crumb on its home, so a wiki home is
+// one click away and never linked to itself.
+func (r *Renderer) treeBreadcrumbHTML(p Page) string {
+	base := r.cfg.base()
+	sep := `<span class="crumb-sep">/</span>`
+	var parts []string
+	// A page that is the tree root itself shows the root once as the current
+	// crumb; a deeper page links back to it.
+	if r.siteRel == "" {
+		if r.nodeIsHome(p) {
+			return crumbCur(r.cfg.Brand.Title)
+		}
+		parts = append(parts, crumbLink(r.treeBase, r.cfg.Brand.Title))
+	} else {
+		parts = append(parts, crumbLink(r.treeBase, r.cfg.Brand.Title))
+		for _, c := range r.siteTrail {
+			parts = append(parts, crumbLink(c.Href, c.Title))
+		}
+		nodeTitle := r.siteTitle
+		if nodeTitle == "" {
+			nodeTitle = r.cfg.Brand.Title
+		}
+		if r.nodeIsHome(p) {
+			parts = append(parts, crumbCur(nodeTitle))
+			return strings.Join(parts, sep)
+		}
+		parts = append(parts, crumbLink(siteBase(r.treeBase, r.siteRel), nodeTitle))
+	}
+	if p.Section != "" {
+		for _, s := range r.sections {
+			if s.ID == p.Section {
+				parts = append(parts, crumbLink(base+s.ID+"/index.html", s.Title))
+				break
+			}
+		}
+	}
+	title := p.Title
+	if title == "" {
+		title = p.Slug
+	}
+	parts = append(parts, crumbCur(title))
+	return strings.Join(parts, sep)
+}
+
+// nodeIsHome reports whether a page is its node's own home: the wiki's
+// index.md, or any page of a synthetic group index. It is what keeps the node's
+// own crumb from being both a link and the current crumb.
+func (r *Renderer) nodeIsHome(p Page) bool {
+	if r.groupIndex {
+		return true
+	}
+	return p.Section == "" && p.Slug == "index"
+}
+
+func crumbLink(href, title string) string {
+	return fmt.Sprintf(`<a href="%s">%s</a>`, template.HTMLEscapeString(href), template.HTMLEscapeString(title))
+}
+
+// crumbCur renders the current breadcrumb segment. It carries the crumb-cur
+// class the stylesheet and the DOM contract expect.
+func crumbCur(title string) string {
+	return fmt.Sprintf(`<span class="crumb-cur">%s</span>`, template.HTMLEscapeString(title))
 }
 
 func stripLeadingH1(body, title string) string {
