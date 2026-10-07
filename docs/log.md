@@ -5,6 +5,8 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-07
 
+* **Update**: The command line page's tree sample uses a generic `example` group
+  name, so no real client name appears in the published bundle.
 * **Page**: A multi-site tour shows what a tree of wikis looks like, with
   screenshots of a group index, search grouped across the tree, the header's
   breadcrumb trail, and the card layout on a phone. `usage/index.md` links it.
