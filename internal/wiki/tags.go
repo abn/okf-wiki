@@ -79,8 +79,9 @@ func sectionTitle(titles map[string]string, id string) string {
 
 // RenderTagPage renders the listing page for one tag through the themed
 // shell. It is a synthetic page: no section, so the sidebar marks nothing
-// active and the breadcrumb reads Docs / Tags / #tag. The title carries the
-// hash, matching the search rows and the chips that point here.
+// active, and the breadcrumb reads Docs / Tags / #tag in a single bundle or the
+// wiki's trail then Tags / #tag in a tree. The title carries the hash, matching
+// the search rows and the chips that point here.
 func (r *Renderer) RenderTagPage(t tagListing, all []tagListing) (string, error) {
 	n := len(t.Pages)
 	lead := fmt.Sprintf("%d pages tagged #%s.", n, t.Display)
