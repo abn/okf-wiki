@@ -5,6 +5,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-07
 
+* **Page**: A multi-site tour shows what a tree of wikis looks like, with
+  screenshots of a group index, search grouped across the tree, the header's
+  breadcrumb trail, and the card layout on a phone. `usage/index.md` links it.
 * **Feature**: A multi-site tree has one brand. The brand anchor targets the
   tree index through a new `{{.HomeHref}}`, which is `{{.Base}}` for a single
   bundle and the tree base for a tree page, so the mark and the wordmark mean
