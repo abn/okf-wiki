@@ -1633,6 +1633,15 @@ func TestTagPageHasNoActiveNav(t *testing.T) {
 	if strings.Contains(body, `side-title-link active`) || strings.Contains(body, `<li class="active"`) {
 		t.Error("tag page marks a sidebar entry active")
 	}
+	// A single bundle is unchanged by the tree work: Docs / Tags / #tag, byte
+	// for byte.
+	got := breadcrumbHTMLOf(t, body)
+	want := `<a href="/wiki/">Docs</a><span class="crumb-sep">/</span>` +
+		`<span>Tags</span><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur"><span class="tag-hash">#</span>alpha</span>`
+	if got != want {
+		t.Errorf("single bundle tag trail =\n%s\nwant\n%s", got, want)
+	}
 	if !strings.Contains(body, "Docs</a>") || !strings.Contains(body, "<span>Tags</span>") ||
 		!strings.Contains(body, `<span class="tag-hash">#</span>alpha</span>`) {
 		t.Error("tag page breadcrumb does not read Docs / Tags / #tag")
@@ -3252,6 +3261,85 @@ func TestMultiSiteBreadcrumbWikiHome(t *testing.T) {
 		`<span class="crumb-cur">Operations</span>`
 	if got != want {
 		t.Errorf("wiki home trail =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestMultiSiteTagPageBreadcrumb covers a tag page inside a tree: the page
+// belongs to its wiki, so it keeps the trail down to that wiki and then appends
+// Tags / #tag. The wiki title links to the wiki home, Tags stays unclassed text
+// since there is no tag index page, and the tag is the current crumb with its
+// hash muted, the same shape every other page of the tree shows.
+func TestMultiSiteTagPageBreadcrumb(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "clients"))
+	mustWrite(t, filepath.Join(dir, "clients", ".meta.json"),
+		`{"title": "Clients", "description": "Engagement wikis."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "example"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", ".meta.json"),
+		`{"title": "Example", "description": "The Example engagement."}`)
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
+		"---\ntype: Overview\ntitle: Operations\ntags: [beta]\n---\n# Operations\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "clients", "example", "operations", "tags", "beta.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/">Clients</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/">Example</a><span class="crumb-sep">/</span>` +
+		`<a href="/family/clients/example/operations/">Operations</a><span class="crumb-sep">/</span>` +
+		`<span>Tags</span><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur"><span class="tag-hash">#</span>beta</span>`
+	if got != want {
+		t.Errorf("tag page trail =\n%s\nwant\n%s", got, want)
+	}
+	if strings.Contains(got, `href="/family/clients/example/operations/tags/beta.html"`) {
+		t.Errorf("the tag page links to itself:\n%s", got)
+	}
+}
+
+// TestMultiSiteRootWikiTagPageBreadcrumb covers a tag page in a tree whose
+// content root is itself a wiki: the tree title links to the tree base, which is
+// the wiki's own home, and then Tags / #tag follows, with no duplicated wiki
+// title above itself.
+func TestMultiSiteRootWikiTagPageBreadcrumb(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntype: Overview\ntitle: Home\ntags: [alpha]\n---\n# Home\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := os.ReadFile(filepath.Join(out, "family", "tags", "alpha.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := breadcrumbHTMLOf(t, string(page))
+	want := `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<span>Tags</span><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur"><span class="tag-hash">#</span>alpha</span>`
+	if got != want {
+		t.Errorf("root wiki tag trail =\n%s\nwant\n%s", got, want)
+	}
+	if n := strings.Count(got, "Wiki"); n != 1 {
+		t.Errorf("the trail names Wiki %d times, want 1:\n%s", n, got)
 	}
 }
 

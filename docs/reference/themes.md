@@ -273,9 +273,11 @@ prefix. A single bundle reads `Docs / section / page`. A tree page reads
 `tree-title / folder / ... / wiki-title / section / page`, where the folder
 crumbs link to the group indexes and the wiki title links to the wiki home; the
 current page is always the last crumb. A group index ends at the group name,
-and the tree root ends at the tree title alone. Every segment uses `.crumb-sep`
-and `.crumb-cur`, so a theme that styles the single-bundle breadcrumb styles the
-tree one too.
+and the tree root ends at the tree title alone. A tag page keeps the trail of
+its wiki and then reads `Tags / #tag`, since it is a page of that wiki; a
+single-bundle tag page is still `Docs / Tags / #tag`. Every segment uses
+`.crumb-sep` and `.crumb-cur`, so a theme that styles the single-bundle
+breadcrumb styles the tree one too.
 
 ## Provenance
 

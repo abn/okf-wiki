@@ -102,9 +102,11 @@ The tree title (`--title`, e.g. "Wiki") links to the tree index, each folder
 links to that group's index, the wiki title links to the wiki's own home, and the
 section and page crumbs follow as they do in a single bundle. The current page is
 always the last crumb. On a group index the trail ends at the group's name, and
-at the tree root it is the tree title alone, never a link to itself. A single
-bundle is unchanged: still `Docs / section / page`, with the brand on its own
-base.
+at the tree root it is the tree title alone, never a link to itself. A tag page
+keeps the trail of the wiki it belongs to and then reads `Tags / #tag`, so the
+reader who followed a tag chip from a page keeps the same trail behind them. A
+single bundle is unchanged: still `Docs / section / page`, and still
+`Docs / Tags / #tag` on a tag page, with the brand on its own base.
 
 ## Watching
 
