@@ -33,7 +33,12 @@ type shellData struct {
 	ThemeVersion string
 	// Base is the URL prefix every asset and page link hangs off, with a
 	// leading and trailing slash. A theme never hardcodes /wiki/.
-	Base       string
+	Base string
+	// SearchBase is the URL prefix the search index is fetched from. It equals
+	// Base for a single bundle. In a multi-site tree it is the tree base, since
+	// one index there spans every wiki. The page carries it as
+	// window.__WIKI_SEARCH; the client falls back to Base when it is unset.
+	SearchBase string
 	Breadcrumb template.HTML
 	Nav        template.HTML
 	// TopNav is the header's links, in the order they were configured.
@@ -79,6 +84,13 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 
 	name, tail := splitWordmark(r.cfg.Brand.Name)
 	base := r.cfg.base()
+	// A single bundle's index sits at its own base, so that is the default. A
+	// wiki or group of a tree is told the tree base instead, where the one
+	// aggregate index lives.
+	searchBase := r.searchBase
+	if searchBase == "" {
+		searchBase = base
+	}
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
@@ -101,6 +113,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		ThemeName:      r.theme.Name,
 		ThemeVersion:   r.theme.Version,
 		Base:           base,
+		SearchBase:     searchBase,
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		TopNav:         template.HTML(r.topNavHTML()),

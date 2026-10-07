@@ -5,12 +5,27 @@
   var isLoading = false;
   var selectedIndex = -1;
   var currentResults = [];
+  // currentGroups is null for a flat list (a single bundle, or a tag search) and
+  // otherwise one entry per wiki: { site, count }. currentResults stays the flat
+  // list the keyboard walks, so ArrowUp/ArrowDown/Enter are unaffected by the
+  // grouping.
+  var currentGroups = null;
   var lastActiveElement = null;
+
+  // A tree of wikis publishes one aggregate index at the tree base and names it
+  // in window.__WIKI_SEARCH. Its own base is still window.__WIKI_BASE, which is
+  // where "this wiki" ends and where the tag catalogue lives. When the two are
+  // equal there is no tree to search across.
+  var base = window.__WIKI_BASE || '/wiki/';
+  var searchBase = window.__WIKI_SEARCH || base;
+  var multiSite = !!window.__WIKI_SEARCH && window.__WIKI_SEARCH !== window.__WIKI_BASE;
+  var scopeAll = true;
 
   var searchBtn = document.getElementById('searchBtn');
   var backdrop = document.getElementById('searchBackdrop');
   var input = document.getElementById('searchInput');
   var closeBtn = document.getElementById('searchCloseBtn');
+  var scopeBtn = document.getElementById('searchScope');
   var resultsContainer = document.getElementById('searchResults');
 
   if (!backdrop || !input || !resultsContainer) {
@@ -23,8 +38,7 @@
     }
     isLoading = true;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
-    var base = window.__WIKI_BASE || '/wiki/';
-    return fetch(base + 'search-index.json' + v)
+    return fetch(searchBase + 'search-index.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
@@ -41,6 +55,16 @@
       });
   }
 
+  // setScope flips the All-wikis / This-wiki toggle and announces the state.
+  // The button only exists in a tree, but setScope is safe to call regardless.
+  function setScope(all) {
+    scopeAll = all;
+    if (scopeBtn) {
+      scopeBtn.setAttribute('aria-pressed', all ? 'true' : 'false');
+      scopeBtn.textContent = all ? 'All wikis' : 'This wiki';
+    }
+  }
+
   function openSearch() {
     lastActiveElement = document.activeElement;
     backdrop.classList.add('open');
@@ -49,6 +73,8 @@
     input.value = '';
     selectedIndex = -1;
     currentResults = [];
+    currentGroups = null;
+    setScope(true);
     renderInitialState();
     fetchIndex();
     setTimeout(function () { input.focus(); }, 20);
@@ -176,10 +202,12 @@
         c: ''
       };
     });
+    currentGroups = null;
     renderResults([tagQuery], '#' + tagQuery);
   }
 
   function renderInitialState() {
+    currentGroups = null;
     var links = (window.__WIKI_QUICK || []).slice(0, 6);
     var html = '<div class="search-empty-state">' +
       '<p>Type a search term, or jump to a section.</p>' +
@@ -249,8 +277,84 @@
     }
 
     matches.sort(function (a, b) { return b.score - a.score; });
-    currentResults = matches.slice(0, 12).map(function (m) { return m.entry; });
+
+    // "This wiki" keeps only the current wiki's rows. A tree names the wiki in
+    // the URL, so the current wiki's base is the prefix of exactly its own rows;
+    // the trailing slash stops /family/a/ from also matching a sibling /family/ab/.
+    if (multiSite && !scopeAll) {
+      matches = matches.filter(function (m) {
+        return m.entry.u && m.entry.u.indexOf(base) === 0;
+      });
+    }
+
+    var grouped = groupMatches(matches);
+    if (grouped) {
+      currentResults = grouped.rows;
+      currentGroups = grouped.groups;
+    } else {
+      currentResults = matches.slice(0, MAX_FLAT).map(function (m) { return m.entry; });
+      currentGroups = null;
+    }
     renderResults(terms, query);
+  }
+
+  // Caps: a multi-site result list shows the best few rows of each wiki and
+  // stops at a screenful, so one wiki cannot bury every other. A single bundle
+  // keeps the flat list it always had.
+  var MAX_FLAT = 12;
+  var MAX_PER_SITE = 5;
+  var MAX_TOTAL = 20;
+
+  // groupMatches splits scored matches by wiki, orders the groups by their best
+  // hit, and caps each group and the total. It returns null when the entries
+  // carry no wiki, which is a single bundle: the caller then renders the flat
+  // list, with no headings, exactly as before.
+  function groupMatches(matches) {
+    var groups = [];
+    var byKey = {};
+    for (var i = 0; i < matches.length; i++) {
+      var entry = matches[i].entry;
+      if (!entry.w && !entry.k) return null;
+      var key = entry.k || entry.w;
+      var g = byKey[key];
+      if (!g) {
+        g = { site: entry.w || '', best: matches[i].score, rows: [] };
+        byKey[key] = g;
+        groups.push(g);
+      }
+      g.rows.push(entry);
+    }
+    groups.sort(function (a, b) { return b.best - a.best; });
+
+    var rows = [];
+    var meta = [];
+    for (var gi = 0; gi < groups.length && rows.length < MAX_TOTAL; gi++) {
+      var grp = groups[gi];
+      var take = Math.min(grp.rows.length, MAX_PER_SITE, MAX_TOTAL - rows.length);
+      if (take <= 0) break;
+      for (var j = 0; j < take; j++) rows.push(grp.rows[j]);
+      meta.push({ site: grp.site, count: take });
+    }
+    return { rows: rows, groups: meta };
+  }
+
+  // resultItemHTML is one search row. index is its position in the flat,
+  // contiguous result list, which is what the keyboard walks.
+  function resultItemHTML(item, index, terms) {
+    var isSelected = index === selectedIndex;
+    var snippet = extractSnippet(item.c, terms);
+    return '<a href="' + escapeHTML(item.u) + '" class="search-result-item' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + index + '">' +
+      '  <div class="search-result-top">' +
+      '    <span class="search-result-section">' + escapeHTML(item.s) + '</span>' +
+      '    <span class="search-result-sep">/</span>' +
+      '    <span class="search-result-doc">' + escapeHTML(item.d) + '</span>' +
+      '  </div>' +
+      '  <div class="search-result-title">' +
+      '    <svg class="search-result-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+      '    <span>' + highlight(item.t || item.d, terms) + '</span>' +
+      '  </div>' +
+      (snippet ? '  <div class="search-result-snippet">' + snippet + '</div>' : '') +
+      '</a>';
   }
 
   function renderResults(terms, query) {
@@ -266,23 +370,25 @@
 
     selectedIndex = 0;
     var html = '<div class="search-results-list" role="listbox">';
-    for (var i = 0; i < currentResults.length; i++) {
-      var item = currentResults[i];
-      var isSelected = i === selectedIndex;
-      var snippet = extractSnippet(item.c, terms);
-      html +=
-        '<a href="' + escapeHTML(item.u) + '" class="search-result-item' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + i + '">' +
-        '  <div class="search-result-top">' +
-        '    <span class="search-result-section">' + escapeHTML(item.s) + '</span>' +
-        '    <span class="search-result-sep">/</span>' +
-        '    <span class="search-result-doc">' + escapeHTML(item.d) + '</span>' +
-        '  </div>' +
-        '  <div class="search-result-title">' +
-        '    <svg class="search-result-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-        '    <span>' + highlight(item.t || item.d, terms) + '</span>' +
-        '  </div>' +
-        (snippet ? '  <div class="search-result-snippet">' + snippet + '</div>' : '') +
-        '</a>';
+    if (currentGroups) {
+      // A wiki's rows sit in their own role="group", labelled by a heading. The
+      // heading is not an option, and the rows keep a flat, contiguous
+      // data-index across the groups, so arrow traversal reaches every row.
+      var flat = 0;
+      for (var g = 0; g < currentGroups.length; g++) {
+        var grp = currentGroups[g];
+        html += '<div class="search-result-group" role="group" aria-labelledby="search-group-' + g + '">';
+        html += '<div class="search-group-heading" id="search-group-' + g + '">' + escapeHTML(grp.site) + '</div>';
+        for (var k = 0; k < grp.count; k++) {
+          html += resultItemHTML(currentResults[flat], flat, terms);
+          flat++;
+        }
+        html += '</div>';
+      }
+    } else {
+      for (var i = 0; i < currentResults.length; i++) {
+        html += resultItemHTML(currentResults[i], i, terms);
+      }
     }
     html += '</div>';
     resultsContainer.innerHTML = html;
@@ -328,6 +434,17 @@
     searchBtn.addEventListener('focus', fetchIndex, { once: true });
   }
   if (closeBtn) closeBtn.addEventListener('click', closeSearch);
+
+  // The scope toggle is only meaningful in a tree, where the index at the tree
+  // base spans more than the current wiki. A single bundle and a group index
+  // leave it hidden, since their search base is their own base.
+  if (scopeBtn && multiSite) {
+    scopeBtn.hidden = false;
+    scopeBtn.addEventListener('click', function () {
+      setScope(!scopeAll);
+      runSearch();
+    });
+  }
 
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeSearch(); });
   input.addEventListener('input', runSearch);

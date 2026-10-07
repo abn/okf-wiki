@@ -112,6 +112,7 @@ these are hard requirements rather than style.
 | `searchBtn` | `search.js` | the script throws on its first `addEventListener`, so search never initialises |
 | `searchInput` `searchResults` `searchBackdrop` | `search.js` | search returns early and does nothing |
 | `searchCloseBtn` | `search.js` | the modal opens and cannot be dismissed |
+| `searchScope` | `search.js` | the All-wikis / This-wiki toggle of a multi-site tree is not offered; single-wiki search is unaffected |
 | `menuBtn` `drawerBackdrop` `sideDrawer` | the drawer script in the template | the drawer script throws, so the mobile menu and Escape-to-close both die |
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
@@ -181,8 +182,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 `search.js` builds `search-empty-state`, `search-empty-hint`, `search-quick-links`,
 `search-results-list`, `search-result-item` with `selected`, `search-result-top`,
 `search-result-section`, `search-result-sep`, `search-result-doc`,
-`search-result-title`, `search-result-icon`, `search-result-snippet` and
-`search-match`.
+`search-result-title`, `search-result-icon`, `search-result-snippet`,
+`search-match`, and, when a tree's index carries the wiki of each hit,
+`search-result-group` with `search-group-heading`.
 
 `diagrams.js` wraps each diagram in `mermaid-frame` with a `mermaid-toolbar`
 carrying `mermaid-type`, `mermaid-actions`, the card zoom in `mermaid-zoom`,
@@ -252,6 +254,12 @@ unchanged: the pages are already where the links say they are. With
 `--base /docs/deep/`, `--out out`, the pages are written under `out/docs/deep/`
 and every asset, page link, the search index fetch, the mermaid bundle path and
 the root redirect follow.
+
+A page names the search index twice: `{{.Base}}` is where its own assets and
+links live, and `{{.SearchBase}}` is where the index it fetches lives. The two
+are equal for a single bundle, and `SearchBase` is the tree base for a wiki of a
+multi-site tree, where one aggregate index spans every wiki. The client reads
+them as `window.__WIKI_BASE` and `window.__WIKI_SEARCH`.
 
 ## Provenance
 
