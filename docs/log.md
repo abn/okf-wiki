@@ -5,6 +5,16 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-07
 
+* **Feature**: A multi-site tree has one brand. The brand anchor targets the
+  tree index through a new `{{.HomeHref}}`, which is `{{.Base}}` for a single
+  bundle and the tree base for a tree page, so the mark and the wordmark mean
+  the deployment home from any depth. The breadcrumb becomes a trail from the
+  tree root down to the current wiki and page
+  (`Wiki / Clients / Example / Operations / Guides / Setup`), with each folder
+  linking to its group index and the wiki title linking to the wiki home; a
+  group index ends at the group name and the tree root shows the title once.
+  A single bundle's header and breadcrumb are byte for byte unchanged.
+  `usage/multi-site.md`, `design/branding.md` and `reference/themes.md` say so.
 * **Fix**: A multi-site group index's wiki cards line up when they sit side by
   side. From the 568px width at which the card grid shows two columns, every card
   reserves two lines for its title and three for its description, so a short card's

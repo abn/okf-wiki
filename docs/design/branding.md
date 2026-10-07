@@ -68,6 +68,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
 | `{{.Base}}` | the URL prefix, with a leading and trailing slash |
+| `{{.HomeHref}}` | the brand anchor's target: `Base` for a single bundle, the tree base for a wiki or group of a multi-site tree |
 | `{{.SearchBase}}` | the URL prefix the search index is fetched from: the same as `Base` for a single bundle, the tree base for a wiki of a multi-site tree |
 | `{{.AssetVersion}}` | the resolved theme's content hash |
 | `{{.BrandName}}` `{{.BrandTail}}` `{{.BrandSub}}` `{{.BrandTitle}}` | the configured brand |
@@ -81,8 +82,12 @@ A theme never hardcodes `/wiki/`. Every asset and page link hangs off
 `--base` relocates the whole site rather than only its markup. The search client
 reads its index location from `window.__WIKI_SEARCH`, which equals
 `window.__WIKI_BASE` for a single bundle and is the tree base for a wiki of a
-multi-site tree, where one aggregate index spans every wiki. A theme that keeps
-the default template gets both for free.
+multi-site tree, where one aggregate index spans every wiki. The brand anchor
+targets `{{.HomeHref}}`, which is `{{.Base}}` for a single bundle and the tree
+base for a page of a tree, so one brand stands for the whole deployment rather
+than for the wiki the reader happens to be in. A theme that keeps the default
+template gets all three for free; one that hardcodes `{{.Base}}` for the brand
+keeps a single bundle's behaviour and gets the local wiki's home in a tree.
 
 ## Two accessibility fixes, deliberately not reproduced
 

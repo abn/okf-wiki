@@ -20,6 +20,20 @@ type siteNode struct {
 	children []*siteNode
 }
 
+// treeCrumb is one folder segment of a multi-site breadcrumb trail: the title
+// shown and the group index it links to.
+type treeCrumb struct {
+	Title string
+	Href  string
+}
+
+// siteCrumb names a node for a trail: the title a catalog card shows and the
+// group index that lists what is below it.
+func (r *Renderer) siteCrumb(n *siteNode) treeCrumb {
+	title, _ := r.siteMeta(n)
+	return treeCrumb{Title: title, Href: siteBase(r.cfg.base(), n.rel)}
+}
+
 // isWikiRoot reports whether a directory is a wiki root. The marker is an
 // index.md, a bundle's home page. A group directory holds only sub-directories
 // and optional metadata (.meta.json, README.md), so it has none.
@@ -108,7 +122,7 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 			}
 		}
 		var err error
-		wikis, err = r.renderSites(tmp, root)
+		wikis, err = r.renderSites(tmp, root, nil)
 		if err != nil {
 			return err
 		}
@@ -131,19 +145,29 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	return wikis, nil
 }
 
-func (r *Renderer) renderSites(root string, n *siteNode) (int, error) {
+// renderSites walks the tree, rendering each wiki and writing a group index for
+// each group. trail is the folder crumbs from the tree root down to n, so a
+// page inside n can name the groups above it.
+func (r *Renderer) renderSites(root string, n *siteNode, trail []treeCrumb) (int, error) {
 	if n.wiki {
-		return r.renderSite(root, n)
+		return r.renderSite(root, n, trail)
+	}
+	// The children sit one level below n, so their trail is n's plus n itself.
+	// The tree root is left out: the breadcrumb names it from the configured
+	// title, not from a folder crumb.
+	childTrail := trail
+	if n.rel != "" {
+		childTrail = append(append([]treeCrumb{}, trail...), r.siteCrumb(n))
 	}
 	total := 0
 	for _, c := range n.children {
-		got, err := r.renderSites(root, c)
+		got, err := r.renderSites(root, c, childTrail)
 		if err != nil {
 			return total, err
 		}
 		total += got
 	}
-	if err := r.writeCatalog(root, n); err != nil {
+	if err := r.writeCatalog(root, n, trail); err != nil {
 		return total, err
 	}
 	return total, nil
@@ -157,10 +181,11 @@ func (r *Renderer) renderSites(root string, n *siteNode) (int, error) {
 // error: one stale link in a tree of linked checkouts should not take the whole
 // wiki offline. The failure is kept on the tree renderer so the caller can
 // report it; the wiki is simply absent from the output and the count.
-func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
+func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int, error) {
 	cfg := r.cfg
 	cfg.Content = n.abs
 	cfg.Base = siteBase(r.cfg.base(), n.rel)
+	title, _ := r.siteMeta(n)
 	sub := &Renderer{
 		md:           r.md,
 		cfg:          cfg,
@@ -171,6 +196,12 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 		// A wiki of a tree searches the tree, not itself: the page carries the
 		// tree base so the client fetches the aggregate index written there.
 		searchBase: r.cfg.base(),
+		// The page belongs to the tree, so its brand and breadcrumb point at the
+		// tree root and name the folders and wiki it sits under.
+		treeBase:  r.cfg.base(),
+		siteRel:   n.rel,
+		siteTitle: title,
+		siteTrail: trail,
 	}
 	if err := sub.load(cfg.Content); err != nil {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
@@ -195,7 +226,6 @@ func (r *Renderer) renderSite(root string, n *siteNode) (int, error) {
 	// order, and this preserves that order. A root that is itself a wiki (rel "")
 	// has no separate aggregate to feed.
 	if n.rel != "" {
-		title, _ := r.siteMeta(n)
 		r.aggregated = append(r.aggregated, labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)...)
 	}
 	return 1, nil
@@ -266,7 +296,7 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 // A child that was skipped is left off the cards: it has no page to link to, and
 // a card that 404s is worse than the wiki being absent. The failure is reported
 // by the caller through SkippedSites, not silently dropped here.
-func (r *Renderer) writeCatalog(root string, n *siteNode) error {
+func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) error {
 	base := r.cfg.base()
 	var b strings.Builder
 	var wikis, folders []*siteNode
@@ -313,7 +343,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode) error {
 	}
 
 	title, desc := r.siteMeta(n)
-	html, err := r.catalogHTML(n, title, desc, b.String())
+	html, err := r.catalogHTML(n, title, desc, b.String(), trail)
 	if err != nil {
 		return err
 	}
@@ -326,14 +356,21 @@ func (r *Renderer) writeCatalog(root string, n *siteNode) error {
 
 // catalogHTML renders a group index through the theme, with no sections of its
 // own: an empty sidebar, no contents, no previous or next. The base stays the
-// tree base so the page's assets and search resolve at the tree base.
-func (r *Renderer) catalogHTML(n *siteNode, title, desc, body string) (string, error) {
+// tree base so the page's assets and search resolve at the tree base. The tree
+// state makes the group's brand and breadcrumb point at the tree root and name
+// the folders above it.
+func (r *Renderer) catalogHTML(n *siteNode, title, desc, body string, trail []treeCrumb) (string, error) {
 	shell := &Renderer{
 		md:           r.md,
 		cfg:          r.cfg,
 		theme:        r.theme,
 		generatedAt:  r.generatedAt,
 		assetVersion: r.assetVersion,
+		treeBase:     r.cfg.base(),
+		siteRel:      n.rel,
+		siteTitle:    title,
+		siteTrail:    trail,
+		groupIndex:   true,
 	}
 	return shell.RenderPage(Page{
 		Synthetic:   true,

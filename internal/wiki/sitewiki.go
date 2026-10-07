@@ -88,6 +88,18 @@ type Renderer struct {
 	// aggregated collects the labelled search entries of a tree render, in the
 	// order the wikis were visited, so the whole tree gets one index at its base.
 	aggregated []SearchEntry
+	// treeBase, siteRel, siteTitle and siteTrail describe a page's place in a
+	// multi-site tree. treeBase is the tree index's URL prefix, empty for a
+	// single bundle, so the brand and the breadcrumb trail mean "the deployment
+	// home" only when there is a tree. siteRel is the page's wiki or group path
+	// under the tree root ("" for the root), siteTitle its display title, and
+	// siteTrail the folder crumbs from the tree root down to it. groupIndex
+	// marks a page that is a generated group index rather than a wiki page.
+	treeBase   string
+	siteRel    string
+	siteTitle  string
+	siteTrail  []treeCrumb
+	groupIndex bool
 }
 
 // SkippedSite is one wiki a tree render left out, with the reason.
