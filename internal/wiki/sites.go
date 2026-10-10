@@ -415,10 +415,10 @@ func (r *Renderer) siteMeta(n *siteNode) (title, desc string) {
 		fm, _ := splitFrontmatter(readFile(filepath.Join(n.abs, "index.md")))
 		title, desc = firstNonEmpty(title, fm.Title), firstNonEmpty(desc, fm.Description)
 	}
-	// A group introduces itself with its landing page when it has one, so the
+	// A group introduces itself with its activated landing page, so the
 	// landing's frontmatter names the group the way a wiki's own frontmatter
-	// names the wiki. Inside a wiki directory the name stays reserved and
-	// inert: the wiki's own index owns the title there.
+	// names the wiki. An unactivated landing.md inside a wiki directory is an
+	// ordinary page there: the wiki's own index owns the title.
 	if title == "" && !n.wiki && hasLanding(n.abs) {
 		fm, _ := splitFrontmatter(readFile(filepath.Join(n.abs, landingFile)))
 		title, desc = firstNonEmpty(title, fm.Title), firstNonEmpty(desc, fm.Description)

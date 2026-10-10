@@ -278,8 +278,8 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 
 	// A root-level redirect, so serving the output directory lands on the wiki
-	// whatever the base is. A bundle root holding landing.md introduces the
-	// deployment there instead.
+	// whatever the base is. A bundle root holding an activated landing.md
+	// introduces the deployment there instead.
 	return r.writeLandingOrRedirect(out)
 }
 
@@ -348,8 +348,9 @@ func (r *Renderer) loadTopLevel(root, title string) error {
 	files, _ := filepath.Glob(filepath.Join(root, "*.md"))
 	sort.Strings(files)
 	for _, f := range files {
-		// A root landing.md introduces the deployment; it is never a page.
-		if strings.EqualFold(filepath.Base(f), landingFile) {
+		// An activated root landing.md introduces the deployment; any other
+		// landing.md is an ordinary page.
+		if hasLandingType(f) {
 			continue
 		}
 		base := strings.TrimSuffix(filepath.Base(f), ".md")
@@ -694,10 +695,14 @@ func markdownFiles(root string) ([]string, error) {
 		if d.IsDir() || !strings.EqualFold(filepath.Ext(name), ".md") {
 			return nil
 		}
-		// The landing name is reserved bundle-wide: only a bundle root or a
-		// multi-site group may hold one, so it is never a section page.
+		// The landing name activates only at a bundle root or a multi-site
+		// group; anywhere else an activated file is skipped rather than
+		// published, so it can only ever mean the introduction.
 		if strings.EqualFold(name, landingFile) {
-			return nil
+			if hasLandingType(p) {
+				return nil
+			}
+			// Falls through: without the type it is an ordinary page.
 		}
 		rel, err := filepath.Rel(real, p)
 		if err != nil {

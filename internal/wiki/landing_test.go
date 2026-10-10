@@ -15,7 +15,7 @@ import (
 func TestRenderLandingReplacesRootRedirect(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ndescription: The wiki home.\n---\n\n# Home\n")
-	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Example\ndescription: A friendlier front end.\n---\n\n# Example\n\nWelcome to the deployment.\n")
+	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Example\ntype: Landing\ndescription: A friendlier front end.\n---\n\n# Example\n\nWelcome to the deployment.\n")
 
 	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t", Title: "T"}})
 	if err != nil {
@@ -88,7 +88,7 @@ func TestRenderWithoutLandingKeepsRedirect(t *testing.T) {
 func TestLandingWithRootBaseFails(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")
-	mustWrite(t, filepath.Join(dir, "landing.md"), "# Example\n")
+	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Example\ntype: Landing\n---\n\n# Example\n")
 
 	r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "t", Title: "T"}})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestLandingWithRootBaseFails(t *testing.T) {
 // catalog, so the group index reads as one page rather than two.
 func TestGroupLandingPrependsCatalog(t *testing.T) {
 	dir := t.TempDir()
-	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Clients\ndescription: Client work.\n---\n\n# Clients\n\nStart here.\n")
+	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Clients\ntype: Landing\ndescription: Client work.\n---\n\n# Clients\n\nStart here.\n")
 	mustWrite(t, filepath.Join(dir, "hero.png"), "fake-png")
 	mustMkdir(t, filepath.Join(dir, "ops"))
 	mustWrite(t, filepath.Join(dir, "ops", "index.md"), "---\ntitle: Operations\ndescription: Runbooks.\n---\n\n# Operations\n")
@@ -136,23 +136,64 @@ func TestGroupLandingPrependsCatalog(t *testing.T) {
 	}
 }
 
-// Inside a wiki directory the landing name stays reserved and inert: no hero
-// is prepended anywhere, no page is published, and the tree root keeps its
-// redirect.
-func TestLandingInsideAWikiDirStaysInert(t *testing.T) {
+// A landing.md without the activating type is an ordinary page: the escape
+// hatch for bundles that already publish one. The output root keeps its
+// redirect and the file renders as a page like any other.
+func TestLandingWithoutTypeStaysOrdinaryPage(t *testing.T) {
 	dir := t.TempDir()
-	mustMkdir(t, filepath.Join(dir, "ops"))
-	mustWrite(t, filepath.Join(dir, "ops", "index.md"), "---\ntitle: Operations\n---\n\n# Operations\n")
-	mustWrite(t, filepath.Join(dir, "ops", "landing.md"), "# Misplaced\n\nNowhere.\n")
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")
+	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Landing Notes\n---\n\n# Landing Notes\n\nJust notes.\n")
 
-	r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "t", Title: "T"}, MultiSite: true})
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t", Title: "T"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := t.TempDir()
-	if _, err := r.RenderSites(out); err != nil {
+	if err := r.RenderAll(out); err != nil {
 		t.Fatal(err)
 	}
+	root, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(root), landingMarker) {
+		t.Error("unactivated landing.md replaced the root redirect")
+	}
+	if !strings.Contains(string(root), "http-equiv=\"refresh\"") {
+		t.Error("output root index no longer redirects to the wiki")
+	}
+	if _, err := os.Stat(filepath.Join(out, "wiki", "landing.html")); err != nil {
+		t.Errorf("unactivated landing.md was not published as a page: %v", err)
+	}
+}
+
+// An activated landing.md inside a wiki directory stays inert: skipped as a
+// page and prepended nowhere, while an unactivated one there is an ordinary
+// page of that wiki.
+func TestLandingInsideAWikiDirStaysInert(t *testing.T) {
+	setup := func(t *testing.T, landing string) (string, *Renderer) {
+		t.Helper()
+		dir := t.TempDir()
+		mustMkdir(t, filepath.Join(dir, "ops"))
+		mustWrite(t, filepath.Join(dir, "ops", "index.md"), "---\ntitle: Operations\n---\n\n# Operations\n")
+		mustWrite(t, filepath.Join(dir, "ops", "landing.md"), landing)
+		r, err := New(Config{Content: dir, Base: "/", Brand: Brand{Name: "t", Title: "T"}, MultiSite: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := t.TempDir()
+		if _, err := r.RenderSites(out); err != nil {
+			t.Fatal(err)
+		}
+		return out, r
+	}
+
+	out, _ := setup(t, "# Misplaced\n\nNowhere.\n")
+	if _, err := os.Stat(filepath.Join(out, "ops", "landing.html")); err != nil {
+		t.Errorf("unactivated landing.md inside a wiki dir was not published as a page: %v", err)
+	}
+
+	out, _ = setup(t, "---\ntitle: Misplaced\ntype: Landing\n---\n\n# Misplaced\n\nNowhere.\n")
 	for _, f := range []string{"index.html", filepath.Join("ops", "index.html")} {
 		b, err := os.ReadFile(filepath.Join(out, f))
 		if err != nil {
@@ -166,7 +207,7 @@ func TestLandingInsideAWikiDirStaysInert(t *testing.T) {
 		}
 	}
 	if _, err := os.Stat(filepath.Join(out, "ops", "landing.html")); !os.IsNotExist(err) {
-		t.Error("landing.md inside a wiki dir was published as a page")
+		t.Error("activated landing.md inside a wiki dir was published as a page")
 	}
 }
 
@@ -175,7 +216,7 @@ func TestLandingInsideAWikiDirStaysInert(t *testing.T) {
 func TestLandingExcludedFromSearchIndex(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")
-	mustWrite(t, filepath.Join(dir, "landing.md"), "# Example\n\nZanzibarConsulting.\n")
+	mustWrite(t, filepath.Join(dir, "landing.md"), "---\ntitle: Example\ntype: Landing\n---\n\n# Example\n\nZanzibarConsulting.\n")
 
 	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t", Title: "T"}})
 	if err != nil {

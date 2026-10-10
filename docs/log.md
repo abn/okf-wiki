@@ -5,7 +5,8 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-10
 
-* **Feature**: A bundle root holding `landing.md` introduces the deployment at
+* **Feature**: A bundle root holding `landing.md` with `type: Landing`
+  introduces the deployment at
   the output root instead of redirecting to the wiki, rendered through the same
   shell, header, tokens and search with no sidebar. A group of a multi-site
   tree shows its landing body above the generated catalog. The theme ships

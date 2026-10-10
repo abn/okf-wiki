@@ -10,10 +10,13 @@ import (
 // landingFile is the optional page a bundle root or a multi-site group holds
 // to introduce the deployment. A single bundle renders it at the output root
 // instead of the redirect to the wiki; a group shows its body above the
-// generated catalog. The name is reserved everywhere else: a landing.md at any
-// other depth is skipped rather than published as a page, so the file can only
-// ever mean the introduction.
+// generated catalog. The type activates it: only a landing.md carrying
+// `type: Landing` introduces the deployment, and any other landing.md is an
+// ordinary page, so no bundle needs renaming and no flag opts out.
 const landingFile = "landing.md"
+
+// landingType is the frontmatter type that activates the introduction.
+const landingType = "Landing"
 
 // landingMarker closes a rendered landing page at the output root. Serve tells
 // a landing apart from the redirect written there otherwise by this marker
@@ -21,10 +24,24 @@ const landingFile = "landing.md"
 // --watch takes effect on the next load with no restart.
 const landingMarker = "<!-- okf-wiki:landing -->"
 
-// hasLanding checks dir for the introduction file.
+// hasLanding checks dir for an activated introduction file.
 func hasLanding(dir string) bool {
-	st, err := os.Stat(filepath.Join(dir, landingFile))
-	return err == nil && !st.IsDir()
+	return hasLandingType(filepath.Join(dir, landingFile))
+}
+
+// hasLandingType reports whether path is a landing.md carrying the activating
+// type. A missing or unparsable file is not one: the page stays an ordinary
+// page rather than failing the render.
+func hasLandingType(path string) bool {
+	if !strings.EqualFold(filepath.Base(path), landingFile) {
+		return false
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	fm, _ := splitFrontmatter(b)
+	return fm.Type == landingType
 }
 
 // loadLandingPage parses dir's landing page. Links resolve from the bundle

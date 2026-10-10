@@ -7,11 +7,12 @@ tags: [usage, landing]
 
 # Landing pages
 
-A bundle root holding `landing.md` introduces the deployment at `/` instead of
-redirecting to the wiki. The page renders through the same shell, header,
-tokens and search as every wiki page, with no sidebar, so the layout collapses
-to its wide solo column. Absent the file, the output root keeps redirecting to
-the wiki base exactly as before.
+A bundle root holding `landing.md` with `type: Landing` in its frontmatter
+introduces the deployment at `/` instead of redirecting to the wiki. The page
+renders through the same shell, header, tokens and search as every wiki page,
+with no sidebar, so the layout collapses to its wide solo column. Without the
+file, or without the type, the output root keeps redirecting to the wiki base
+exactly as before, and the file renders as an ordinary page.
 
 ```text
 docs/
@@ -33,12 +34,17 @@ eyebrow label above the title:
 ```markdown
 ---
 title: Example
+type: Landing
 description: A friendlier front end to Example service.
 kicker: One binary · no runtime
 ---
 
 Start here, then add rich sections below with Markdown and HTML.
 ```
+
+The type is what activates the page: without it the file is an ordinary page
+under its own URL, which is the escape hatch for bundles that already publish
+one. With it the file has no wiki URL of its own and offers no download.
 
 A `type` or `tags` frontmatter renders chips under the lead the way a wiki
 page shows them. There is no per-page download link: the page is synthetic and
@@ -63,19 +69,20 @@ quickstarts. Restyle them in a theme; the names are the contract.
 
 ## Groups in a tree
 
-In [multi-site mode](multi-site.md) a group directory holding `landing.md`
-shows its body above the generated catalog, so the group index reads as one
-page: the authored introduction first, then the wiki cards. The landing's
-frontmatter names the group when no `.meta.json` does. Inside a wiki directory
-the name stays reserved and inert: it is never published as a page, and the
-wiki's own `index.md` owns the title there. A content root that is itself a
-wiki ignores the file for the same reason; the wiki home already owns the base.
+In [multi-site mode](multi-site.md) a group directory holding an activated
+`landing.md` shows its body above the generated catalog, so the group index
+reads as one page: the authored introduction first, then the wiki cards. The
+landing's frontmatter names the group when no `.meta.json` does. Inside a wiki
+directory an activated file stays inert and unlisted, while an unactivated one
+is an ordinary page of that wiki; the wiki's own `index.md` owns the title
+there. A content root that is itself a wiki ignores the file for the same
+reason; the wiki home already owns the base.
 
 ## Limits
 
-The name `landing.md` is reserved bundle-wide and skipped as a page at any
-other depth. A base of `/` leaves no room for both a wiki home and a landing
-page at the output root, so that combination fails the render and names the
-clash; serve the wiki under a base such as `/wiki/` to make room. Adding or
-removing the file under `--watch` takes effect on the next load with no
-restart.
+An activated `landing.md` at any other depth is skipped rather than published,
+so the introduction can only ever mean the bundle root or a group. A base of
+`/` leaves no room for both a wiki home and a landing page at the output root,
+so that combination fails the render and names the clash; serve the wiki under
+a base such as `/wiki/` to make room. Adding, removing or deactivating the file
+under `--watch` takes effect on the next load with no restart.
