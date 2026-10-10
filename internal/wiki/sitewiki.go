@@ -104,6 +104,10 @@ type Renderer struct {
 	siteTitle  string
 	siteTrail  []treeCrumb
 	groupIndex bool
+	// landing marks a renderer for the deployment's introduction page. It has
+	// no sections of its own, so the sidebar stays empty; the brand points at
+	// the output root the page sits at rather than at the wiki base.
+	landing bool
 }
 
 // SkippedSite is one wiki a tree render left out, with the reason.
@@ -274,8 +278,9 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 
 	// A root-level redirect, so serving the output directory lands on the wiki
-	// whatever the base is.
-	return r.writeRootRedirect(out)
+	// whatever the base is. A bundle root holding landing.md introduces the
+	// deployment there instead.
+	return r.writeLandingOrRedirect(out)
 }
 
 // writeRootRedirect points the output root at the base, so serving the output
@@ -343,6 +348,10 @@ func (r *Renderer) loadTopLevel(root, title string) error {
 	files, _ := filepath.Glob(filepath.Join(root, "*.md"))
 	sort.Strings(files)
 	for _, f := range files {
+		// A root landing.md introduces the deployment; it is never a page.
+		if strings.EqualFold(filepath.Base(f), landingFile) {
+			continue
+		}
 		base := strings.TrimSuffix(filepath.Base(f), ".md")
 		p, err := r.parsePage("", base, f)
 		if err != nil {
@@ -406,6 +415,7 @@ func (r *Renderer) loadSection(dir, id, title string) (Section, error) {
 type frontmatter struct {
 	Title       string   `yaml:"title"`
 	Nav         string   `yaml:"nav"`
+	Kicker      string   `yaml:"kicker"`
 	Type        string   `yaml:"type"`
 	Description string   `yaml:"description"`
 	Status      string   `yaml:"status"`
@@ -437,6 +447,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		GeneratedAt: fm.Generated.At,
 		Title:       fm.Title,
 		Nav:         fm.Nav,
+		Kicker:      fm.Kicker,
 	}
 
 	doc := r.md.Parser().Parse(text.NewReader(body))
@@ -683,6 +694,11 @@ func markdownFiles(root string) ([]string, error) {
 		if d.IsDir() || !strings.EqualFold(filepath.Ext(name), ".md") {
 			return nil
 		}
+		// The landing name is reserved bundle-wide: only a bundle root or a
+		// multi-site group may hold one, so it is never a section page.
+		if strings.EqualFold(name, landingFile) {
+			return nil
+		}
 		rel, err := filepath.Rel(real, p)
 		if err != nil {
 			return err
@@ -732,6 +748,11 @@ func copyBundleFiles(root, dest string) error {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		// The introduction page is never a wiki page, so its source is not
+		// offered beside the pages that are.
+		if strings.EqualFold(name, landingFile) {
 			return nil
 		}
 		if d.IsDir() {

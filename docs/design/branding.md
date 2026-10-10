@@ -75,6 +75,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.VersionTag}}` | a freeform version label beside the wordmark, empty when unset |
 | `{{.ThemeName}}` `{{.ThemeVersion}}` | the resolved theme's identity |
 | `{{.QuickJSON}}` | the search modal's quick-link list, as a JS value |
+| `{{.IsLanding}}` | true on the deployment's introduction page, false everywhere else |
 | `{{.Slot "name"}}` | a named fragment from the manifest's `slots` |
 
 A theme never hardcodes `/wiki/`. Every asset and page link hangs off

@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="{{.Base}}tokens.css?v={{.AssetVersion}}">
 <link rel="stylesheet" href="{{.Base}}fonts.css?v={{.AssetVersion}}">
 <link rel="stylesheet" href="{{.Base}}wiki.css?v={{.AssetVersion}}">
+<link rel="stylesheet" href="{{.Base}}landing.css?v={{.AssetVersion}}">
 <script>
   // Apply the saved theme before first paint to avoid a flash. A pinned theme
   // wins; with none pinned the OS preference decides, so color-scheme is set
@@ -75,7 +76,7 @@
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="layout wrap{{if not .Nav}} layout-solo{{end}}">
   {{if .Nav}}<aside class="sidebar" id="sideDrawer">{{.Nav}}{{if or .TopNavInternal .TopNavExternal}}<div class="side-links">{{if .TopNavInternal}}<p class="side-links-title">On this wiki</p>{{.TopNavInternal}}{{end}}{{if .TopNavExternal}}<p class="side-links-title">Elsewhere</p>{{.TopNavExternal}}{{end}}</div>{{end}}</aside>{{end}}
-  <main class="content" id="main">
+  <main class="content{{if .IsLanding}} content-landing{{end}}" id="main">
     <article class="prose">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}
       <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>

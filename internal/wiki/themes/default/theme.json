@@ -7,6 +7,7 @@
     "tokens.css": { "mode": "replace" },
     "fonts.css": { "mode": "replace" },
     "wiki.css": { "mode": "replace" },
+    "landing.css": { "mode": "replace" },
     "fonts/": { "mode": "replace" },
     "brand-mark.svg": { "mode": "replace" },
     "favicon.svg": { "mode": "replace" },

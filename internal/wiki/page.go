@@ -66,6 +66,9 @@ type shellData struct {
 	QuickJSON template.JS
 	// Slots holds the theme's named fragments, reachable as {{.Slot "name"}}.
 	Slots map[string]template.HTML
+	// IsLanding marks the deployment's introduction page, so a theme can tell
+	// it apart from a wiki page.
+	IsLanding bool
 }
 
 // Slot returns a named template slot, or empty when the theme leaves it unset.
@@ -98,16 +101,25 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		searchBase = base
 	}
 	// The brand points at the deployment home: the page's own base for a single
-	// bundle, the tree base for a wiki or group of a tree.
+	// bundle, the tree base for a wiki or group of a tree, and the output root
+	// for a landing page, which sits above the wiki base.
 	homeHref := base
 	if r.treeBase != "" {
 		homeHref = r.treeBase
+	} else if r.landing {
+		homeHref = "/"
 	}
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
 	if !p.Synthetic {
 		markdown = base + p.Slug + ".md"
+	}
+	// A landing page ends its trail at the deployment title: it has no section
+	// and it is the home rather than a page beneath one.
+	breadcrumb := template.HTML(r.breadcrumbHTML(p))
+	if r.landing {
+		breadcrumb = template.HTML(crumbCur(r.cfg.Brand.Title))
 	}
 	data := shellData{
 		Title:          title,
@@ -127,7 +139,8 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Base:           base,
 		HomeHref:       homeHref,
 		SearchBase:     searchBase,
-		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
+		Breadcrumb:     breadcrumb,
+		IsLanding:      r.landing,
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		TopNav:         template.HTML(r.topNavHTML()),
 		TopNavInternal: template.HTML(r.topNavMatching(false)),

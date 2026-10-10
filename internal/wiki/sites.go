@@ -343,13 +343,34 @@ func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) err
 	}
 
 	title, desc := r.siteMeta(n)
-	html, err := r.catalogHTML(n, title, desc, b.String(), trail)
+	// A group holding landing.md introduces itself above the catalog: the
+	// authored body first, then the generated cards. The heading survives the
+	// trip, since a catalog passes its body to the template unstripped.
+	hero := ""
+	kicker := ""
+	if hasLanding(n.abs) {
+		lp, err := r.loadLandingPage(n.abs)
+		if err != nil {
+			return err
+		}
+		hero = stripLeadingH1(lp.Body, lp.Title)
+		kicker = lp.Kicker
+	}
+	html, err := r.catalogHTML(n, title, desc, kicker, hero+b.String(), trail)
 	if err != nil {
 		return err
 	}
 	dir := Config{Base: siteBase(base, n.rel)}.sitePath(root)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
+	}
+	// A group landing's images travel with it: the catalog writes only its own
+	// index, so top-level sibling files are copied beside it. Markdown stays
+	// out, since a stray .md here is neither a page nor a download.
+	if hasLanding(n.abs) {
+		if err := copyGroupFiles(n.abs, dir); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(filepath.Join(dir, "index.html"), []byte(html), 0o644)
 }
@@ -359,7 +380,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) err
 // tree base so the page's assets and search resolve at the tree base. The tree
 // state makes the group's brand and breadcrumb point at the tree root and name
 // the folders above it.
-func (r *Renderer) catalogHTML(n *siteNode, title, desc, body string, trail []treeCrumb) (string, error) {
+func (r *Renderer) catalogHTML(n *siteNode, title, desc, kicker, body string, trail []treeCrumb) (string, error) {
 	shell := &Renderer{
 		md:           r.md,
 		cfg:          r.cfg,
@@ -376,6 +397,7 @@ func (r *Renderer) catalogHTML(n *siteNode, title, desc, body string, trail []tr
 		Synthetic:   true,
 		Slug:        n.rel,
 		Title:       title,
+		Kicker:      kicker,
 		Description: desc,
 		Body:        body,
 	})
@@ -391,6 +413,14 @@ func (r *Renderer) siteMeta(n *siteNode) (title, desc string) {
 	}
 	if title == "" && n.wiki {
 		fm, _ := splitFrontmatter(readFile(filepath.Join(n.abs, "index.md")))
+		title, desc = firstNonEmpty(title, fm.Title), firstNonEmpty(desc, fm.Description)
+	}
+	// A group introduces itself with its landing page when it has one, so the
+	// landing's frontmatter names the group the way a wiki's own frontmatter
+	// names the wiki. Inside a wiki directory the name stays reserved and
+	// inert: the wiki's own index owns the title there.
+	if title == "" && !n.wiki && hasLanding(n.abs) {
+		fm, _ := splitFrontmatter(readFile(filepath.Join(n.abs, landingFile)))
 		title, desc = firstNonEmpty(title, fm.Title), firstNonEmpty(desc, fm.Description)
 	}
 	if title == "" {
@@ -411,6 +441,29 @@ func (r *Renderer) siteMeta(n *siteNode) (title, desc string) {
 		desc = "Wikis published here."
 	}
 	return title, desc
+}
+
+// copyGroupFiles copies a group directory's top-level files beside its
+// generated index, so a landing page's images resolve. Subdirectories are
+// wikis and groups with their own output, and Markdown is never a page here,
+// so neither travels.
+func copyGroupFiles(abs, dest string) error {
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		if strings.EqualFold(filepath.Ext(e.Name()), ".md") {
+			continue
+		}
+		if err := copyFile(filepath.Join(abs, e.Name()), filepath.Join(dest, e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type siteMetaJSON struct {

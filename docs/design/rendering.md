@@ -39,7 +39,8 @@ flowchart LR
    drops the shared prefix, so the row fits one line at any rail width. A
    section opens one of its groups at a time, so a rail of many groups stays
    short. `nav` in a page's frontmatter overrides the label the rail shows, for
-   a body title too long for the rail.
+   a body title too long for the rail. `kicker` renders an eyebrow label above
+   the page title, empty on pages that do not set it.
    Markdown is collected at any depth. Files
    and directories whose name begins with a dot are skipped, so a bundle that is
    also a working tree does not render its own `.git`.

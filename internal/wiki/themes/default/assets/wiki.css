@@ -224,6 +224,10 @@ a { color: var(--color-accent-text); text-decoration: none; }
   display: flex; flex-direction: column;
   min-height: calc(100vh - 210px);
 }
+/* A landing page has no sidebar and carries wide blocks (grids, tables, tab
+   rows), so its column grows past the reading width and centers. Only the
+   introduction page takes this class, through {{.IsLanding}}. */
+.layout-solo .content-landing { max-width: 1080px; margin: 0 auto; }
 
 .drawer-backdrop {
   display: none; position: fixed; inset: 0;
