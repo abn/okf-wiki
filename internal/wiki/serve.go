@@ -65,6 +65,14 @@ func handler(opts ServeOptions) http.Handler {
 		mux.Handle(trimmed, http.RedirectHandler(base, http.StatusMovedPermanently))
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/" {
+				// A bundle root holding landing.md introduces the deployment
+				// at "/", so the root serves the page rather than bouncing to
+				// the wiki. The marker tells the two apart per request, which
+				// is what keeps --watch correct when the file appears or goes.
+				if hasLandingRoot(opts.OutDir) {
+					site.ServeHTTP(w, r)
+					return
+				}
 				http.Redirect(w, r, base, http.StatusFound)
 				return
 			}

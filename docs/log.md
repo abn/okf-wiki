@@ -3,6 +3,18 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-10
+
+* **Feature**: A bundle root holding `landing.md` with `type: Landing`
+  introduces the deployment at
+  the output root instead of redirecting to the wiki, rendered through the same
+  shell, header, tokens and search with no sidebar. A group of a multi-site
+  tree shows its landing body above the generated catalog. The theme ships
+  namespaced `landing-*` blocks for calls to action, cards, grammar strips,
+  command strips, tabbed panels, comparison tables and quickstarts.
+  `usage/landing.md` says how to write one; `reference/themes.md` and
+  `design/branding.md` carry the class and template contract.
+
 ## 2026-10-07
 
 * **Update**: The sidebar's third level reads as a group's leaves. A page whose

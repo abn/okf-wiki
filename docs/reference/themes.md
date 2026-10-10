@@ -89,6 +89,7 @@ These are the keys the default theme publishes, and the ones worth replacing:
 | :--- | :--- |
 | `tokens.css` | design tokens. The cheapest thing to override, and usually the only thing a recolour needs. |
 | `wiki.css` | layout and prose, bound to the class-name contract. |
+| `landing.css` | blocks a landing page body may use, all namespaced `landing-`. Restyle them; the names are the contract, listed below. |
 | `fonts.css` | `@font-face` declarations, pointing at `fonts/`. |
 | `fonts/` | the font files themselves. |
 | `brand-mark.svg` `favicon.svg` | the header mark and the browser icon. |
@@ -178,6 +179,14 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 - `pre.mermaid`, `pre.code` around an unhighlighted block, and `pre.code.chroma`
   around a Chroma-highlighted one, each with a `language-*` class on the inner
   `code` element
+- Content the author of a landing page opts into: `landing-cta` with
+  `landing-btn` and `landing-btn-primary`, `landing-grid` with `landing-card`
+  carrying `mono`, `two-col` and list rows, `landing-grammar` with `landing-ph`
+  carrying `k`, `v` and `e` plus `landing-arrow`, `landing-code` with `cmt`,
+  `landing-tabs` with `landing-pane`, `table.landing-cmp` with `feat`, `yes`
+  and `no`, and `landing-qs` with `landing-step`. The introduction page itself
+  takes `content-landing` on its `main`, which widens the solo column to the
+  landing width; only that page ever carries it.
 
 ### Classes the clients write
 
