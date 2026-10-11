@@ -2,7 +2,13 @@
   'use strict';
 
   var searchIndex = null;
-  var isLoading = false;
+  // searchIndexPromise holds the in-flight index request. A caller that asks
+  // while the first fetch is still loading must be handed that same request, not
+  // a promise resolved with a searchIndex that is still null: runSearch would
+  // then call fetchIndex again from its own .then, and since both would run as
+  // microtasks the loop never yields to the event loop, so the tab hangs and the
+  // request it is waiting for can never complete.
+  var searchIndexPromise = null;
   var selectedIndex = -1;
   var currentResults = [];
   // currentGroups is null for a flat list (a single bundle, or a tag search) and
@@ -33,26 +39,26 @@
   }
 
   function fetchIndex() {
-    if (searchIndex || isLoading) {
-      return Promise.resolve(searchIndex);
-    }
-    isLoading = true;
+    if (searchIndex) return Promise.resolve(searchIndex);
+    if (searchIndexPromise) return searchIndexPromise;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
-    return fetch(searchBase + 'search-index.json' + v)
+    searchIndexPromise = fetch(searchBase + 'search-index.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function (data) {
-        searchIndex = data;
-        isLoading = false;
+        searchIndex = data || [];
         return searchIndex;
       })
       .catch(function (err) {
-        isLoading = false;
+        // An empty catalogue rather than a null one, so runSearch does not treat
+        // a failed load as "still loading" and retry on every keystroke.
         console.warn('Failed to load wiki search index:', err);
-        return [];
+        searchIndex = [];
+        return searchIndex;
       });
+    return searchIndexPromise;
   }
 
   // setScope flips the All-wikis / This-wiki toggle and announces the state.
@@ -131,32 +137,33 @@
   }
 
   // Tags live in a separate file from the text index, and are only fetched
-  // for hash-prefixed queries, so a text search never pays for them.
+  // for hash-prefixed queries, so a text search never pays for them. The
+  // in-flight request is memoized for the same reason as the text index: a
+  // second caller must wait on it rather than spin on a not-yet-loaded
+  // catalogue.
   var tagsIndex = null;
-  var tagsLoading = false;
+  var tagsPromise = null;
 
   function fetchTags() {
-    if (tagsIndex || tagsLoading) {
-      return Promise.resolve(tagsIndex);
-    }
-    tagsLoading = true;
+    if (tagsIndex) return Promise.resolve(tagsIndex);
+    if (tagsPromise) return tagsPromise;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
     var base = window.__WIKI_BASE || '/wiki/';
-    return fetch(base + 'tags.json' + v)
+    tagsPromise = fetch(base + 'tags.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
       .then(function (data) {
         tagsIndex = data || [];
-        tagsLoading = false;
         return tagsIndex;
       })
       .catch(function (err) {
-        tagsLoading = false;
         console.warn('Failed to load wiki tag catalogue:', err);
-        return [];
+        tagsIndex = [];
+        return tagsIndex;
       });
+    return tagsPromise;
   }
 
   // A query starting with # searches the tag namespace rather than page
