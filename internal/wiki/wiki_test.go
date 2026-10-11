@@ -205,6 +205,54 @@ func TestDefaultThemeSearchInputCanShrink(t *testing.T) {
 	}
 }
 
+// TestDefaultThemeSearchSharesTheInFlightFetch pins the guard that keeps a
+// keystroke during the first index load from wedging the tab. Resolving with
+// searchIndex while it is still null sends runSearch straight back into
+// fetchIndex from its own .then; both run as microtasks, so the chain never
+// yields and the request it waits on can never settle. The guard must instead
+// hand back the one in-flight request, and a failed load must leave an empty
+// catalogue rather than a null one, or a keystroke restarts the loop through the
+// failure path. Go tests cannot run the client, so this asserts the guard's
+// shape.
+func TestDefaultThemeSearchSharesTheInFlightFetch(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+	// A boolean loading flag is what made the second caller resolve early, so
+	// its return pins the regression.
+	if strings.Contains(js, "isLoading") || strings.Contains(js, "tagsLoading") {
+		t.Error("search.js still gates a fetch on a loading flag, so a caller during the load is resolved with a null index and spins runSearch on the microtask queue")
+	}
+	// The in-flight request is memoized under a promise, and the guard returns
+	// that promise rather than one resolved with the not-yet-loaded index.
+	for _, guard := range []string{
+		"if (searchIndexPromise) return searchIndexPromise;",
+		"if (tagsPromise) return tagsPromise;",
+	} {
+		if !strings.Contains(js, guard) {
+			t.Errorf("search.js has no %q, so a concurrent caller is not handed the in-flight fetch", guard)
+		}
+	}
+	// The failure path must not leave a catalogue null: runSearch would read
+	// that as "still loading" and retry on every keystroke. Both the text index
+	// and the tag catalogue take this path.
+	for _, empty := range []string{"searchIndex = [];", "tagsIndex = [];"} {
+		if !strings.Contains(js, empty) {
+			t.Errorf("search.js must leave an empty catalogue on a failed load (%s), not a null one, or the client retries on every keystroke", empty)
+		}
+	}
+}
+
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,

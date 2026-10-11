@@ -3,6 +3,16 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-11
+
+* **Fix**: The search modal no longer hangs when a term is typed before the
+  index has loaded. A caller that asked while the first fetch was in flight was
+  resolved with a not-yet-loaded index, so `runSearch` called `fetchIndex` again
+  from its own `.then`; both ran as microtasks, so the chain never yielded to the
+  event loop and the request it waited on could never settle. The in-flight
+  request is now shared, and a failed load leaves an empty catalogue rather than
+  a null one. The same guard covers the `#tag` catalogue.
+
 ## 2026-10-07
 
 * **Update**: The sidebar's third level reads as a group's leaves. A page whose
