@@ -344,6 +344,65 @@
     return TYPE_NAMES[role] || role;
   }
 
+  // Mermaid writes the accTitle and accDescr directives as the SVG's first
+  // children. Only a direct child is the drawing's own text: a <title> further
+  // down belongs to one node in the drawing.
+  function svgMeta(svg, tag) {
+    var kids = svg.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].tagName && kids[i].tagName.toLowerCase() === tag) return kids[i];
+    }
+    return null;
+  }
+
+  // What the drawing is announced as. An author who wrote accTitle or accDescr
+  // gets that text; without either the nearest preceding heading names it,
+  // because a type word alone does not say which diagram on the page this is.
+  function diagramName(pre, svg, type) {
+    var titleEl = svgMeta(svg, 'title');
+    var descrEl = svgMeta(svg, 'desc');
+    var title = titleEl ? (titleEl.textContent || '').trim() : '';
+    var descr = descrEl ? (descrEl.textContent || '').trim() : '';
+    if (!title && !descr) {
+      var heading = titleFor(pre);
+      return heading ? type + ': ' + heading : '';
+    }
+    // The label carries what these two elements said. Chromium also reads an
+    // SVG root's own <title> and <desc> as the accessible description, so
+    // keeping them would have the description announced twice.
+    if (titleEl) titleEl.remove();
+    if (descrEl) descrEl.remove();
+    // aria-description is not supported in every browser a page is read in, and
+    // an attribute a browser ignores drops its text silently, so the
+    // description rides in the label rather than in an attribute of its own.
+    return [title, descr].filter(Boolean).join(', ');
+  }
+
+  // The drawing becomes one thing to announce. As mermaid leaves it, the inner
+  // shapes are exposed on their own and a reader walks the diagram node by
+  // node; as an image, its name is what is read.
+  function nameDiagram(pre) {
+    var svg = pre.querySelector('svg');
+    if (!svg) return;
+    // The type word is read through the same function the toolbar and the
+    // viewer use, so a type is named in one place.
+    var type = diagramType(pre);
+    var name = diagramName(pre, svg, type);
+    if (!name) return;
+    // Mermaid points aria-labelledby and aria-describedby at its own <title>
+    // and <desc> when the directives were written. Both outrank aria-label in
+    // the name computation, so leaving either would drop the name built here.
+    svg.removeAttribute('aria-labelledby');
+    svg.removeAttribute('aria-describedby');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', name);
+    // Mermaid's own value is an internal type name. A reader gets the word for
+    // it when the map has one, and exactly what mermaid wrote otherwise.
+    if (svg.getAttribute('aria-roledescription')) {
+      svg.setAttribute('aria-roledescription', type);
+    }
+  }
+
   function iconButton(cls, label, path, onClick) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -377,6 +436,7 @@
     pre.classList.add('mermaid-rendered');
 
     var frame = wrapFrame(pre);
+    nameDiagram(pre);
 
     var bar = document.createElement('div');
     bar.className = 'mermaid-toolbar';
