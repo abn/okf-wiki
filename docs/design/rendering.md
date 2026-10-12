@@ -53,8 +53,10 @@ flowchart LR
    escaped into `pre.code` and left unhighlighted. GitHub alert blockquotes
    (`> [!NOTE]`) become callout cards. The marker is matched without regard to
    case, the way GitHub matches it, so `> [!note]` and `> [!NOTE]` are the same
-   card; a marker that is not one of the five is left alone. Mermaid fences pass
-   through as `<pre class="mermaid">` for the browser to render.
+   card; a marker that is not one of the five is left alone, and so is one that
+   is not at the very start of the first line, such as a marker after a link.
+   Mermaid fences pass through as `<pre class="mermaid">` for the browser to
+   render.
 
    The browser draws each diagram into a card: a toolbar naming the type, a
    zoom group and the copy and expand affordances, then the drawing. Every

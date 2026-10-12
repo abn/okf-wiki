@@ -39,11 +39,17 @@ func detectAlert(bq *ast.Blockquote, source []byte) {
 	if !ok {
 		return
 	}
+	// The probe stops at the first node that is not text. Walking past one
+	// concatenates across it, so a marker sitting after a node that contributes
+	// nothing reads as though it opened the line, and the whitespace skip after
+	// it would then delete a space that belongs to that node.
 	var b strings.Builder
 	for c := p.FirstChild(); c != nil; c = c.NextSibling() {
-		if textNode, ok := c.(*ast.Text); ok {
-			b.Write(textNode.Segment.Value(source))
+		textNode, ok := c.(*ast.Text)
+		if !ok {
+			break
 		}
+		b.Write(textNode.Segment.Value(source))
 	}
 	val := b.String()
 	for prefix, info := range alertPrefixes {

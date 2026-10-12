@@ -78,3 +78,15 @@ recognised level.
 > An unrecognised level is left alone.
 
 >Text with no space after the marker is not a callout either.
+
+A marker that follows an inline node is not at the start either, so these stay
+blockquotes:
+
+> [a link](callouts.md)[!NOTE]
+> A marker after a link.
+
+> `code`[!WARNING]
+> A marker after a code span.
+
+>![alt text](assets/pipeline-stages.svg)[!TIP]
+> A marker after an image, with no space after the `>`.
