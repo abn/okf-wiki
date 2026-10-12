@@ -40,6 +40,11 @@ type shellData struct {
 	// deployment home and works from any depth. It falls back to Base whenever
 	// no tree base is set.
 	HomeHref string
+	// Lang is the language the page declares on the <html> element, for a
+	// screen reader and a read-aloud voice: a subtag such as "de", or a tag
+	// with a region such as "pt-BR". It is DefaultLang when none is
+	// configured.
+	Lang string
 	// SearchBase is the URL prefix the search index is fetched from. It equals
 	// Base for a single bundle. In a multi-site tree it is the tree base, since
 	// one index there spans every wiki. The page carries it as
@@ -126,6 +131,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		ThemeVersion:   r.theme.Version,
 		Base:           base,
 		HomeHref:       homeHref,
+		Lang:           r.cfg.lang(),
 		SearchBase:     searchBase,
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),

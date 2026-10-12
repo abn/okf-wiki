@@ -15,6 +15,7 @@ Resolution order is flag, then environment variable, then default.
 | `--multi-site` | `OKF_WIKI_MULTI_SITE` | `false` | Treat the content directory as a tree of wikis |
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
+| `--lang` | `OKF_WIKI_LANG` | `en` | Language the pages declare, a tag such as `de` or `pt-BR` |
 | `--repo` | `OKF_WIKI_REPO` | empty | Repository root served at `/repo/` |
 | `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid bundle. Required when the bundle has a diagram |
 | `--theme` | `OKF_WIKI_THEME` | empty | Theme directory layered over the embedded default |
@@ -45,6 +46,13 @@ with no wiki subdirectory, and there is no root redirect, because the wiki's own
 `index.html` already occupies that path. This is the base the GitHub Action
 computes for a user or organisation Pages site, so it is a normal configuration
 rather than an edge case.
+
+`--lang` is the language the pages declare on the `<html>` element, for a screen
+reader and a read-aloud voice: a subtag such as `de`, or one with a region such
+as `pt-BR`. A value carrying anything else is refused, because a browser ignores
+a tag it cannot read and would then read every page as English whatever was
+configured. The root redirect carries the same language as the pages it
+redirects to.
 
 `--nav-links` adds links to the header, comma-separated as `Label=URL` pairs. A
 target with an `http` or `https` scheme leaves the wiki: it opens in a new tab
