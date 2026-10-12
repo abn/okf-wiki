@@ -11,6 +11,8 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
@@ -84,20 +86,30 @@ func detectAlert(bq *ast.Blockquote, source []byte) {
 	}
 }
 
-// customRenderer implements callout blockquotes and chroma-highlighted fenced
-// code blocks (with a mermaid passthrough).
+// customRenderer implements callout blockquotes, table cells, and
+// chroma-highlighted fenced code blocks (with a mermaid passthrough).
+//
+// The config is GFM's own TableConfig so that a table cell renders through the
+// same settings the GFM extension carries, alignment method included.
 type customRenderer struct {
-	html.Config
+	extension.TableConfig
 }
 
 func newCustomRenderer() renderer.NodeRenderer {
-	return &customRenderer{Config: html.NewConfig()}
+	return &customRenderer{TableConfig: extension.NewTableConfig()}
 }
 
 // RegisterFuncs implements renderer.NodeRenderer.
+//
+// GFM registers a renderer for table cells at priority 500, the same priority as
+// this one, so registration order decides which of the two renders a cell.
+// Goldmark registers renderers from the end of the sorted list backwards, so
+// among equals the one appended first wins, and this renderer is appended before
+// the GFM extension extends the markdown.
 func (r *customRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(ast.KindBlockquote, r.renderBlockquote)
 	reg.Register(ast.KindFencedCodeBlock, r.renderFencedCodeBlock)
+	reg.Register(extast.KindTableCell, r.renderTableCell)
 }
 
 func (r *customRenderer) renderBlockquote(w util.BufWriter, source []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -115,7 +127,7 @@ func (r *customRenderer) renderBlockquote(w util.BufWriter, source []byte, n ast
 	title := alertTitle(kind)
 
 	if entering {
-		_, _ = fmt.Fprintf(w, "<div class=\"callout callout-%s\" role=\"region\" aria-label=\"%s\">\n", kind, title)
+		_, _ = fmt.Fprintf(w, "<div class=\"callout callout-%s\" role=\"note\">\n", kind)
 		_, _ = fmt.Fprintf(w, "<div class=\"callout-title\">%s<span>%s</span></div>\n", alertIconSVG(kind), title)
 		_, _ = w.WriteString("<div class=\"callout-body\">\n")
 	} else {
@@ -176,6 +188,71 @@ func (r *customRenderer) renderFencedCodeBlock(w util.BufWriter, source []byte, 
 	_ = formatter.Format(w, style, iterator)
 	_, _ = w.WriteString("</code></pre>\n")
 	return ast.WalkSkipChildren, nil
+}
+
+// renderTableCell is a copy of the alignment logic in
+// extension.(*TableHTMLRenderer).renderTableCell, with one addition: a header
+// cell says which direction it heads. Keep the copied half in step with
+// goldmark, since a change to how it emits alignments has to land here too.
+func (r *customRenderer) renderTableCell(
+	w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	n := node.(*extast.TableCell)
+	tag := "td"
+	if n.Parent().Kind() == extast.KindTableHeader {
+		tag = "th"
+	}
+	if entering {
+		_, _ = fmt.Fprintf(w, "<%s", tag)
+		if n.Alignment != extast.AlignNone {
+			amethod := r.TableConfig.TableCellAlignMethod
+			if amethod == extension.TableCellAlignDefault {
+				if r.Config.XHTML {
+					amethod = extension.TableCellAlignAttribute
+				} else {
+					amethod = extension.TableCellAlignStyle
+				}
+			}
+			switch amethod {
+			case extension.TableCellAlignAttribute:
+				if _, ok := n.AttributeString("align"); !ok { // Skip align render if overridden
+					_, _ = fmt.Fprintf(w, ` align="%s"`, n.Alignment.String())
+				}
+			case extension.TableCellAlignStyle:
+				v, ok := n.AttributeString("style")
+				var cob util.CopyOnWriteBuffer
+				if ok {
+					switch v := v.(type) {
+					case []byte:
+						cob = util.NewCopyOnWriteBuffer(v)
+					case string:
+						cob = util.NewCopyOnWriteBuffer([]byte(v))
+					}
+					cob.AppendByte(';')
+				}
+				style := fmt.Sprintf("text-align:%s", n.Alignment.String())
+				cob.AppendString(style)
+				n.SetAttributeString("style", cob.Bytes())
+			}
+		}
+		if n.Attributes() != nil {
+			if tag == "td" {
+				html.RenderAttributes(w, n, extension.TableTdCellAttributeFilter) // <td>
+			} else {
+				html.RenderAttributes(w, n, extension.TableThCellAttributeFilter) // <th>
+			}
+		}
+		// scope is obsolete on a <td>, and goldmark marks no cell as a row
+		// header, so only a column header gets it. Without it a screen reader
+		// reads a cell as "Left Useful information", with nothing saying that
+		// Left is the column it sits under.
+		if tag == "th" {
+			_, _ = w.WriteString(` scope="col"`)
+		}
+		_ = w.WriteByte('>')
+	} else {
+		_, _ = fmt.Fprintf(w, "</%s>\n", tag)
+	}
+	return ast.WalkContinue, nil
 }
 
 func alertTitle(kind string) string {
