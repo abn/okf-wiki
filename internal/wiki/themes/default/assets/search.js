@@ -17,6 +17,8 @@
   // grouping.
   var currentGroups = null;
   var lastActiveElement = null;
+  var status = null;
+  var announcedSet = null;
 
   // A tree of wikis publishes one aggregate index at the tree base and names it
   // in window.__WIKI_SEARCH. Its own base is still window.__WIKI_BASE, which is
@@ -33,6 +35,8 @@
   var closeBtn = document.getElementById('searchCloseBtn');
   var scopeBtn = document.getElementById('searchScope');
   var resultsContainer = document.getElementById('searchResults');
+  var resultsHost = null;
+  var modal = document.querySelector('.search-modal') || backdrop;
 
   if (!backdrop || !input || !resultsContainer) {
     return;
@@ -73,6 +77,10 @@
 
   function openSearch() {
     lastActiveElement = document.activeElement;
+    // The announced set belongs to the session that is ending. Without the reset
+    // a dialog reopened on the same terms says nothing, because the key it would
+    // write is the one already in the status node.
+    announcedSet = null;
     backdrop.classList.add('open');
     backdrop.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -172,12 +180,14 @@
     if (!tagQuery) {
       selectedIndex = -1;
       currentResults = [];
-      resultsContainer.innerHTML =
+      resultsHost.innerHTML =
         '<div class="search-empty-state"><p>Type a tag name after #.</p></div>';
+      announce('Type a tag name after #');
       return;
     }
     if (!tagsIndex) {
-      resultsContainer.innerHTML = '<div class="search-empty-state"><p>Loading tags...</p></div>';
+      resultsHost.innerHTML = '<div class="search-empty-state"><p>Loading tags...</p></div>';
+      announce('Loading tags');
       fetchTags().then(runSearch);
       return;
     }
@@ -227,7 +237,8 @@
       html += '</div>';
     }
     html += '</div>';
-    resultsContainer.innerHTML = html;
+    resultsHost.innerHTML = html;
+    announce('Type a search term, or jump to a section.');
   }
 
   function runSearch() {
@@ -243,7 +254,8 @@
       return;
     }
     if (!searchIndex) {
-      resultsContainer.innerHTML = '<div class="search-empty-state"><p>Loading search index...</p></div>';
+      resultsHost.innerHTML = '<div class="search-empty-state"><p>Loading search index...</p></div>';
+      announce('Loading search index');
       fetchIndex().then(runSearch);
       return;
     }
@@ -364,14 +376,52 @@
       '</a>';
   }
 
+  // announce writes the one line a reader cannot see. The set signature is what
+  // keeps it quiet: a keystroke that leaves the set alone, a change of case or
+  // an extra letter that still matches the same pages, has nothing new to say.
+  function announce(text, key) {
+    if (!status) return;
+    if (key === undefined) key = text;
+    if (key === announcedSet) return;
+    announcedSet = key;
+    status.textContent = text;
+  }
+
+  // What a reader cannot see is how many rows are reachable, and in a tree which
+  // wikis they came from. The query is not repeated back: the reader just typed
+  // it, and a set that has stopped moving under further keystrokes would leave a
+  // stale one behind. The count is of the capped flat list, which is what a
+  // reader can reach, rather than of the matches the index holds.
+  function announceResults() {
+    var count = currentResults.length;
+    var text;
+    if (count === 0) {
+      text = 'No results';
+    } else {
+      text = count === 1 ? '1 result' : count + ' results';
+      if (currentGroups) {
+        var sites = [];
+        for (var g = 0; g < currentGroups.length; g++) {
+          if (currentGroups[g].site) sites.push(currentGroups[g].site);
+        }
+        if (sites.length === 1) text += ' in ' + sites[0];
+        else if (sites.length > 1) text += ' in ' + sites.join(', ');
+      }
+    }
+    var key = String(count);
+    for (var i = 0; i < currentResults.length; i++) key += '|' + currentResults[i].u;
+    announce(text, key);
+  }
+
   function renderResults(terms, query) {
     if (currentResults.length === 0) {
       selectedIndex = -1;
-      resultsContainer.innerHTML =
+      resultsHost.innerHTML =
         '<div class="search-empty-state">' +
         '<p>No results found for "<b>' + escapeHTML(query) + '</b>"</p>' +
         '<p class="search-empty-hint">Try a host, a command, or a topic.</p>' +
         '</div>';
+      announceResults();
       return;
     }
 
@@ -398,7 +448,8 @@
       }
     }
     html += '</div>';
-    resultsContainer.innerHTML = html;
+    resultsHost.innerHTML = html;
+    announceResults();
   }
 
   function updateSelection() {
@@ -462,6 +513,48 @@
     else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
   });
 
+  // A placeholder is a hint rather than a name: it disappears as soon as a
+  // reader types, and is announced as one. A name the markup already carries,
+  // whether an aria-label, an aria-labelledby or a label element, wins; this
+  // only fills the gap left by a theme that replaces the template.
+  if (!input.getAttribute('aria-label') && !input.getAttribute('aria-labelledby') &&
+      !(input.labels && input.labels.length)) {
+    input.setAttribute('aria-label', 'Search documentation');
+  }
+
+  // The announced counterpart of the visible rows, set politely so it never
+  // interrupts a keystroke. Both children are built once, here: the rows are
+  // rewritten on every keystroke, and a live region sharing their subtree would
+  // speak every time it was. So the status node holds the count inside the
+  // results container the theme's contract names, and nothing else.
+  status = document.createElement('p');
+  status.className = 'search-status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.setAttribute('aria-atomic', 'true');
+  resultsHost = document.createElement('div');
+  resultsContainer.appendChild(status);
+  resultsContainer.appendChild(resultsHost);
+
+  // The dialog declares aria-modal, so Tab must not leave it. The candidates
+  // are collected on each keypress: the result rows are rebuilt on every
+  // keystroke, and a list held over from the open would focus a detached node.
+  function trapTab(e) {
+    if (!modal) return;
+    var candidates = Array.prototype.filter.call(
+      modal.querySelectorAll('button, a[href], input'),
+      function (el) {
+        if (el.disabled || el.hasAttribute('hidden') || el.closest('[inert]')) return false;
+        return el.offsetParent !== null;
+      });
+    if (!candidates.length) return;
+    var first = candidates[0], last = candidates[candidates.length - 1];
+    var active = document.activeElement;
+    var inside = modal.contains(active);
+    if (e.shiftKey && (active === first || !inside)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || !inside)) { e.preventDefault(); first.focus(); }
+  }
+
   document.addEventListener('keydown', function (e) {
     if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -473,6 +566,7 @@
       openSearch();
       return;
     }
+    if (e.key === 'Tab' && backdrop.classList.contains('open')) trapTab(e);
     if (e.key === 'Escape' && backdrop.classList.contains('open')) closeSearch();
   });
 
