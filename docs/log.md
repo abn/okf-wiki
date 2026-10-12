@@ -3,6 +3,16 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-12
+
+* **Fix**: An alert marker in lower or mixed case renders as its callout. The
+  marker was matched as written, so `> [!warning]` fell through to a plain
+  blockquote with the marker visible as text. GitHub matches it without regard
+  to case, and the renderer now does too, so every spelling of the five kinds
+  gives the same card. A marker outside those five is still left alone.
+  `design/rendering.md` says so, and `testbed/callouts.md` shows the lower and
+  mixed case forms.
+
 ## 2026-10-11
 
 * **Fix**: The search modal no longer hangs when a term is typed before the
