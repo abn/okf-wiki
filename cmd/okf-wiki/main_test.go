@@ -199,3 +199,37 @@ func TestEnvDuration(t *testing.T) {
 		})
 	}
 }
+
+// --lang is bound in bindCommon with the other flags, so its default, its
+// environment variable and its precedence over that variable are the CLI's
+// contract. The rendered page carries the value, which the wiki package's own
+// tests cover.
+func TestBindCommonLang(t *testing.T) {
+	tests := []struct {
+		name string
+		flag string
+		env  string
+		want string
+	}{
+		{name: "unset uses the default", flag: "", env: "", want: wiki.DefaultLang},
+		{name: "flag sets the language", flag: "de", env: "", want: "de"},
+		{name: "environment sets the language", flag: "", env: "fr", want: "fr"},
+		{name: "flag beats the environment", flag: "de", env: "fr", want: "de"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("OKF_WIKI_LANG", tc.env)
+			fs := flag.NewFlagSet("render", flag.ContinueOnError)
+			fs.SetOutput(nil)
+			cfg := bindCommon(fs)
+			if tc.flag != "" {
+				if err := fs.Parse([]string{"--lang", tc.flag}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if cfg.Lang != tc.want {
+				t.Errorf("Lang = %q, want %q", cfg.Lang, tc.want)
+			}
+		})
+	}
+}

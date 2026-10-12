@@ -12,6 +12,10 @@ import (
 // DefaultBase is the URL prefix the rendered wiki is served under.
 const DefaultBase = "/wiki/"
 
+// DefaultLang is the language the rendered pages declare when none is
+// configured, so a bundle that says nothing reads as English.
+const DefaultLang = "en"
+
 // Brand holds the presentation identity of the rendered wiki.
 type Brand struct {
 	// Name is the wordmark. A trailing "." is split out and handed to the
@@ -63,9 +67,13 @@ func parseNav(s string) []NavLink {
 
 // Config is the resolved configuration for a render/serve run.
 type Config struct {
-	Content   string // OKF bundle directory
-	Out       string // output directory
-	Base      string // URL prefix the wiki is served under (default "/wiki/")
+	Content string // OKF bundle directory
+	Out     string // output directory
+	Base    string // URL prefix the wiki is served under (default "/wiki/")
+	// Lang is the language the pages declare as their own, for a screen
+	// reader and a read-aloud voice: a BCP-47 tag such as "de", or one with
+	// a region such as "pt-BR". Empty declares DefaultLang.
+	Lang      string
 	Repo      string // repository root exposed at /repo/ (optional)
 	VendorDir string // directory holding the mermaid bundle (optional)
 	ThemeDir  string // theme override directory (optional)
@@ -90,6 +98,16 @@ func (c Config) base() string {
 		b += "/"
 	}
 	return b
+}
+
+// lang returns the language the pages declare, normalised to the value that
+// will be emitted, so the redirect and the pages it redirects to carry the
+// same one.
+func (c Config) lang() string {
+	if strings.TrimSpace(c.Lang) == "" {
+		return DefaultLang
+	}
+	return strings.TrimSpace(c.Lang)
 }
 
 // SiteDir returns the directory a render writes into, given the output root.
@@ -196,6 +214,27 @@ func orderedSectionIDs(configured []sectionSpec, present []string) []sectionSpec
 func (b Brand) validate() error {
 	if strings.TrimSpace(b.Name) == "" {
 		return fmt.Errorf("brand name must not be empty")
+	}
+	return nil
+}
+
+// validateLang checks the shape of a declared language. The value reaches an
+// attribute, so one carrying a space or a quote is either ignored by the
+// browser or ends the tag, and a tag never begins with a hyphen or a digit.
+// Refusing it beats emitting an element that reads as English whatever was
+// asked for.
+func validateLang(lang string) error {
+	lang = strings.TrimSpace(lang)
+	if lang == "" {
+		return nil
+	}
+	for i, r := range lang {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		case i > 0 && r >= '0' && r <= '9', i > 0 && r == '-':
+		default:
+			return fmt.Errorf("language %q is not a language tag: use letters, digits and hyphens, such as de or pt-BR", lang)
+		}
 	}
 	return nil
 }

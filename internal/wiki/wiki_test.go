@@ -68,6 +68,24 @@ func TestBaseNormalisation(t *testing.T) {
 	}
 }
 
+// lang mirrors base: an unset or blank Lang resolves to DefaultLang, so a bundle
+// that says nothing still declares a language, and a surrounding space never
+// reaches the attribute.
+func TestLangResolution(t *testing.T) {
+	cases := []struct{ lang, want string }{
+		{"", "en"},
+		{"   ", "en"},
+		{"de", "de"},
+		{"  de  ", "de"},
+		{"pt-BR", "pt-BR"},
+	}
+	for _, tc := range cases {
+		if got := (Config{Lang: tc.lang}).lang(); got != tc.want {
+			t.Errorf("Config{Lang: %q}.lang() = %q, want %q", tc.lang, got, tc.want)
+		}
+	}
+}
+
 func TestSiteDirFollowsBase(t *testing.T) {
 	got, err := Config{Base: "/docs/deep/"}.SiteDir("/out")
 	if err != nil {
@@ -662,6 +680,93 @@ func TestRenderAtNestedBaseWritesARootRedirect(t *testing.T) {
 	}
 	if !strings.Contains(string(redirect), "url=/handbook/") {
 		t.Errorf("no root redirect at a nested base:\n%s", redirect)
+	}
+}
+
+// TestPageLanguageIsDeclared covers the language the renderer writes. An
+// unconfigured bundle declares English, and the root redirect the output root
+// gets carries the language that was configured: the redirect is a page the
+// reader is sent to, so it declares the same language as the page it redirects
+// to rather than making a screen reader switch voice on arrival.
+func TestPageLanguageIsDeclared(t *testing.T) {
+	render := func(lang string) (page, redirect string) {
+		t.Helper()
+		content := t.TempDir()
+		mustWrite(t, filepath.Join(content, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+		out := t.TempDir()
+		r, err := New(Config{
+			Content: content, Base: "/wiki/", Lang: lang,
+			Brand: Brand{Name: "t", Title: "Wiki"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.RenderAll(out); err != nil {
+			t.Fatal(err)
+		}
+		written, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rooted, err := os.ReadFile(filepath.Join(out, "index.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(written), string(rooted)
+	}
+
+	page, redirect := render("")
+	if !strings.Contains(page, `<html lang="en">`) {
+		t.Errorf("an unconfigured bundle does not declare English:\n%s", page)
+	}
+	if !strings.Contains(redirect, `<html lang="en">`) {
+		t.Errorf("the root redirect does not declare English:\n%s", redirect)
+	}
+
+	page, redirect = render("de")
+	if !strings.Contains(page, `<html lang="de">`) {
+		t.Errorf("the configured language did not reach the page:\n%s", page)
+	}
+	if !strings.Contains(redirect, `<html lang="de">`) {
+		t.Errorf("the root redirect does not carry the configured language:\n%s", redirect)
+	}
+}
+
+// A declared language reaches an attribute, so its shape is decided before the
+// render rather than left for the browser to ignore.
+func TestLangValidation(t *testing.T) {
+	tests := []struct {
+		lang string
+		want bool // want reports whether the tag is one the renderer will emit
+	}{
+		{"", true},
+		{"en", true},
+		{"de", true},
+		{"pt-BR", true},
+		{"zh-Hans-CN", true},
+		{"  de  ", true},
+		{"my wiki", false},
+		{"de AT", false},
+		{"de;", false},
+		{`de"`, false},
+		{`de<`, false},
+		{"-de", false},
+		{"3d", false},
+		{"de_AT", false},
+	}
+	for _, tc := range tests {
+		err := validateLang(tc.lang)
+		if tc.want && err != nil {
+			t.Errorf("validateLang(%q) = %v, want it accepted", tc.lang, err)
+		}
+		if !tc.want && err == nil {
+			t.Errorf("validateLang(%q) = nil, want it rejected", tc.lang)
+		}
+	}
+	// The check has to be the one a render goes through, not a helper nothing
+	// calls.
+	if _, err := New(Config{Content: t.TempDir(), Lang: "my wiki", Brand: Brand{Name: "t"}}); err == nil {
+		t.Error("New accepted a language that is not a language tag")
 	}
 }
 

@@ -122,6 +122,9 @@ func New(cfg Config) (*Renderer, error) {
 	if err := cfg.Brand.validate(); err != nil {
 		return nil, err
 	}
+	if err := validateLang(cfg.Lang); err != nil {
+		return nil, err
+	}
 	theme, err := ResolveTheme(cfg.ThemeDir)
 	if err != nil {
 		return nil, err
@@ -292,7 +295,7 @@ func (r *Renderer) writeRootRedirect(out string) error {
 	if r.nested || filepath.Clean(site) == filepath.Clean(out) {
 		return nil
 	}
-	redirect := `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+	redirect := `<!DOCTYPE html><html lang="` + r.cfg.lang() + `"><head><meta charset="utf-8">` +
 		`<meta http-equiv="refresh" content="0; url=` + base + `"><title>` +
 		htmlEscape(r.cfg.Brand.Title) + `</title></head>` +
 		`<body><a href="` + base + `">` + htmlEscape(r.cfg.Brand.Title) + `</a></body></html>`

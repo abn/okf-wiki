@@ -68,6 +68,7 @@ flags (render):
                      a generated index of their children
   --out DIR          output directory (default: .scratch/wiki)
   --base PATH        URL prefix the wiki is served under (default "/wiki/")
+  --lang TAG         language the pages declare, e.g. de or pt-BR (default "en")
   --repo DIR         repository root exposed read-only at /repo/ (optional)
   --vendor DIR       directory holding the mermaid bundle (required if the
                      bundle has a diagram, or the render is not offline)
@@ -89,9 +90,10 @@ serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
 what a container stop sends. A request part way through a body is finished
 rather than cut.
 
-environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE, OKF_WIKI_REPO,
-  OKF_WIKI_VENDOR, OKF_WIKI_THEME, OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB,
-  OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE, OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
+environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE,
+  OKF_WIKI_LANG, OKF_WIKI_REPO, OKF_WIKI_VENDOR, OKF_WIKI_THEME,
+  OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB, OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE,
+  OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
   OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_WATCH_INTERVAL,
   OKF_WIKI_MULTI_SITE
 `)
@@ -187,6 +189,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Content, "content", env("OKF_WIKI_CONTENT", ""), "OKF bundle to render")
 	fs.StringVar(&c.Out, "out", env("OKF_WIKI_OUT", ".scratch/wiki"), "output directory")
 	fs.StringVar(&c.Base, "base", env("OKF_WIKI_BASE", wiki.DefaultBase), "URL prefix the wiki is served under")
+	fs.StringVar(&c.Lang, "lang", env("OKF_WIKI_LANG", wiki.DefaultLang), "language the pages declare, e.g. de or pt-BR")
 	fs.StringVar(&c.Repo, "repo", env("OKF_WIKI_REPO", ""), "repository root for /repo/")
 	fs.StringVar(&c.VendorDir, "vendor", env("OKF_WIKI_VENDOR", "mermaid"), "mermaid bundle directory")
 	fs.StringVar(&c.ThemeDir, "theme", env("OKF_WIKI_THEME", ""), "theme directory layered over the embedded default")
