@@ -105,6 +105,12 @@ only restyles, this section does not apply. If a theme replaces it, the renderer
 still guarantees some HTML and the two clients still look for specific ids, so
 these are hard requirements rather than style.
 
+A callout is a `note`, not a `region`, so it never joins the landmark
+list, and it carries no `aria-label`: the visible title in
+`.callout-title` is the accessible name, so a label repeating that
+word would be announced twice. A table header cell is a `th` with
+`scope="col"`, since goldmark writes no scope of its own.
+
 ### Ids the clients require
 
 | Id | Needed by | If it is missing |
@@ -153,7 +159,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   is a plain `li.side-leaf` link instead, the way a section with no child pages
   is.
 - `.active`, on the current page's sidebar link and on the current section's
-  title, which is how a theme marks position
+  title, which is how a theme marks position. The same link carries
+  `aria-current="true"`, so a screen reader announces the position the class
+  only paints, the way the tag page's current chip already does.
 - `.breadcrumb`, `.crumb-sep`, `.crumb-cur`
 - `.prose`, `.page-lead`, `.page-meta`, `.chip`, `.chip-type`, `.tag-link`,
   `.source-ref` on a citation that resolves to a sources entry, and
@@ -184,6 +192,8 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `.callout-title`, `.callout-icon`, `.callout-body` and the per-kind modifiers
   `callout-note`, `callout-tip`, `callout-important`, `callout-warning`,
   `callout-caution`
+- `table` with `thead` and `tbody`, where a header cell is a `th` carrying
+  `scope="col"` and any alignment a table declares is a `style` on the cell
 - `pre.mermaid`, `pre.code` around an unhighlighted block, and `pre.code.chroma`
   around a Chroma-highlighted one, each with a `language-*` class on the inner
   `code` element

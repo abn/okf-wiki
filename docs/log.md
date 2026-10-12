@@ -13,6 +13,48 @@ deprecated, or restructured. It is deliberately separate from software releases.
   after the marker is skipped within its own node, so a space belonging to a
   later node survives. `design/rendering.md` says so, and `testbed/callouts.md`
   shows the markers that now stay blockquotes.
+* **Fix**: The search dialog keeps focus, names its input, and says what it
+  found. The dialog declared `aria-modal`, so Tab was expected to stay inside
+  it, and a walk of Tab presses on a freshly opened dialog left the results and
+  reached the page chrome behind. The candidates are collected on each keypress,
+  because the rows are rebuilt on every keystroke. The input was named by its
+  placeholder, which is a hint rather than a name and disappears as soon as a
+  reader types. Nothing was announced at all, so the result count, and in a tree
+  the wikis it came from, now go to a polite status node beside the rows,
+  clipped out of the layout rather than hidden. `reference/themes.md` says so.
+* **Feature**: A wiki declares the language its pages are written in. `<html
+  lang="en">` was hardcoded, so a screen reader and a read-aloud voice picked
+  English whatever language the bundle was written in. A `--lang` flag and its
+  `OKF_WIKI_LANG` environment variable set it, defaulting to `en`, and the root
+  redirect carries the same language as the pages it redirects to. A value that
+  is not a language tag is refused, since a browser ignores a tag it cannot read
+  and the page would then read as English whatever was asked for.
+  `reference/configuration.md` says so.
+* **Fix**: A callout is a note rather than a landmark, and a table header says
+  which direction it heads. A callout carried `role="region"`, so every card on a
+  page added another entry to the landmark list, and its `aria-label` repeated
+  the word the visible title in `.callout-title` already spells, which a screen
+  reader announced twice. The role is now `note`, which is not a landmark, and
+  the visible title is what names it. A table header was a bare `<th>`, so a
+  screen reader read a cell as "Left Useful information" with nothing saying
+  that Left is the column it sits under, and every header cell now carries
+  `scope="col"`. The alignment a table declares is unchanged and a body cell
+  gains no scope, since goldmark marks no cell as a row header.
+  `reference/themes.md` says so.
+* **Feature**: The sidebar's active link carries `aria-current` beside the active
+  class, and the labels the default theme drew in uppercase text are small caps
+  now. The class only painted the position, so a screen reader had nothing to
+  announce for the page a reader was on. An uppercase text transform reaches a
+  screen reader as uppercase text, so a label such as "Previous" was announced
+  shouted, while small caps keep the same weight and leave the text as it was
+  written. `reference/themes.md` says so.
+* **Feature**: A rendered diagram has an accessible name and is announced as one
+  image. The SVG had nothing for a screen reader to announce, and a reader view
+  read the drawing as a run of node labels. The name comes from the fence's own
+  `accTitle` and `accDescr` when the author wrote them, and from the nearest
+  preceding heading otherwise, the type word is the readable one rather than
+  mermaid's internal name, and the drawing is one image rather than every shape
+  in it. `design/rendering.md` says so.
 
 ## 2026-10-12
 
