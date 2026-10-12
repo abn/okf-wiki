@@ -3,6 +3,17 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-13
+
+* **Fix**: An alert marker after an inline node no longer becomes a callout. The
+  probe that finds the marker read only text nodes, so a marker following a
+  link, an image, a code span or emphasis looked like it opened the line: the
+  callout card appeared with the marker stripped and only the inline node left
+  as its body. The probe now stops at the first non-text node, and the space
+  after the marker is skipped within its own node, so a space belonging to a
+  later node survives. `design/rendering.md` says so, and `testbed/callouts.md`
+  shows the markers that now stay blockquotes.
+
 ## 2026-10-12
 
 * **Fix**: An alert marker in lower or mixed case renders as its callout. The

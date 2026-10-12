@@ -1107,14 +1107,7 @@ func TestAlertMarkerWithMultiByteRuneIsNotAMarker(t *testing.T) {
 // alertDoc is the Markdown of a one-page bundle whose only blockquote carries
 // marker.
 func alertDoc(marker string) string {
-	return strings.Join([]string{
-		"---",
-		"title: Alert",
-		"---",
-		"# Alert",
-		"> " + marker,
-		"> Body text.",
-	}, "\n")
+	return alertDocBody("> " + marker + "\n> Body text.")
 }
 
 // renderOnlyPage writes body as the one page of a bundle in dir and returns
@@ -1139,6 +1132,87 @@ func renderOnlyPage(t *testing.T, dir, body string) string {
 		t.Fatal(err)
 	}
 	return html
+}
+
+// A marker only opens a callout when it is the first thing in the paragraph.
+// The probe reads text nodes only, so a marker that follows a link, an image or
+// a code span has to stay a blockquote: the marker is not at the start of the
+// line, and the marker text has to survive in the output rather than being
+// stripped out from under an inline node.
+func TestAlertMarkerAfterInlineNodeStaysABlockquote(t *testing.T) {
+	cases := []struct{ name, body string }{
+		{"after a link", "> [a](b)[!NOTE]\n> Body text.\n"},
+		{"after an image", "> ![alt](a.png)[!NOTE]\n> Body text.\n"},
+		{"after a code span", "> `x`[!NOTE]\n> Body text.\n"},
+		{"after emphasis", "> **bold**[!NOTE]\n> Body text.\n"},
+		// Raw HTML splits the paragraph into siblings, so the marker sits after
+		// a node the probe has to stop at. An empty tag and a bare break carry
+		// no text of their own, which is what makes them discriminate: the
+		// marker's own text is the whole window either way, and a probe that
+		// walked past the node would still see it.
+		{"after raw html", "> <b></b>[!NOTE]\n> Body text.\n"},
+		{"after a hard break", "> <br>[!NOTE]\n> Body text.\n"},
+		// An HTML comment produces no goldmark node to stop at, so it
+		// discriminates nothing: a marker after one was a callout before this
+		// change and still is.
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			html := renderOnlyPage(t, t.TempDir(), alertDocBody(tc.body))
+
+			if strings.Contains(html, `class="callout`) {
+				t.Errorf("%s: became a callout, want a plain blockquote", tc.name)
+			}
+			if !strings.Contains(html, "<blockquote>") {
+				t.Errorf("%s: expected a plain blockquote", tc.name)
+			}
+			if !strings.Contains(html, "[!NOTE]") {
+				t.Errorf("%s: marker was stripped from the output", tc.name)
+			}
+		})
+	}
+}
+
+// The whitespace after the marker is skipped within the text that holds it.
+// A space that belongs to a later node, one separated by an inline node, has to
+// survive: the probe is bounded by the text node, so it cannot reach across the
+// link to eat it.
+func TestAlertMarkerLeavesASpaceAfterAnInlineNode(t *testing.T) {
+	html := renderOnlyPage(t, t.TempDir(), alertDocBody("> [!NOTE] [a link](x) tail\n"))
+
+	if !strings.Contains(html, `class="callout callout-note"`) {
+		t.Error("expected a note callout")
+	}
+	// The body is the link, then the word that followed it, one space apart.
+	if !strings.Contains(html, "</a> tail") {
+		t.Errorf("the space after the link was consumed; rendered body is %q", renderedCalloutBody(html))
+	}
+	if strings.Contains(html, "</a>tail") {
+		t.Error("the space between the link and the following text was removed")
+	}
+}
+
+// alertDocBody is the one-page bundle skeleton alertDoc builds on, for a test
+// that writes its own blockquote.
+func alertDocBody(body string) string {
+	return strings.Join([]string{
+		"---",
+		"title: Alert",
+		"---",
+		"# Alert",
+		body,
+	}, "\n")
+}
+
+// renderedCalloutBody is the first callout's body, for a failure message that
+// shows what actually rendered.
+func renderedCalloutBody(html string) string {
+	m := regexp.MustCompile(`(?s)class="callout[^"]*".*?<div class="callout-body">(.*?)</div>`).FindStringSubmatch(html)
+	if m == nil {
+		return "(no callout body found)"
+	}
+	return strings.TrimSpace(m[1])
 }
 
 // uniqueID is the unit of behaviour behind the above: the candidate has to be
