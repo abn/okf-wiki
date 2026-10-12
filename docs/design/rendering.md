@@ -68,6 +68,13 @@ flowchart LR
    card carrying the parser's message and the source, so the mistake is
    readable where it is written rather than an empty block.
 
+   The drawing is announced as one image, so a screen reader gets its name
+   once instead of every node label in it. The name comes from the fence's
+   own `accTitle` and `accDescr` when the author wrote them, and from the
+   nearest preceding heading otherwise: a flowchart under a heading called
+   Rendering pipeline is announced as "Flowchart: Rendering pipeline". The
+   type word is the readable one rather than mermaid's internal name.
+
    Footnotes whose label matches a `sources[]` id are rewritten into numbered
    citations to a generated Sources section; see [Sources](#sources).
 4. **Index.** Each page is split into heading-anchored text chunks and written
