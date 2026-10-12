@@ -324,6 +324,12 @@ func (r *Renderer) buildMeta(p Page, markdown string) string {
 // decorative; the link's own text names the action.
 const downloadArrow = `<svg class="page-download-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3-3-3M3 13h10"/></svg>`
 
+// ariaCurrentMark is the attribute a link to the page being read carries, so a
+// screen reader announces the position the active class only paints. The value
+// is the one the tag page writes on its current chip, so both constructs say
+// position the same way.
+const ariaCurrentMark = ` aria-current="true"`
+
 func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 	// A renderer with no sections, which is what a multi-site group index uses,
 	// has no sidebar to show. Empty rather than an empty nav, so the template
@@ -359,17 +365,19 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 
 		secHref := ""
 		secActive := ""
+		secCurrent := ""
 		if rootPage != nil {
 			secHref = base + rootPage.Slug + ".html"
 			if rootPage.Slug == activeSlug {
 				secActive = " active"
+				secCurrent = ariaCurrentMark
 			}
 		}
 
 		if len(childPages) == 0 {
 			b.WriteString(`<div class="side-sec side-leaf"><div class="side-summary">`)
 			if secHref != "" {
-				fmt.Fprintf(&b, `<a href="%s" class="side-title-link%s">%s</a>`, secHref, secActive, template.HTMLEscapeString(sec.Title))
+				fmt.Fprintf(&b, `<a href="%s" class="side-title-link%s"%s>%s</a>`, secHref, secActive, secCurrent, template.HTMLEscapeString(sec.Title))
 			} else {
 				fmt.Fprintf(&b, `<span class="side-title-text">%s</span>`, template.HTMLEscapeString(sec.Title))
 			}
@@ -387,7 +395,7 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 		b.WriteString(`<details class="side-sec" name="wiki-sections"` + isOpen + `>`)
 		b.WriteString(`<summary class="side-summary">`)
 		if secHref != "" {
-			fmt.Fprintf(&b, `<a href="%s" class="side-title-link%s">%s</a>`, secHref, secActive, template.HTMLEscapeString(sec.Title))
+			fmt.Fprintf(&b, `<a href="%s" class="side-title-link%s"%s>%s</a>`, secHref, secActive, secCurrent, template.HTMLEscapeString(sec.Title))
 		} else {
 			fmt.Fprintf(&b, `<span class="side-title-text">%s</span>`, template.HTMLEscapeString(sec.Title))
 		}
@@ -477,8 +485,10 @@ func (r *Renderer) writeSidebarEntries(b *strings.Builder, base string, sec Sect
 // the group heading already carries.
 func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, activeSlug, prefix string) {
 	active := ""
+	cur := ""
 	if page.Slug == activeSlug {
 		active = ` class="active"`
+		cur = ariaCurrentMark
 	}
 	title := page.Nav
 	if title == "" {
@@ -488,7 +498,7 @@ func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, 
 		title = page.Slug
 	}
 	title = sidebarLabel(title, prefix)
-	fmt.Fprintf(b, `<li%s><a href="%s%s.html">%s</a></li>`, active, base, page.Slug, template.HTMLEscapeString(title))
+	fmt.Fprintf(b, `<li%s><a href="%s%s.html"%s>%s</a></li>`, active, base, page.Slug, cur, template.HTMLEscapeString(title))
 }
 
 // writeSidebarGroup writes a sub-directory of a section as its own list item: a
@@ -517,14 +527,17 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 
 	if len(g.pages) == 0 && g.root != nil {
 		active := ""
+		cur := ""
 		if g.root.Slug == activeSlug {
 			active = ` class="active"`
+			cur = ariaCurrentMark
 		}
-		fmt.Fprintf(b, `<li class="side-leaf"><a%s href="%s">%s</a></li>`, active, href, template.HTMLEscapeString(label))
+		fmt.Fprintf(b, `<li class="side-leaf"><a%s%s href="%s">%s</a></li>`, active, cur, href, template.HTMLEscapeString(label))
 		return
 	}
 
 	open := ""
+	cur := ""
 	for i := range g.pages {
 		if g.pages[i].Slug == activeSlug {
 			open = " open"
@@ -533,11 +546,12 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 	}
 	if g.root != nil && g.root.Slug == activeSlug {
 		open = " open"
+		cur = ariaCurrentMark
 	}
 
 	fmt.Fprintf(b, `<li><details class="side-sub" name="wiki-sub-%s"%s><summary class="side-subsum">`, template.HTMLEscapeString(secID), open)
 	if href != "" {
-		fmt.Fprintf(b, `<a href="%s">%s</a>`, href, template.HTMLEscapeString(label))
+		fmt.Fprintf(b, `<a href="%s"%s>%s</a>`, href, cur, template.HTMLEscapeString(label))
 	} else {
 		fmt.Fprintf(b, `<span>%s</span>`, template.HTMLEscapeString(label))
 	}

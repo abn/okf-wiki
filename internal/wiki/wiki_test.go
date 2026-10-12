@@ -1446,7 +1446,7 @@ func TestNestedContentPagesRender(t *testing.T) {
 	if !strings.Contains(nav, `<details class="side-sub" name="wiki-sub-guide" open><summary class="side-subsum"><span>Setup</span>`) {
 		t.Errorf("the setup sub-directory is not a nested group:\n%s", nav)
 	}
-	if !strings.Contains(nav, `<li class="active"><a href="/wiki/guide/setup/install.html">Install</a></li>`) {
+	if !strings.Contains(nav, `<li class="active"><a href="/wiki/guide/setup/install.html" aria-current="true">Install</a></li>`) {
 		t.Errorf("the active page is not inside the setup group:\n%s", nav)
 	}
 	if !strings.Contains(nav, `<summary class="side-subsum"><span>Deep</span>`) {
@@ -1497,7 +1497,7 @@ func TestSidebarNavLabelOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	nav := r.sidebarHTML("guide", "guide/setup/install")
-	if !strings.Contains(nav, `<a href="/wiki/guide/setup/install.html">Install</a>`) {
+	if !strings.Contains(nav, `<a href="/wiki/guide/setup/install.html" aria-current="true">Install</a>`) {
 		t.Errorf("the nav label did not replace the page title:\n%s", nav)
 	}
 	if strings.Contains(nav, "Installing the whole thing") {
@@ -1520,7 +1520,7 @@ func TestSidebarGroupPrefixFold(t *testing.T) {
 		t.Fatal(err)
 	}
 	nav := r.sidebarHTML("agents", "agents/tape/report")
-	if !strings.Contains(nav, `<li class="active"><a href="/wiki/agents/tape/report.html">Report</a></li>`) {
+	if !strings.Contains(nav, `<li class="active"><a href="/wiki/agents/tape/report.html" aria-current="true">Report</a></li>`) {
 		t.Errorf("the repeating prefix was not shortened in the rail:\n%s", nav)
 	}
 }
