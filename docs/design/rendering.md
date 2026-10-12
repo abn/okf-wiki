@@ -51,8 +51,10 @@ flowchart LR
 3. **Transform.** Fenced code is highlighted with Chroma into `pre.code.chroma`,
    with a `language-*` class naming the language. A fence with no language is
    escaped into `pre.code` and left unhighlighted. GitHub alert blockquotes
-   (`> [!NOTE]`) become callout cards. Mermaid fences pass through as
-   `<pre class="mermaid">` for the browser to render.
+   (`> [!NOTE]`) become callout cards. The marker is matched without regard to
+   case, the way GitHub matches it, so `> [!note]` and `> [!NOTE]` are the same
+   card; a marker that is not one of the five is left alone. Mermaid fences pass
+   through as `<pre class="mermaid">` for the browser to render.
 
    The browser draws each diagram into a card: a toolbar naming the type, a
    zoom group and the copy and expand affordances, then the drawing. Every

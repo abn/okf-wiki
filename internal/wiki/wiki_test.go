@@ -1006,6 +1006,141 @@ func TestHeadingIDsAreUnique(t *testing.T) {
 	}
 }
 
+// GitHub matches an alert marker without regard to case, so a lowercase or
+// mixed-case marker has to become the same card as its uppercase spelling.
+func TestAlertMarkersMatchAnyCase(t *testing.T) {
+	cases := []struct {
+		marker string
+		kind   string
+		body   string
+	}{
+		{"[!NOTE]", "note", "Body text."},
+		{"[!note]", "note", "Body text."},
+		{"[!Note]", "note", "Body text."},
+		{"[!TIP]", "tip", "Body text."},
+		{"[!tip]", "tip", "Body text."},
+		{"[!tIp]", "tip", "Body text."},
+		{"[!IMPORTANT]", "important", "Body text."},
+		{"[!important]", "important", "Body text."},
+		{"[!WARNING]", "warning", "Body text."},
+		{"[!warning]", "warning", "Body text."},
+		{"[!Warning]", "warning", "Body text."},
+		{"[!CAUTION]", "caution", "Body text."},
+		{"[!caution]", "caution", "Body text."},
+		{"[!CaUtIoN]", "caution", "Body text."},
+		// The marker shares the line with its body rather than standing alone.
+		{"[!note]", "note", ""},
+		// Multi-byte runes either side of the marker, since the marker is
+		// matched over a fixed-length byte window and the body is cut at byte
+		// offsets. A rune that folded to an ASCII letter would break both.
+		{"[!warning]", "warning", "Größe, naïve, 日本語, 🚀 emoji."},
+		{"[!note]", "note", "⚠️ Ünïcode straight after the marker."},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.marker+" "+tc.body, func(t *testing.T) {
+			lines := []string{
+				"---",
+				"title: Alert",
+				"---",
+				"# Alert",
+			}
+			if tc.body == "" {
+				lines = append(lines, "> "+tc.marker+" Body on the same line.")
+			} else {
+				lines = append(lines, "> "+tc.marker, "> "+tc.body)
+			}
+			html := renderOnlyPage(t, t.TempDir(), strings.Join(lines, "\n"))
+
+			if want := `class="callout callout-` + tc.kind + `"`; !strings.Contains(html, want) {
+				t.Errorf("%s did not render a %s callout", tc.marker, tc.kind)
+			}
+			if strings.Contains(html, "[!") {
+				t.Errorf("%s: marker left in the rendered page", tc.marker)
+			}
+			wantBody := tc.body
+			if wantBody == "" {
+				wantBody = "Body on the same line."
+			}
+			if !strings.Contains(html, wantBody) {
+				t.Errorf("%s: body %q missing or truncated in the rendered page", tc.marker, wantBody)
+			}
+		})
+	}
+}
+
+func TestAlertMarkerNotRecognisedStaysABlockquote(t *testing.T) {
+	// The near misses matter as much as the obvious ones: each is a marker
+	// whose window is the right length and wrong in one character.
+	for _, marker := range []string{"[!UNKNOWN]", "[!NOTES]", "[!nota]", "[!NOTE", "![!NOTE]", "NOTE", "[ NOTE ]"} {
+		t.Run(marker, func(t *testing.T) {
+			html := renderOnlyPage(t, t.TempDir(), alertDoc(marker))
+
+			if strings.Contains(html, `class="callout`) {
+				t.Errorf("%s rendered as a callout", marker)
+			}
+			if !strings.Contains(html, "<blockquote>") {
+				t.Errorf("%s: expected a plain blockquote", marker)
+			}
+		})
+	}
+}
+
+// A multi-byte rune inside the marker window must not fold onto an ASCII
+// letter and make the window match, since the body is then cut at a byte
+// offset that no longer lines up with the rune boundary.
+func TestAlertMarkerWithMultiByteRuneIsNotAMarker(t *testing.T) {
+	for _, marker := range []string{"[!wärning]", "[!nöte]", "[!ᴡarning]", "[!noteﬁ]"} {
+		t.Run(marker, func(t *testing.T) {
+			html := renderOnlyPage(t, t.TempDir(), alertDoc(marker))
+
+			if strings.Contains(html, `class="callout`) {
+				t.Errorf("%s rendered as a callout", marker)
+			}
+			if !strings.Contains(html, "<blockquote>") {
+				t.Errorf("%s: expected a plain blockquote", marker)
+			}
+		})
+	}
+}
+
+// alertDoc is the Markdown of a one-page bundle whose only blockquote carries
+// marker.
+func alertDoc(marker string) string {
+	return strings.Join([]string{
+		"---",
+		"title: Alert",
+		"---",
+		"# Alert",
+		"> " + marker,
+		"> Body text.",
+	}, "\n")
+}
+
+// renderOnlyPage writes body as the one page of a bundle in dir and returns
+// that page's HTML. It fails the test unless the bundle holds exactly one
+// page, so a caller reaching for the wrong page hears about it.
+func renderOnlyPage(t *testing.T, dir, body string) string {
+	t.Helper()
+	mustWrite(t, filepath.Join(dir, "index.md"), body)
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pages []Page
+	for _, s := range r.Sections() {
+		pages = append(pages, s.Pages...)
+	}
+	if len(pages) != 1 {
+		t.Fatalf("bundle has %d pages, want exactly 1", len(pages))
+	}
+	html, err := r.RenderPage(pages[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return html
+}
+
 // uniqueID is the unit of behaviour behind the above: the candidate has to be
 // checked against every id already taken, not against a count of one base slug.
 func TestUniqueID(t *testing.T) {

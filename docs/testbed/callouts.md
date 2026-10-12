@@ -8,7 +8,9 @@ tags: [testbed, callouts]
 # Callouts
 
 A blockquote whose first line begins with an alert marker becomes a callout
-card. The marker is stripped, so the body is the sentence that follows it.
+card. The marker is stripped, so the body is the sentence that follows it. The
+marker is matched without regard to case, as on GitHub, so `[!note]` and
+`[!NOTE]` give the same card.
 
 ## The five levels
 
@@ -27,6 +29,22 @@ card. The marker is stripped, so the body is the sentence that follows it.
 
 > [!CAUTION]
 > Advises about risks or negative outcomes of certain actions.
+
+## Any case
+
+Lower and mixed case are the same five cards.
+
+> [!note]
+> Lowercase note.
+
+> [!Tip]
+> Mixed case tip.
+
+> [!iMpOrTaNt]
+> Mixed case important.
+
+> [!warning]
+> Lowercase warning, the spelling that once fell through to a blockquote.
 
 ## Marker only
 

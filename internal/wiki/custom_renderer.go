@@ -17,22 +17,23 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// alertInfo holds metadata for a GitHub-style alert callout.
+// alertInfo holds metadata for a GitHub-style alert callout. The kind is all
+// it carries: alertTitle derives the label from the kind once the kind is on
+// the node, so a second copy of the label here would only be able to drift.
 type alertInfo struct {
-	kind  string // note, tip, important, warning, caution
-	title string // Note, Tip, Important, Warning, Caution
+	kind string // note, tip, important, warning, caution
 }
 
 var alertPrefixes = map[string]alertInfo{
-	"[!NOTE]":      {kind: "note", title: "Note"},
-	"[!TIP]":       {kind: "tip", title: "Tip"},
-	"[!IMPORTANT]": {kind: "important", title: "Important"},
-	"[!WARNING]":   {kind: "warning", title: "Warning"},
-	"[!CAUTION]":   {kind: "caution", title: "Caution"},
+	"[!NOTE]":      {kind: "note"},
+	"[!TIP]":       {kind: "tip"},
+	"[!IMPORTANT]": {kind: "important"},
+	"[!WARNING]":   {kind: "warning"},
+	"[!CAUTION]":   {kind: "caution"},
 }
 
 // detectAlert inspects a blockquote node. If it starts with [!NOTE] or similar,
-// it strips the marker and tags the node with data-alert.
+// in any letter case, it strips the marker and tags the node with data-alert.
 func detectAlert(bq *ast.Blockquote, source []byte) {
 	p, ok := bq.FirstChild().(*ast.Paragraph)
 	if !ok {
@@ -46,29 +47,34 @@ func detectAlert(bq *ast.Blockquote, source []byte) {
 	}
 	val := b.String()
 	for prefix, info := range alertPrefixes {
-		if strings.HasPrefix(val, prefix) {
-			bq.SetAttribute([]byte("data-alert"), []byte(info.kind))
-			rem := len(prefix)
-			for rem < len(val) && (val[rem] == ' ' || val[rem] == '\t' || val[rem] == '\n' || val[rem] == '\r') {
-				rem++
-			}
-			toRemove := rem
-			for c := p.FirstChild(); c != nil && toRemove > 0; {
-				next := c.NextSibling()
-				if textNode, ok := c.(*ast.Text); ok {
-					segLen := textNode.Segment.Len()
-					if segLen <= toRemove {
-						p.RemoveChild(p, c)
-						toRemove -= segLen
-					} else {
-						textNode.Segment = text.NewSegment(textNode.Segment.Start+toRemove, textNode.Segment.Stop)
-						toRemove = 0
-					}
-				}
-				c = next
-			}
-			return
+		// GitHub matches the marker without regard to case, so `[!warning]`
+		// renders the way `[!WARNING]` does. EqualFold over a window of the
+		// prefix's own length keeps the byte offsets below valid, which
+		// uppercasing the whole value would not.
+		if len(val) < len(prefix) || !strings.EqualFold(val[:len(prefix)], prefix) {
+			continue
 		}
+		bq.SetAttribute([]byte("data-alert"), []byte(info.kind))
+		rem := len(prefix)
+		for rem < len(val) && (val[rem] == ' ' || val[rem] == '\t' || val[rem] == '\n' || val[rem] == '\r') {
+			rem++
+		}
+		toRemove := rem
+		for c := p.FirstChild(); c != nil && toRemove > 0; {
+			next := c.NextSibling()
+			if textNode, ok := c.(*ast.Text); ok {
+				segLen := textNode.Segment.Len()
+				if segLen <= toRemove {
+					p.RemoveChild(p, c)
+					toRemove -= segLen
+				} else {
+					textNode.Segment = text.NewSegment(textNode.Segment.Start+toRemove, textNode.Segment.Stop)
+					toRemove = 0
+				}
+			}
+			c = next
+		}
+		return
 	}
 }
 
