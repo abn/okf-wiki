@@ -117,6 +117,15 @@ these are hard requirements rather than style.
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
 
+`search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
+`role="status"` and `aria-live="polite"`, clipped out of the layout by the
+stylesheet, carrying the result count and in a tree the wikis it came from, and
+a wrapper that holds the rows. The count lives beside the rows rather than in
+their subtree, which is rewritten on every keystroke and would otherwise be
+re-announced with every render. Tab collects its candidates from the dialog on
+each keypress for the same reason: the rows a list held from the open would name
+are detached by then.
+
 The three behaviours above, the drawer, the theme toggle and the pre-paint
 restore that avoids a flash of the wrong ground, are **inline in the template**,
 not in a client file. A theme that replaces `template.html` takes on all three.
@@ -198,6 +207,9 @@ builds the lightbox out of `wiki-lbx` with its `wiki-lbx-bar`, `wiki-lbx-id`,
 not parse keeps `mermaid-fallback` on the source element and gains a
 `mermaid-error` card with `mermaid-error-head`, `mermaid-error-detail` and
 `mermaid-error-source`.
+
+`search.js` adds `search-status`, and wraps the rows it writes in a plain
+`div` inside `#searchResults`.
 
 An unstyled class is invisible rather than broken, so a theme that misses one of
 these loses the affordance, not the feature. The ids above are the ones that

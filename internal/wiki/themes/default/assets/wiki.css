@@ -1028,6 +1028,15 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   font-weight: var(--fw-semibold); color: var(--color-text-muted);
 }
 
+/* The announced counterpart of the visible rows: the result count and, in a
+   tree, the wikis it came from. Clipped rather than display:none, which would
+   take it out of the accessibility tree and silence it. */
+.search-status {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
+
 .search-modal-footer {
   /* The scope toggle and the keyboard hints share one row on a wide modal and
      wrap to two on a phone, so the footer never scrolls horizontally. */

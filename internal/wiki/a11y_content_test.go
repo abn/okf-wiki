@@ -24,7 +24,7 @@ import (
 // ordinary prose, but it is not a landmark: a landmark list holding one entry
 // per callout buries the page's own regions. The title, which is visible text
 // inside the callout, is what names it, so an attribute repeating that word
-// made a screen reader announce it twice.
+// would have a screen reader announce it twice.
 func TestCalloutIsANoteNotALandmark(t *testing.T) {
 	page := renderOnlyPage(t, t.TempDir(), alertDoc("[!NOTE]"))
 	tag := calloutTag(t, page, "note")
