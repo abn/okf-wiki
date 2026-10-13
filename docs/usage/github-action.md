@@ -88,6 +88,7 @@ yourself.
 | `brand-sub` | `docs` | subtitle label |
 | `version-tag` | empty | freeform version label beside the wordmark |
 | `title` | `Wiki` | document title suffix |
+| `lang` | `en` | language the pages declare, a tag such as `de` or `pt-BR` |
 | `sections` | empty | section order, `id:Title` pairs |
 | `nav-links` | empty | header links, `Label=URL` pairs |
 | `deploy` | `false` | publish to GitHub Pages |

@@ -49,6 +49,10 @@ inputs:
     description: Document title suffix.
     required: false
     default: Wiki
+  lang:
+    description: Language the pages declare, a tag such as de or pt-BR.
+    required: false
+    default: en
   sections:
     description: Section order as comma-separated id:Title pairs.
     required: false
@@ -129,6 +133,7 @@ runs:
         BRAND_SUB: ${{ inputs.brand-sub }}
         VERSION_TAG: ${{ inputs.version-tag }}
         TITLE: ${{ inputs.title }}
+        LANG: ${{ inputs.lang }}
         SECTIONS: ${{ inputs.sections }}
         NAV_LINKS: ${{ inputs.nav-links }}
         BASE: ${{ steps.resolve.outputs.base }}
@@ -138,7 +143,7 @@ runs:
         # No --vendor: the image's baked-in mermaid bundle is wanted.
         args=(render --content "$CONTENT" --out "$OUT" --base "$BASE"
               --brand "$BRAND" --brand-sub "$BRAND_SUB" --title "$TITLE"
-              --version-tag "$VERSION_TAG")
+              --version-tag "$VERSION_TAG" --lang "$LANG")
         [ -n "$SECTIONS" ] && args+=(--sections "$SECTIONS")
         [ -n "$NAV_LINKS" ] && args+=(--nav-links "$NAV_LINKS")
         [ -n "$THEME" ] && args+=(--theme "$THEME")

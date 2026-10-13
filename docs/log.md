@@ -3,6 +3,12 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-14
+
+* **Update**: A `lang` action input, matching the `--lang` flag and
+  `OKF_WIKI_LANG`, sets the language the rendered pages declare, defaulting to
+  `en`; `action.yml` and the action inputs document it.
+
 ## 2026-10-13
 
 * **Fix**: An alert marker after an inline node no longer becomes a callout. The
