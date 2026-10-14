@@ -121,6 +121,7 @@ word would be announced twice. A table header cell is a `th` with
 | `searchScope` | `search.js` | the All-wikis / This-wiki toggle of a multi-site tree is not offered; single-wiki search is unaffected |
 | `menuBtn` `drawerBackdrop` `sideDrawer` | the drawer script in the template | the drawer script throws, so the mobile menu and Escape-to-close both die |
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
+| `readingToggle` | the reading-mode script in the template | the full width reading mode does not toggle |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
 
 `search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
@@ -132,9 +133,10 @@ re-announced with every render. Tab collects its candidates from the dialog on
 each keypress for the same reason: the rows a list held from the open would name
 are detached by then.
 
-The three behaviours above, the drawer, the theme toggle and the pre-paint
-restore that avoids a flash of the wrong ground, are **inline in the template**,
-not in a client file. A theme that replaces `template.html` takes on all three.
+The four behaviours above, the drawer, the theme toggle, the pre-paint
+restore that avoids a flash of the wrong ground, and the full width reading
+mode, are **inline in the template**, not in a client file. A theme that
+replaces `template.html` takes on all four.
 
 Two things a theme must keep for the pre-paint restore to hold. It paints the
 ground on `html` as well as `body`, because the canvas a browser shows between
@@ -183,6 +185,12 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `.nav-ext` on its arrow. The drawer repeats them under `.side-links`: the
   in-wiki `{{.TopNavInternal}}` first, then `{{.TopNavExternal}}`, each under a
   `.side-links-title`.
+- The full width reading mode: the toggle is `.reading-toggle`, an `.icon-btn`
+  in the header, and the script sets `reading-mode` on the `<html>` element, so
+  a theme that restyles keeps both. In reading mode the article takes the
+  columns the sidebars held, the sidebar becomes a drawer reached from
+  `.menu-btn`, the contents column hides behind `.toc-btn`, and the top
+  navigation moves into `.side-links`.
 - A multi-site group index: `.site-list` with `.site-item`, `.site-link`,
   `.site-name`, `.site-badge`, `.site-badge-wiki` and `.site-desc` for the wikis
   of a group, then `.site-group` with `.site-group-title` and `.folder-list`,
