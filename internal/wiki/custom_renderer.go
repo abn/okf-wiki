@@ -268,7 +268,7 @@ func alertTitle(kind string) string {
 	case "caution":
 		return "Caution"
 	default:
-		return strings.Title(kind) //nolint:staticcheck // fixed ASCII kinds
+		return titleCase(kind)
 	}
 }
 

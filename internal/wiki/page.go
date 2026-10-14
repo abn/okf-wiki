@@ -174,6 +174,9 @@ func splitWordmark(name string) (string, string) {
 // quickLinksJSON builds a small list of section landing pages for the search
 // modal's empty state, derived from the bundle rather than hardcoded.
 func (r *Renderer) quickLinksJSON() string {
+	if r.quickLinksReady {
+		return r.quickLinksCache
+	}
 	type link struct {
 		Label string `json:"label"`
 		Href  string `json:"href"`
@@ -206,7 +209,9 @@ func (r *Renderer) quickLinksJSON() string {
 		}
 	}
 	b, _ := json.Marshal(links)
-	return string(b)
+	r.quickLinksCache = string(b)
+	r.quickLinksReady = true
+	return r.quickLinksCache
 }
 
 func buildTOC(p Page) string {
@@ -244,6 +249,13 @@ type PageLink struct {
 // Either side is nil at the ends, and both are nil when the page stands
 // alone or is not found.
 func (r *Renderer) pageNeighbors(section, slug string) (prev, next *PageLink) {
+	if r.neighborCache == nil {
+		r.neighborCache = map[string]*neighborCacheEntry{}
+	}
+	cacheKey := section + "\x00" + slug
+	if entry, ok := r.neighborCache[cacheKey]; ok {
+		return entry.prev, entry.next
+	}
 	link := func(p Page) *PageLink {
 		title := p.Title
 		if title == "" {
@@ -265,9 +277,11 @@ func (r *Renderer) pageNeighbors(section, slug string) (prev, next *PageLink) {
 			if i+1 < len(s.Pages) {
 				next = link(s.Pages[i+1])
 			}
+			r.neighborCache[cacheKey] = &neighborCacheEntry{prev: prev, next: next}
 			return prev, next
 		}
 	}
+	r.neighborCache[cacheKey] = &neighborCacheEntry{prev: nil, next: nil}
 	return nil, nil
 }
 

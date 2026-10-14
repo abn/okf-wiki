@@ -104,6 +104,20 @@ type Renderer struct {
 	siteTitle  string
 	siteTrail  []treeCrumb
 	groupIndex bool
+
+	// Render caches, populated on first use inside this renderer. A render
+	// runs every page through RenderPage, so values derived from the bundle
+	// must not be recomputed once per page.
+	quickLinksCache  string
+	quickLinksReady  bool
+	neighborCache    map[string]*neighborCacheEntry
+	tagListingsCache []tagListing
+	tagListingsReady bool
+}
+
+type neighborCacheEntry struct {
+	prev *PageLink
+	next *PageLink
 }
 
 // SkippedSite is one wiki a tree render left out, with the reason.
@@ -501,15 +515,41 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 
 func splitFrontmatter(data []byte) (frontmatter, []byte) {
 	var fm frontmatter
-	if !bytes.HasPrefix(data, []byte("---\n")) {
+	var head []byte
+	switch {
+	case bytes.HasPrefix(data, []byte("---\r\n")):
+		head = []byte("---\r\n")
+	case bytes.HasPrefix(data, []byte("---\n")):
+		head = []byte("---\n")
+	default:
 		return fm, data
 	}
-	end := bytes.Index(data[4:], []byte("\n---\n"))
-	if end == -1 {
+	rest := data[len(head):]
+	// The closing fence may carry a trailing newline (\n or \r\n) or sit
+	// at the very end of the file; all three are valid. endLength counts the
+	// bytes consumed by the fence and the newline after it.
+	markers := [][]byte{[]byte("\n---\r\n"), []byte("\n---\n"), []byte("\n---")}
+	best := -1
+	var marker []byte
+	for _, m := range markers {
+		i := bytes.Index(rest, m)
+		if i < 0 {
+			continue
+		}
+		// A bare trailing fence only counts when it reaches end of file.
+		if i+len(m) != len(rest) && bytes.Equal(m, []byte("\n---")) {
+			continue
+		}
+		if best == -1 || i < best {
+			best = i
+			marker = m
+		}
+	}
+	if best == -1 {
 		return fm, data
 	}
-	_ = yaml.Unmarshal(data[4:4+end], &fm)
-	return fm, data[4+end+5:]
+	_ = yaml.Unmarshal(rest[:best], &fm)
+	return fm, rest[best+len(marker):]
 }
 
 // linkPath resolves a markdown link from a page slug into a wiki URL. A link

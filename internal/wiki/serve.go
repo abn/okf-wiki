@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -237,7 +238,7 @@ func etag(outDir string) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			sum, err := fileSHA256(file)
+			sum, err := cachedFileSHA256(file)
 			if err != nil {
 				next.ServeHTTP(w, r)
 				return
@@ -267,6 +268,42 @@ func fileSHA256(name string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// An etag is derived from file contents, but the contents of a rendered file do
+// not change between re-renders: serve sees the same file until the watcher
+// writes a new one and mtime advances. Caching on size and mtime avoids
+// re-hashing every request.
+var etagCacheMu sync.Mutex
+var etagCache = map[string]etagCacheEntry{}
+
+type etagCacheEntry struct {
+	size  int64
+	mtime time.Time
+	sum   string
+}
+
+func cachedFileSHA256(name string) (string, error) {
+	st, err := os.Stat(name)
+	if err != nil {
+		return "", err
+	}
+	etagCacheMu.Lock()
+	if e, ok := etagCache[name]; ok && e.size == st.Size() && e.mtime.Equal(st.ModTime()) {
+		sum := e.sum
+		etagCacheMu.Unlock()
+		return sum, nil
+	}
+	etagCacheMu.Unlock()
+
+	sum, err := fileSHA256(name)
+	if err != nil {
+		return "", err
+	}
+	etagCacheMu.Lock()
+	etagCache[name] = etagCacheEntry{size: st.Size(), mtime: st.ModTime(), sum: sum}
+	etagCacheMu.Unlock()
+	return sum, nil
 }
 
 // etagMatches reports whether an If-None-Match header names the given tag.

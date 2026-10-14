@@ -121,7 +121,7 @@ func ResolveTheme(dir string) (*Theme, error) {
 	// a recolour-only theme still reports which design it descends from.
 	t.Name = firstNonEmpty(over.Name, base.Name)
 	t.Version = firstNonEmpty(over.Version, base.Version)
-	t.Description = over.Description
+	t.Description = firstNonEmpty(over.Description, base.Description)
 	t.Source = dir
 	return t.compile(base, over)
 }
