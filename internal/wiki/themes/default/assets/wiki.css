@@ -296,10 +296,16 @@ details.side-sub summary.side-subsum {
 }
 details.side-sub summary.side-subsum::-webkit-details-marker { display: none; }
 details.side-sub summary.side-subsum:hover { background: var(--color-accent-soft); }
-.side-subsum a, .side-subsum span {
+.side li .side-subsum a, .side-subsum span {
   flex: 1; font-family: var(--font-ui); font-size: var(--text-sm);
   font-weight: var(--fw-medium); color: var(--color-text-muted);
 }
+/* The summary carries the row's own horizontal padding, so a link inside it
+   must not add the generic .side li a padding on top: that doubles the indent
+   and pushes the group heading a step deeper than the loose pages and leaf
+   groups beside it. The selector outranks .side li a on specificity so the
+   reset wins. */
+.side li .side-subsum a { padding: 0; }
 .side-subsum a:hover { color: var(--color-heading); }
 .side-subsum a.active { color: var(--color-accent-text); }
 details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
