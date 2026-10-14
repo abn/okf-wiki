@@ -100,6 +100,7 @@
     backdrop.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     if (lastActiveElement && typeof lastActiveElement.focus === 'function') lastActiveElement.focus();
+    lastActiveElement = null;
   }
 
   function escapeHTML(str) {
@@ -362,7 +363,7 @@
   function resultItemHTML(item, index, terms) {
     var isSelected = index === selectedIndex;
     var snippet = extractSnippet(item.c, terms);
-    return '<a href="' + escapeHTML(item.u) + '" class="search-result-item' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + index + '">' +
+    return '<a href="' + escapeHTML(item.u) + '" id="search-result-' + index + '" class="search-result-item' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + index + '">' +
       '  <div class="search-result-top">' +
       '    <span class="search-result-section">' + escapeHTML(item.s) + '</span>' +
       '    <span class="search-result-sep">/</span>' +
@@ -421,6 +422,7 @@
         '<p>No results found for "<b>' + escapeHTML(query) + '</b>"</p>' +
         '<p class="search-empty-hint">Try a host, a command, or a topic.</p>' +
         '</div>';
+      input.removeAttribute('aria-activedescendant');
       announceResults();
       return;
     }
@@ -459,6 +461,7 @@
         items[i].classList.add('selected');
         items[i].setAttribute('aria-selected', 'true');
         items[i].scrollIntoView({ block: 'nearest' });
+        input.setAttribute('aria-activedescendant', 'search-result-' + selectedIndex);
       } else {
         items[i].classList.remove('selected');
         items[i].setAttribute('aria-selected', 'false');

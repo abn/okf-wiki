@@ -22,6 +22,11 @@ type tagListing struct {
 // seen. A tag with no URL form cannot have a page and is left out here;
 // buildMeta renders those as plain spans instead of links.
 func (r *Renderer) tagListings() []tagListing {
+	if r.tagListingsReady {
+		out := make([]tagListing, len(r.tagListingsCache))
+		copy(out, r.tagListingsCache)
+		return out
+	}
 	type accum struct {
 		display string
 		pages   []Page
@@ -67,6 +72,9 @@ func (r *Renderer) tagListings() []tagListing {
 		out = append(out, tagListing{Display: a.display, Slug: slug, Pages: pages})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
+	r.tagListingsCache = make([]tagListing, len(out))
+	copy(r.tagListingsCache, out)
+	r.tagListingsReady = true
 	return out
 }
 

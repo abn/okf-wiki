@@ -324,11 +324,13 @@
     'stateDiagram': 'State diagram',
     'classDiagram': 'Class diagram',
     'er': 'Entity relationship',
+    'erDiagram': 'Entity relationship',
     'gantt': 'Gantt chart',
     'pie': 'Pie chart',
     'gitGraph': 'Git graph',
     'journey': 'User journey',
     'mindmap': 'Mind map',
+    'mindmapDiagram': 'Mind map',
     'quadrantChart': 'Quadrant chart',
     'timeline': 'Timeline',
     'xychart': 'XY chart',
@@ -473,7 +475,7 @@
     actions.appendChild(iconButton('mermaid-copy', 'Copy diagram source',
       '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
       '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
-      function () { copySource(pre, actions); }));
+      function () { copySource(pre, this); }));
     actions.appendChild(iconButton('mermaid-expand', 'Open diagram in full screen',
       '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
       function () { openLightbox(pre); }));
@@ -557,15 +559,17 @@
   // Copy the fence body, not the rendered text: the source is what a reader
   // wants to paste elsewhere. Feedback is the button's own title, so no text
   // appears in the toolbar.
-  function copySource(pre, actions) {
+  // The feedback is written onto the copy button rather than its parent, so
+  // a hover or focus tooltip does not land on the zoom group beside it.
+  function copySource(pre, btn) {
     var src = pre.__mmdSource || pre.textContent;
     var done = function (ok) {
       var label = ok ? 'Copied' : 'Copy failed';
-      actions.setAttribute('data-copy', ok ? 'ok' : 'fail');
-      actions.setAttribute('aria-label', label);
+      btn.setAttribute('data-copy', ok ? 'ok' : 'fail');
+      btn.setAttribute('aria-label', label);
       setTimeout(function () {
-        actions.removeAttribute('data-copy');
-        actions.setAttribute('aria-label', '');
+        btn.removeAttribute('data-copy');
+        btn.setAttribute('aria-label', 'Copy diagram source');
       }, 1200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -851,6 +855,24 @@
   function initLightbox() {
     if (document.__wikiDiagramLb) return;
     document.__wikiDiagramLb = true;
+
+    // Content images act as buttons into the viewer, so they need a
+    // keyboard pathway alongside the click one. Diagram frames are made
+    // reachable the same way through the expand button, not the svg.
+   Array.from(document.querySelectorAll('.prose img')).forEach(function (img) {
+      img.setAttribute('tabindex', '0');
+      img.setAttribute('role', 'button');
+      img.setAttribute('aria-label', (img.alt && img.alt.trim()) ? img.alt.trim() : 'Expand image');
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var active = document.activeElement;
+      if (!(active instanceof Element) || !active.matches('.prose img')) return;
+      openImageLightbox(active);
+      e.preventDefault();
+    });
+
     document.addEventListener('click', function (e) {
       var target = e.target;
       if (!(target instanceof Element)) return;

@@ -136,7 +136,11 @@ func runServe(args []string) {
 	}
 	absRepo := ""
 	if cfg.Repo != "" {
-		absRepo, _ = absPath(cfg.Repo)
+		var err error
+		absRepo, err = absPath(cfg.Repo)
+		if err != nil {
+			fatal(err)
+		}
 	}
 	if err := wiki.Serve(wiki.ServeOptions{
 		OutDir:   cfg.Out,

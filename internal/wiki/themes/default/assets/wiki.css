@@ -518,6 +518,7 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .prose hr { border: none; border-top: 1px solid var(--color-line); margin: 2.4em 0; }
 .prose img { max-width: 100%; height: auto; border-radius: var(--radius-lg); cursor: zoom-in; }
 .prose img:hover { outline: 2px solid var(--color-accent-ring); }
+.mermaid-frame { cursor: zoom-in; }
 .wiki-lbx-content > img { box-shadow: var(--shadow-xl); border-radius: var(--radius-lg); }
 .prose mark { background: var(--color-mark); color: var(--color-mark-ink); padding: 0 0.15em; border-radius: 3px; }
 

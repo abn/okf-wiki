@@ -299,7 +299,7 @@ const wantModal = `<div class="search-modal-backdrop" id="searchBackdrop" aria-h
   <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search documentation">
     <div class="search-modal-header">
       <svg class="search-modal-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input type="search" id="searchInput" class="search-input" placeholder="Search..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <input type="search" id="searchInput" class="search-input" placeholder="Search..." aria-controls="searchResults" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <button type="button" class="search-close-btn" id="searchCloseBtn" aria-label="Close search"><kbd class="kbd-esc">ESC</kbd></button>
     </div>
     <div class="search-modal-body" id="searchResults"></div>
