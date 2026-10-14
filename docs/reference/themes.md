@@ -213,7 +213,9 @@ carrying `mermaid-type`, `mermaid-actions`, the card zoom in `mermaid-zoom`,
 `mermaid-copy` and `mermaid-expand` buttons. It adds `mermaid-rendered` and
 builds the lightbox out of `wiki-lbx` with its `wiki-lbx-bar`, `wiki-lbx-id`,
 `wiki-lbx-pill`, `wiki-lbx-title`, `wiki-lbx-ctrls`, `wiki-lbx-btn`,
-`wiki-lbx-stage`, `wiki-lbx-content` and `wiki-lbx-hint`. A diagram that will
+`wiki-lbx-stage`, `wiki-lbx-content` and `wiki-lbx-hint`. The same viewer opens on a
+content image clicked inside `.prose`; then `wiki-lbx-pill` reads Image
+and the title is the image's alt. A diagram that will
 not parse keeps `mermaid-fallback` on the source element and gains a
 `mermaid-error` card with `mermaid-error-head`, `mermaid-error-detail` and
 `mermaid-error-source`.

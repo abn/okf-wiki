@@ -649,6 +649,7 @@
       el: el, stage: stage,
       content: el.querySelector('.wiki-lbx-content'),
       title: el.querySelector('.wiki-lbx-title'),
+      pill: el.querySelector('.wiki-lbx-pill'),
       pct: el.querySelector('[data-act="fit"]'),
       hint: el.querySelector('.wiki-lbx-hint')
     };
@@ -754,15 +755,59 @@
     return (h1 && headingLabel(h1)) || 'Diagram';
   }
 
+  function openImageLightbox(img) {
+    if (!img) return;
+    var src = img.currentSrc || img.getAttribute('src') || img.src;
+    if (!src) return;
+    buildLightbox();
+    if (!lb) return;
+
+    // Keep the diagram viewer's pan/zoom machinery, but present the image
+    // on the page surface rather than on a diagram ground.
+    lb.stage.style.background = 'var(--color-surface)';
+
+    var w = img.naturalWidth || img.width || 1;
+    var h = img.naturalHeight || img.height || 1;
+    nat = { w: w, h: h };
+
+    var clone = new Image();
+    clone.src = src;
+    clone.alt = img.alt || '';
+    // Images decode asynchronously; size the stage entry off the natural
+    // dimensions the page already holds, not the clone's, so the viewer opens
+    // on the first frame.
+    clone.style.width = w + 'px';
+    clone.style.height = h + 'px';
+    clone.style.maxWidth = 'none';
+    clone.style.display = 'block';
+    lb.content.innerHTML = '';
+    lb.content.appendChild(clone);
+
+    if (lb.pill) lb.pill.textContent = 'Image';
+    lb.title.textContent = (img.alt && img.alt.trim()) ? img.alt.trim() : 'Image';
+    var touch = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+    lb.hint.textContent = touch
+      ? 'pinch to zoom \u00b7 drag to pan \u00b7 close to exit'
+      : 'scroll to zoom \u00b7 drag to pan \u00b7 double-click to toggle \u00b7 esc to close';
+
+    lb.el.classList.add('is-open');
+    if (prevOverflow == null) prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    prevFocus = document.activeElement;
+    var closeBtn = lb.el.querySelector('[data-act="close"]');
+    if (closeBtn) { try { closeBtn.focus({ preventScroll: true }); } catch (e) {} }
+    requestAnimationFrame(function () { requestAnimationFrame(lbFit); });
+  }
+
   function openLightbox(pre) {
     var svg = pre && pre.querySelector('svg');
     if (!svg) return;
     buildLightbox();
     if (!lb) return;
 
-    // The stage takes the diagram's own ground so the drawing sits on the same
-    // field it was rendered against, rather than on a guess at one.
     lb.stage.style.background = diagramPalette(isDark()).ground;
+
+    if (lb.pill) lb.pill.textContent = 'Diagram';
 
     var w = 0, h = 0;
     var vb = svg.getAttribute('viewBox');
@@ -811,13 +856,18 @@
       if (!(target instanceof Element)) return;
       if (target.closest('.mermaid-expand')) return; // handled by the button itself
       var pre = target.closest('pre.mermaid.mermaid-rendered');
-      if (pre) openLightbox(pre);
+      if (pre) { openLightbox(pre); return; }
+      var img = target.closest('img');
+      // Only content images get the viewer; the brand mark and the wiki's own
+      // chrome are meant to do their own job.
+      if (img && img.closest('.prose')) { openImageLightbox(img); e.preventDefault(); }
     });
   }
 
+  function initAll() { initLightbox(); renderAll(); }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderAll);
+    document.addEventListener('DOMContentLoaded', initAll);
   } else {
-    renderAll();
+    initAll();
   }
 })();
