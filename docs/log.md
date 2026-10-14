@@ -5,6 +5,10 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-14
 
+* **Feature**: A full width reading mode, toggled by an icon beside the theme
+  toggle, lets the article take the width the sidebars held. The rails collapse
+  into the breadcrumb bar's drawer and On this page control, and the choice is
+  persisted across page loads. `reference/themes.md` says so.
 * **Fix**: A sidebar group heading no longer sits a step deeper than the loose
   pages and leaf groups beside it. The group's `summary` carries the row's
   horizontal padding, and the link inside it also picked up the generic

@@ -167,6 +167,11 @@ a { color: var(--color-accent-text); text-decoration: none; }
 }
 .theme-toggle { padding: 0 var(--space-2); }
 .theme-toggle .icon-moon { display: none; }
+.reading-toggle { padding: 0 var(--space-2); }
+.reading-toggle .icon-narrow { display: none; }
+.reading-toggle[aria-pressed="true"] { color: var(--color-accent-text); }
+.reading-toggle[aria-pressed="true"] .icon-widen { display: none; }
+.reading-toggle[aria-pressed="true"] .icon-narrow { display: block; }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: none; }
 :root[data-theme="dark"] .theme-toggle .icon-moon { display: block; }
 @media (prefers-color-scheme: dark) {
@@ -224,6 +229,32 @@ a { color: var(--color-accent-text); text-decoration: none; }
   display: flex; flex-direction: column;
   min-height: calc(100vh - 210px);
 }
+
+/* Full width reading mode. The class is on <html> so it is in place before the
+   body parses and reaches the chrome that lives outside .layout. */
+html.reading-mode .layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+/* The sidebar leaves the grid but stays reachable through the same drawer the
+   responsive layout uses, so it is never stranded. */
+html.reading-mode .sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: min(320px, 84vw);
+  max-height: none; z-index: var(--z-overlay);
+  background: var(--color-bg-elevated); border-right: 1px solid var(--color-line);
+  padding: var(--space-5) var(--space-4); overflow-y: auto;
+  transform: translateX(-102%); transition: transform var(--dur-slow) var(--ease);
+}
+html.reading-mode .sidebar.open { transform: translateX(0); }
+/* The breadcrumb-bar controls are what reopens a hidden rail, so they stay
+   visible in reading mode even on a wide viewport, and the top navigation moves
+   into the drawer's link list the way it does on a phone. */
+html.reading-mode .menu-btn,
+html.reading-mode .toc-btn { display: inline-flex; }
+html.reading-mode .top-nav { display: none; }
+html.reading-mode .side-links { display: block; }
+html.reading-mode .toc-aside { display: none; }
+html.reading-mode .content { max-width: none; }
 
 .drawer-backdrop {
   display: none; position: fixed; inset: 0;
@@ -574,7 +605,7 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   display: none; align-items: center; gap: var(--space-1);
   /* Pushed to the far end of the bar: the button is the right-hand control,
      mirroring the hamburger on the left. */
-  margin-left: auto;
+  margin-left: auto; white-space: nowrap;
   background: transparent; border: 1px solid transparent; color: var(--color-heading);
   padding: 6px var(--space-3); border-radius: var(--radius-pill); cursor: pointer;
   font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);

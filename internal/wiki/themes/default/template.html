@@ -34,6 +34,13 @@
     var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   })();
+  (function () {
+    try {
+      if (localStorage.getItem('wiki-reading-mode') === '1') {
+        document.documentElement.classList.add('reading-mode');
+      }
+    } catch (e) {}
+  })();
 </script>
 </head>
 <body>
@@ -59,14 +66,18 @@
         <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
       </button>
+      <button type="button" class="icon-btn reading-toggle" id="readingToggle" aria-label="Toggle full width reading mode" aria-pressed="false" title="Full width reading mode">
+        <svg class="icon-widen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h6M14 12h6M4 12l3-3M4 12l3 3M20 12l-3-3M20 12l-3 3"/></svg>
+        <svg class="icon-narrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h6M14 12h6M10 12l-3-3M10 12l-3 3M14 12l3-3M14 12l3 3"/></svg>
+      </button>
     </div>
   </div>
 </header>
 <div class="breadcrumb-bar">
   <div class="wrap breadcrumb-inner">
-    <button class="menu-btn" id="menuBtn" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sideDrawer">
+    {{if .Nav}}<button class="menu-btn" id="menuBtn" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sideDrawer">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-    </button>
+    </button>{{end}}
     <nav class="breadcrumb" aria-label="Breadcrumb">{{.Breadcrumb}}</nav>
     {{if .TOCList}}<button class="toc-btn" id="tocBtn" aria-expanded="false" aria-controls="tocPanel">On this page<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="toc-panel" id="tocPanel" hidden>{{.TOCList}}</div>{{end}}
@@ -88,29 +99,32 @@
   {{if .TOCList}}<aside class="toc-aside" aria-label="On this page"><p class="toc-aside-title">On this page</p>{{.TOCList}}</aside>{{end}}
 </div>
 <script>
-  // Slide-out navigation drawer
+  // Slide-out navigation drawer. A page with no sidebar renders no drawer, so
+  // the script no-ops rather than throwing on a missing node.
   var menuBtn = document.getElementById('menuBtn');
   var drawer = document.getElementById('sideDrawer');
   var backdrop = document.getElementById('drawerBackdrop');
-  function openDrawer() {
-    drawer.classList.add('open');
-    backdrop.classList.add('open');
-    menuBtn.setAttribute('aria-expanded', 'true');
-    document.body.style.overflow = 'hidden';
+  if (menuBtn && drawer) {
+    function openDrawer() {
+      drawer.classList.add('open');
+      backdrop.classList.add('open');
+      menuBtn.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeDrawer() {
+      drawer.classList.remove('open');
+      backdrop.classList.remove('open');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+    menuBtn.addEventListener('click', function () {
+      if (drawer.classList.contains('open')) closeDrawer(); else openDrawer();
+    });
+    backdrop.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+    });
   }
-  function closeDrawer() {
-    drawer.classList.remove('open');
-    backdrop.classList.remove('open');
-    menuBtn.setAttribute('aria-expanded', 'false');
-    document.body.style.overflow = '';
-  }
-  menuBtn.addEventListener('click', function () {
-    if (drawer.classList.contains('open')) closeDrawer(); else openDrawer();
-  });
-  backdrop.addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
-  });
   document.querySelectorAll('details.side-sec').forEach(function (details) {
     details.addEventListener('toggle', function () {
       if (details.open) {
@@ -296,6 +310,29 @@
       document.documentElement.style.colorScheme = next;
       try { localStorage.setItem('wiki-theme', next); } catch (e) {}
     });
+  })();
+
+  // Full width reading mode: the class on <html> drives the layout, and the
+  // choice is persisted so it holds across page loads.
+  (function () {
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('.reading-toggle'));
+    if (!buttons.length) return;
+    function isOn() {
+      return document.documentElement.classList.contains('reading-mode');
+    }
+    function apply(on) {
+      document.documentElement.classList.toggle('reading-mode', on);
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('aria-label', on ? 'Exit full width reading mode' : 'Toggle full width reading mode');
+        b.setAttribute('title', on ? 'Back to normal width' : 'Full width reading mode');
+      });
+      try { localStorage.setItem('wiki-reading-mode', on ? '1' : '0'); } catch (e) {}
+    }
+    buttons.forEach(function (b) { b.addEventListener('click', function () { apply(!isOn()); }); });
+    try {
+      if (localStorage.getItem('wiki-reading-mode') === '1') apply(true);
+    } catch (e) {}
   })();
 </script>
 <script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_SEARCH = '{{.SearchBase}}'; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>

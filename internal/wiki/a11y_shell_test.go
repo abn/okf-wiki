@@ -204,6 +204,27 @@ func TestRenderedLabelsSpeakInAuthoredCase(t *testing.T) {
 	}
 }
 
+// TestReadingToggleIsAnAccessibleToggle covers the full width reading control
+// in the header: it is a button, it declares its pressed state and an
+// accessible name rather than relying on the icon, and it carries both the
+// widen and narrow glyphs so the state is drawn without a text label.
+func TestReadingToggleIsAnAccessibleToggle(t *testing.T) {
+	page, _ := a11yBundle(t)
+	for _, want := range []string{
+		`type="button"`,
+		`class="icon-btn reading-toggle"`,
+		`id="readingToggle"`,
+		`aria-pressed="false"`,
+		`aria-label="Toggle full width reading mode"`,
+		`class="icon-widen"`,
+		`class="icon-narrow"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the header reading toggle is missing %q:\n%s", want, page)
+		}
+	}
+}
+
 // ruleOf returns the declaration block of one selector, so an assertion is
 // about that rule rather than about any line in the file.
 func ruleOf(t *testing.T, sheet, selector string) string {
