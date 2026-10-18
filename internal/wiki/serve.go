@@ -1,6 +1,7 @@
 package wiki
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -57,7 +59,7 @@ func handler(opts ServeOptions) http.Handler {
 	base := Config{Base: opts.Base}.base()
 
 	mux := http.NewServeMux()
-	site := noCache(etag(opts.OutDir)(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir)))
+	site := noCache(gzipResponses(etag(opts.OutDir)(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir))))
 	mux.Handle(base, site)
 	// A base of "/" is the whole site, so there is no prefix to redirect and
 	// nothing left for a catch-all: TrimSuffix would give "", which ServeMux
@@ -210,6 +212,231 @@ func noCache(next http.Handler) http.Handler {
 	})
 }
 
+// gzipResponses compresses a compressible static response when the client
+// accepts gzip. The rendered site is mostly text, and the aggregate search
+// index is the large JSON response this exists for, so the transfer is
+// dominated by exactly these bodies.
+//
+// The choice is per response, not per route: the file server sets the content
+// type from the file's extension when it writes, and images, fonts and other
+// already-compressed bytes must pass through untouched. Vary is set on every
+// response, including the uncompressed one, so a cache keys both variants of a
+// URL on Accept-Encoding. The variant's ETag is set by etag(), which knows the
+// file, so a conditional request and its 200 agree on one validator.
+func gzipResponses(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding")
+		if !acceptsGzip(r) || r.Header.Get("Range") != "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gw := &gzipResponseWriter{ResponseWriter: w}
+		defer gw.close()
+		next.ServeHTTP(gw, r)
+	})
+}
+
+// gzipResponseWriter decides at header time whether the body is compressible,
+// then routes writes through a pooled gzip writer. A response that does not
+// qualify is written through unchanged.
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gz      *gzip.Writer
+	decided bool
+}
+
+func (w *gzipResponseWriter) WriteHeader(code int) {
+	if w.decided {
+		w.ResponseWriter.WriteHeader(code)
+		return
+	}
+	w.decided = true
+	h := w.Header()
+	if code >= 200 && code != http.StatusNoContent && h.Get("Content-Encoding") == "" &&
+		compressibleContentType(h.Get("Content-Type")) && compressibleLength(h.Get("Content-Length")) {
+		h.Set("Content-Encoding", "gzip")
+		// The file server's length describes the bytes on disk, not the
+		// compressed ones, and a wrong length would truncate the response.
+		h.Del("Content-Length")
+		w.gz = newGzipWriter(w.ResponseWriter)
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *gzipResponseWriter) Write(p []byte) (int, error) {
+	if !w.decided {
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.gz == nil {
+		return w.ResponseWriter.Write(p)
+	}
+	return w.gz.Write(p)
+}
+
+// Flush preserves http.Flusher across the wrapper, which would otherwise hide
+// it: the gzip buffer is flushed before the underlying writer's.
+func (w *gzipResponseWriter) Flush() {
+	if !w.decided {
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.gz != nil {
+		_ = w.gz.Flush()
+	}
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *gzipResponseWriter) close() {
+	if w.gz == nil {
+		return
+	}
+	_ = w.gz.Close()
+	gzipPool.Put(w.gz)
+	w.gz = nil
+}
+
+// A pooled writer is reused across requests: the search index is large enough
+// that allocating a fresh one per request and letting its buffers churn is
+// worth avoiding. BestSpeed keeps the render-serve loop responsive; the index
+// is read once and answered many times.
+var gzipPool = sync.Pool{
+	New: func() any {
+		gz, _ := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+		return gz
+	},
+}
+
+func newGzipWriter(w io.Writer) *gzip.Writer {
+	gz := gzipPool.Get().(*gzip.Writer)
+	gz.Reset(w)
+	return gz
+}
+
+// acceptsGzip reports whether the request's Accept-Encoding allows gzip. The
+// choice is per RFC 9110: an explicit gzip entry overrides the wildcard, so
+// `gzip;q=0, *` refuses gzip rather than accepting it through `*`.
+func acceptsGzip(r *http.Request) bool {
+	header := r.Header.Get("Accept-Encoding")
+	if header == "" {
+		return false
+	}
+	explicit := -1.0
+	wildcard := -1.0
+	for _, part := range strings.Split(header, ",") {
+		name, params, _ := strings.Cut(part, ";")
+		name = strings.TrimSpace(name)
+		switch {
+		case strings.EqualFold(name, "gzip"):
+			explicit = qValue(params)
+		case name == "*":
+			wildcard = qValue(params)
+		}
+	}
+	if explicit >= 0 {
+		return explicit > 0
+	}
+	if wildcard >= 0 {
+		return wildcard > 0
+	}
+	return false
+}
+
+func qValue(params string) float64 {
+	for _, p := range strings.Split(params, ";") {
+		p = strings.TrimSpace(p)
+		if v, ok := strings.CutPrefix(p, "q="); ok {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				return f
+			}
+		}
+	}
+	return 1
+}
+
+// compressibleContentType reports whether a response of this content type is
+// worth gzipping. It is the text-like set gzip helps; an image or a font is
+// already compressed, and recompressing it spends CPU to grow the body.
+func compressibleContentType(ct string) bool {
+	if ct == "" {
+		return false
+	}
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		mt = ct
+	}
+	switch mt {
+	case "application/json", "application/javascript", "text/javascript", "image/svg+xml":
+		return true
+	}
+	return strings.HasPrefix(mt, "text/")
+}
+
+// minGzipBytes is where compression stops paying: below this the framing and
+// the compression cost more than the bytes they save, and a tiny body grows.
+const minGzipBytes = 1024
+
+// compressibleLength reports whether a body of this size is worth compressing.
+// An absent or unparsable length counts as compressible, since a streaming
+// response has no known size to weigh.
+func compressibleLength(contentLength string) bool {
+	if contentLength == "" {
+		return true
+	}
+	n, err := strconv.ParseInt(contentLength, 10, 64)
+	if err != nil {
+		return true
+	}
+	return n >= minGzipBytes
+}
+
+// gzipCoded reports whether a response for this request would be gzip-coded,
+// which decides the validator its 200 and its 304 must carry. It mirrors the
+// gzip middleware: gzip accepted, no range, a compressible type and a body
+// large enough to be worth compressing.
+func gzipCoded(r *http.Request, file string, size int64) bool {
+	if !acceptsGzip(r) || r.Header.Get("Range") != "" {
+		return false
+	}
+	return size >= minGzipBytes && compressibleContentType(contentTypeForFile(file))
+}
+
+// contentTypeForFile mirrors the rule http.ServeContent uses: the extension
+// when it names a type, and a sniff of the leading bytes otherwise. The gzip
+// wrapper reads the same content type off the response header, so the tag this
+// chooses agrees with the coding the wrapper applies.
+func contentTypeForFile(file string) string {
+	if ct := mime.TypeByExtension(filepath.Ext(file)); ct != "" {
+		return ct
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	var buf [512]byte
+	n, _ := io.ReadFull(f, buf[:])
+	return http.DetectContentType(buf[:n])
+}
+
+// gzipETag marks a tag as belonging to the gzip variant of an entity, so the
+// compressed and uncompressed responses of one URL cannot share a validator.
+func gzipETag(tag string) string {
+	if strings.HasSuffix(tag, `"`) {
+		return tag[:len(tag)-1] + `-gzip"`
+	}
+	return tag + "-gzip"
+}
+
+// stripGzipSuffix reduces a gzip-variant tag to the content tag its coding
+// shares with the plain one.
+func stripGzipSuffix(tag string) string {
+	if strings.HasSuffix(tag, `-gzip"`) {
+		return tag[:len(tag)-len(`-gzip"`)] + `"`
+	}
+	return tag
+}
+
 // etag sets an ETag from the file's content so a conditional request is answered
 // with a 304 even after a re-render moved its modification time.
 //
@@ -244,7 +471,15 @@ func etag(outDir string) func(http.Handler) http.Handler {
 				return
 			}
 			tag := `"` + sum + `"`
-			w.Header().Set("ETag", tag)
+			// The response carries the tag of the coding the server would use,
+			// not of the coding the request named. A conditional request and
+			// its 200 therefore always agree: a 304 for a gzip-coded exchange
+			// names the gzip variant, and a plain-coded one the plain tag.
+			variant := tag
+			if gzipCoded(r, file, st.Size()) {
+				variant = gzipETag(tag)
+			}
+			w.Header().Set("ETag", variant)
 			// If-None-Match wins over If-Modified-Since (RFC 9110), so a match
 			// here is answered before the handler can send a 200 body.
 			if match := r.Header.Get("If-None-Match"); match != "" && etagMatches(match, tag) {
@@ -309,14 +544,17 @@ func cachedFileSHA256(name string) (string, error) {
 // etagMatches reports whether an If-None-Match header names the given tag.
 // The header is a comma-separated list, "*" matches anything, and a weak tag
 // ("W/...") is compared without its prefix, which is what makes a weak
-// validator usable for a conditional GET.
+// validator usable for a conditional GET. The gzip variant of a tag also
+// matches: the two codings share one underlying file, so a client holding
+// either revalidates the resource.
 func etagMatches(header, tag string) bool {
 	for _, part := range strings.Split(header, ",") {
 		part = strings.TrimSpace(part)
 		if part == "*" {
 			return true
 		}
-		if strings.TrimPrefix(part, "W/") == tag {
+		part = strings.TrimPrefix(part, "W/")
+		if part == tag || stripGzipSuffix(part) == tag {
 			return true
 		}
 	}

@@ -1,12 +1,15 @@
 package wiki
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -333,4 +336,328 @@ func TestAnnounceWarnsOnANonLoopbackBind(t *testing.T) {
 			t.Errorf("bind %s warning does not say the wiki is unauthenticated: %q", addr, got)
 		}
 	}
+}
+
+// A gzip request gets a compressed body that decompresses to the bytes of the
+// uncompressed response. The aggregate search index is the response this
+// exists for, so it is the one the test names.
+func TestServeGzipsCompressibleResponses(t *testing.T) {
+	dir, index, page := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+
+	for _, tc := range []struct {
+		path string
+		want string
+	}{
+		{"/wiki/search-index.json", index},
+		{"/wiki/index.html", page},
+	} {
+		plain := serveGET(t, h, tc.path, nil)
+		if enc := plain.Header().Get("Content-Encoding"); enc != "" {
+			t.Errorf("GET %s without the header set Content-Encoding %q", tc.path, enc)
+		}
+		if got := plain.Body.String(); got != tc.want {
+			t.Errorf("GET %s body changed without compression", tc.path)
+		}
+
+		gz := serveGET(t, h, tc.path, map[string]string{"Accept-Encoding": "gzip"})
+		if enc := gz.Header().Get("Content-Encoding"); enc != "gzip" {
+			t.Fatalf("GET %s with Accept-Encoding: gzip Content-Encoding = %q, want gzip", tc.path, enc)
+		}
+		if cl := gz.Header().Get("Content-Length"); cl != "" {
+			t.Errorf("GET %s kept Content-Length %q beside a compressed body", tc.path, cl)
+		}
+		if got := gunzip(t, gz.Body.Bytes()); string(got) != tc.want {
+			t.Errorf("GET %s gzip body does not decompress to the uncompressed bytes", tc.path)
+		}
+		if gz.Body.Len() >= len(tc.want) {
+			t.Errorf("GET %s compressed body is %d bytes, not smaller than %d", tc.path, gz.Body.Len(), len(tc.want))
+		}
+	}
+}
+
+func TestServeDoesNotCompressWithoutAcceptEncoding(t *testing.T) {
+	dir, index, _ := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+
+	w := serveGET(t, h, "/wiki/search-index.json", nil)
+	if enc := w.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("Content-Encoding = %q without Accept-Encoding, want none", enc)
+	}
+	if w.Body.String() != index {
+		t.Error("the body is not the raw file")
+	}
+
+	// An explicit gzip;q=0 turns compression off even though the header names
+	// gzip.
+	q0 := serveGET(t, h, "/wiki/search-index.json", map[string]string{"Accept-Encoding": "gzip;q=0"})
+	if enc := q0.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("Content-Encoding = %q for gzip;q=0, want none", enc)
+	}
+}
+
+// A binary body is already compressed, and a range request would have to
+// decompress a whole representation to answer a slice, so neither is gzipped.
+func TestServeDoesNotCompressBinaryOrRange(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "wiki"))
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("binary data ", 200)
+	mustWrite(t, filepath.Join(dir, "wiki", "logo.png"), png)
+	mustWrite(t, filepath.Join(dir, "wiki", "search-index.json"), strings.Repeat(`{"a":1}`, 200))
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+
+	img := serveGET(t, h, "/wiki/logo.png", map[string]string{"Accept-Encoding": "gzip"})
+	if enc := img.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("image Content-Encoding = %q, want none", enc)
+	}
+	if img.Body.String() != png {
+		t.Error("the image body was altered")
+	}
+
+	rng := serveGET(t, h, "/wiki/search-index.json", map[string]string{
+		"Accept-Encoding": "gzip",
+		"Range":           "bytes=0-9",
+	})
+	if enc := rng.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("range request Content-Encoding = %q, want none", enc)
+	}
+	if rng.Code != http.StatusPartialContent {
+		t.Errorf("range request status = %d, want 206", rng.Code)
+	}
+}
+
+// Both codings of one URL revalidate to 304, and each answers with its own tag
+// so a cache cannot apply a compressed body's validator to a plain one.
+func TestServeConditionalGzipVariants(t *testing.T) {
+	dir, _, _ := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+	const path = "/wiki/search-index.json"
+
+	plainTag := serveGET(t, h, path, nil).Header().Get("ETag")
+	gzTag := serveGET(t, h, path, map[string]string{"Accept-Encoding": "gzip"}).Header().Get("ETag")
+	if plainTag == "" || gzTag == "" {
+		t.Fatal("missing ETag on one of the variants")
+	}
+	if plainTag == gzTag {
+		t.Errorf("the two variants share the ETag %q", plainTag)
+	}
+
+	got := serveGET(t, h, path, map[string]string{"If-None-Match": plainTag})
+	if got.Code != http.StatusNotModified {
+		t.Errorf("plain If-None-Match %q = %d, want 304", plainTag, got.Code)
+	}
+	if got.Header().Get("ETag") != plainTag {
+		t.Errorf("plain 304 ETag = %q, want %q", got.Header().Get("ETag"), plainTag)
+	}
+
+	got = serveGET(t, h, path, map[string]string{
+		"If-None-Match":   gzTag,
+		"Accept-Encoding": "gzip",
+	})
+	if got.Code != http.StatusNotModified {
+		t.Fatalf("gzip If-None-Match %q = %d, want 304", gzTag, got.Code)
+	}
+	if got.Header().Get("ETag") != gzTag {
+		t.Errorf("gzip 304 ETag = %q, want %q", got.Header().Get("ETag"), gzTag)
+	}
+	if got.Body.Len() != 0 {
+		t.Errorf("304 carried a %d byte body", got.Body.Len())
+	}
+
+	weak := serveGET(t, h, path, map[string]string{
+		"If-None-Match":   "W/" + gzTag,
+		"Accept-Encoding": "gzip",
+	})
+	if weak.Code != http.StatusNotModified {
+		t.Errorf("weak gzip If-None-Match = %d, want 304", weak.Code)
+	}
+}
+
+// TestServeNotModifiedCarriesTheCodingTag pins the 304's validator: it is the
+// tag of the coding the server would use, not the one the request happened to
+// name, so a client revalidating with the plain tag against a gzip request is
+// answered with the gzip variant's tag and never a tag its own 200 would not
+// carry.
+func TestServeNotModifiedCarriesTheCodingTag(t *testing.T) {
+	dir, _, _ := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+	const path = "/wiki/search-index.json"
+
+	plainTag := serveGET(t, h, path, nil).Header().Get("ETag")
+	gzTag := serveGET(t, h, path, map[string]string{"Accept-Encoding": "gzip"}).Header().Get("ETag")
+	if plainTag == "" || gzTag == "" || plainTag == gzTag {
+		t.Fatalf("variant tags = %q, %q, want two distinct tags", plainTag, gzTag)
+	}
+
+	// The If-None-Match form: a gzip request holding the plain tag still
+	// revalidates, and the 304 names the gzip variant, which is what its 200
+	// carries.
+	got := serveGET(t, h, path, map[string]string{
+		"If-None-Match":   plainTag,
+		"Accept-Encoding": "gzip",
+	})
+	if got.Code != http.StatusNotModified {
+		t.Fatalf("gzip If-None-Match with the plain tag = %d, want 304", got.Code)
+	}
+	if tag := got.Header().Get("ETag"); tag != gzTag {
+		t.Errorf("304 ETag = %q, want the gzip variant %q", tag, gzTag)
+	}
+
+	// The If-Modified-Since form takes the same path through the file server,
+	// and its validator is still the coding's rather than the file's plain tag.
+	lm := serveGET(t, h, path, nil).Header().Get("Last-Modified")
+	if lm == "" {
+		t.Fatal("no Last-Modified on the plain 200")
+	}
+	ims := serveGET(t, h, path, map[string]string{
+		"If-Modified-Since": lm,
+		"Accept-Encoding":   "gzip",
+	})
+	if ims.Code != http.StatusNotModified {
+		t.Fatalf("If-Modified-Since gzip = %d, want 304", ims.Code)
+	}
+	if tag := ims.Header().Get("ETag"); tag != gzTag {
+		t.Errorf("If-Modified-Since 304 ETag = %q, want the gzip variant %q", tag, gzTag)
+	}
+
+	// A plain-coded exchange keeps the plain tag, so the two codings never
+	// share a validator.
+	plain := serveGET(t, h, path, map[string]string{"If-None-Match": plainTag})
+	if plain.Code != http.StatusNotModified || plain.Header().Get("ETag") != plainTag {
+		t.Errorf("plain 304 = %d ETag %q, want 304 with %q", plain.Code, plain.Header().Get("ETag"), plainTag)
+	}
+
+	// A non-compressible body is a plain exchange even when gzip is accepted,
+	// so its 304 keeps the plain tag too.
+	mustWrite(t, filepath.Join(dir, "wiki", "logo.png"), "\x89PNG\r\n\x1a\n"+strings.Repeat("bits ", 400))
+	pngTag := serveGET(t, h, "/wiki/logo.png", nil).Header().Get("ETag")
+	png := serveGET(t, h, "/wiki/logo.png", map[string]string{
+		"If-None-Match":   pngTag,
+		"Accept-Encoding": "gzip",
+	})
+	if png.Code != http.StatusNotModified || png.Header().Get("ETag") != pngTag {
+		t.Errorf("image 304 = %d ETag %q, want 304 with the plain tag %q", png.Code, png.Header().Get("ETag"), pngTag)
+	}
+}
+
+// TestServeGzipQualitySelection pins the content-coding choice: the two
+// codings that matter are gzip and identity, and an explicit gzip entry wins
+// over the wildcard, including a q=0 that refuses gzip.
+func TestServeGzipQualitySelection(t *testing.T) {
+	dir, _, _ := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+
+	for _, tc := range []struct {
+		header string
+		want   bool
+	}{
+		{"gzip", true},
+		{"", false},
+		{"identity", false},
+		{"br", false},
+		{"gzip, deflate, br", true},
+		{"gzip;q=0", false},
+		{"gzip;q=0, *", false}, // the explicit refusal beats the wildcard
+		{"gzip;q=0, *;q=1", false},
+		{"*", true},
+		{"*;q=0", false},
+		{"*;q=0, gzip;q=1", true}, // the explicit entry beats a wildcard refusal
+		{"gzip;q=0.5, identity;q=0", true},
+	} {
+		w := serveGET(t, h, "/wiki/search-index.json", map[string]string{"Accept-Encoding": tc.header})
+		got := w.Header().Get("Content-Encoding") == "gzip"
+		if got != tc.want {
+			t.Errorf("Accept-Encoding %q gzipped = %v, want %v", tc.header, got, tc.want)
+		}
+	}
+}
+
+// TestServeSmallBodyStaysUncompressed pins the size floor: a body smaller than
+// the floor is served as it is, since gzip's framing would grow a tiny
+// response, while a larger one still compresses.
+func TestServeSmallBodyStaysUncompressed(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "wiki"))
+	small := `{"a":"tiny"}`
+	big := strings.Repeat(`{"key":"value"}`, 200)
+	if len(small) >= minGzipBytes || len(big) < minGzipBytes {
+		t.Fatalf("fixture sizes small=%d big=%d do not straddle the %d floor", len(small), len(big), minGzipBytes)
+	}
+	mustWrite(t, filepath.Join(dir, "wiki", "small.json"), small)
+	mustWrite(t, filepath.Join(dir, "wiki", "big.json"), big)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+
+	sw := serveGET(t, h, "/wiki/small.json", map[string]string{"Accept-Encoding": "gzip"})
+	if enc := sw.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("a %d byte body was gzip-coded (%q), which grows it", len(small), enc)
+	}
+	if cl := sw.Header().Get("Content-Length"); cl != "" && cl != strconv.Itoa(len(small)) {
+		t.Errorf("small body Content-Length = %q, want %d or none", cl, len(small))
+	}
+	if sw.Body.String() != small {
+		t.Error("the small body was altered")
+	}
+	if !strings.Contains(sw.Header().Get("Vary"), "Accept-Encoding") {
+		t.Errorf("small body Vary = %q, want Accept-Encoding", sw.Header().Get("Vary"))
+	}
+
+	bw := serveGET(t, h, "/wiki/big.json", map[string]string{"Accept-Encoding": "gzip"})
+	if enc := bw.Header().Get("Content-Encoding"); enc != "gzip" {
+		t.Errorf("a %d byte body is not gzip-coded: %q", len(big), enc)
+	}
+	if got := gunzip(t, bw.Body.Bytes()); string(got) != big {
+		t.Error("the compressed large body does not decompress to the file")
+	}
+	if !strings.Contains(bw.Header().Get("Vary"), "Accept-Encoding") {
+		t.Errorf("large body Vary = %q, want Accept-Encoding", bw.Header().Get("Vary"))
+	}
+}
+
+func TestServeVaryHeaderOnBothVariants(t *testing.T) {
+	dir, _, _ := gzipFixture(t)
+	h := handler(ServeOptions{OutDir: dir, Base: "/wiki/"})
+	for _, headers := range []map[string]string{nil, {"Accept-Encoding": "gzip"}} {
+		w := serveGET(t, h, "/wiki/search-index.json", headers)
+		if !strings.Contains(w.Header().Get("Vary"), "Accept-Encoding") {
+			t.Errorf("Vary = %q for headers %v, want Accept-Encoding", w.Header().Get("Vary"), headers)
+		}
+	}
+}
+
+// gzipFixture writes a repetitive index and page, so a compressed body is
+// reliably smaller than the file and the decompressed bytes can be compared.
+func gzipFixture(t *testing.T) (dir, index, page string) {
+	t.Helper()
+	dir = t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "wiki"))
+	index = strings.Repeat(`{"title":"a page","text":"lorem ipsum dolor sit amet"}`, 80)
+	page = "<html><body><h1>A page</h1><p>" + strings.Repeat("lorem ipsum ", 200) + "</p></body></html>"
+	mustWrite(t, filepath.Join(dir, "wiki", "search-index.json"), index)
+	mustWrite(t, filepath.Join(dir, "wiki", "index.html"), page)
+	return dir, index, page
+}
+
+func serveGET(t *testing.T, h http.Handler, path string, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("GET", path, nil)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
+}
+
+func gunzip(t *testing.T, b []byte) []byte {
+	t.Helper()
+	zr, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("gzip body does not decode: %v", err)
+	}
+	defer zr.Close()
+	out, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("reading gzip body: %v", err)
+	}
+	return out
 }
