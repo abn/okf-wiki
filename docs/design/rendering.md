@@ -103,6 +103,15 @@ flowchart LR
    one search over prepared text rather than re-lowercasing the whole index on
    every keystroke; Enter, the arrows and Escape stay immediate.
 
+   An entry matches when every term is present in one of its fields, and the
+   score puts a title hit above a document, section or content hit. Beyond the
+   field weights, a term that starts a word in a title or a document scores
+   above one found mid-word, and a term the entry repeats in its text climbs a
+   step at two, four and eight mentions. Equal scores break on global keys: an
+   overview entry before a section entry, then the shorter title, then the
+   entry's place in the index, so the order is the same in every browser. The
+   matching set, the grouping and the caps do not move.
+
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
    In a multi-site tree, each wiki keeps its own index and content file, and

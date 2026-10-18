@@ -202,6 +202,61 @@
     refreshSelection = null;
   }
 
+  // isWordChar reports whether a lowercased character can be part of a word.
+  // A character above ASCII is a letter when its case pairs, which covers an
+  // accented word without a Unicode property class the language predates.
+  function isWordChar(ch) {
+    if (!ch) return false;
+    if (ch >= '0' && ch <= '9') return true;
+    if (ch >= 'a' && ch <= 'z') return true;
+    return ch.toUpperCase() !== ch.toLowerCase();
+  }
+
+  // wordHitKind grades the best occurrence of term in a lowercased field: 2 for
+  // a whole word, 1 for one that starts a word, 0 for one embedded in one. A
+  // word starts at the field's beginning or after a character that cannot be in
+  // one. Scanning indexOf hits keeps a term with a regexp metacharacter literal
+  // and avoids compiling a pattern from the query on every keystroke.
+  function wordHitKind(field, term) {
+    var from = 0;
+    var starts = false;
+    while (from <= field.length - term.length) {
+      var pos = field.indexOf(term, from);
+      if (pos === -1) break;
+      var before = pos > 0 && isWordChar(field.charAt(pos - 1));
+      var after = pos + term.length < field.length && isWordChar(field.charAt(pos + term.length));
+      if (!before && !after) return 2;
+      if (!before) starts = true;
+      from = pos + 1;
+    }
+    return starts ? 1 : 0;
+  }
+
+  // countOccurrences counts non-overlapping hits of term in a lowercased field,
+  // resuming at from and starting from the one hit the caller already found, and
+  // stops at stop, the count past which the repeat bonus no longer grows. The
+  // scan the match test already made is not repeated, and a long entry costs a
+  // bounded number of further scans.
+  function countOccurrences(field, term, stop, from) {
+    var count = 1;
+    while (count < stop) {
+      var pos = field.indexOf(term, from);
+      if (pos === -1) break;
+      count++;
+      from = pos + term.length;
+    }
+    return count;
+  }
+
+  // A term an entry repeats is likelier to be about it, so the content hit
+  // carries a bonus that grows with the count: none for a single mention, then a
+  // step for 2-3, 4-7 and 8 or more. The count stops at REPEAT_STOP, past which
+  // the bonus no longer grows.
+  var REPEAT_STOP = 8;
+  function repeatBonus(count) {
+    return count <= 1 ? 0 : count <= 3 ? 4 : count <= 7 ? 7 : 9;
+  }
+
   // setScope flips the All-wikis / This-wiki toggle and announces the state.
   // The button only exists in a tree, but setScope is safe to call regardless.
   function setScope(all) {
@@ -410,6 +465,10 @@
     if (terms.length === 0) { renderInitialState(); return; }
 
     var matches = [];
+    // contentHit[j] records where term j first hit the entry's content, -1 for
+    // none, so the repeat count resumes past that hit: the match test's scan is
+    // not walked twice, and the count runs only for a matched entry.
+    var contentHit = new Array(terms.length);
     for (var i = 0; i < searchIndex.length; i++) {
       var entry = searchIndex[i];
       var lower = searchIndexLower[i];
@@ -427,10 +486,20 @@
           termMatched = true;
           score += 45;
           if (titleLower === term || titleLower.startsWith(term + ' ')) score += 40;
+          var titleKind = wordHitKind(titleLower, term);
+          if (titleKind === 2) score += 25;
+          else if (titleKind === 1) score += 15;
         }
-        if (docLower.indexOf(term) !== -1) { termMatched = true; score += 25; }
+        if (docLower.indexOf(term) !== -1) {
+          termMatched = true;
+          score += 25;
+          var docKind = wordHitKind(docLower, term);
+          if (docKind === 2) score += 12;
+          else if (docKind === 1) score += 8;
+        }
         if (secLower.indexOf(term) !== -1) { termMatched = true; score += 15; }
-        if (contentLower.indexOf(term) !== -1) { termMatched = true; score += 10; }
+        contentHit[j] = contentLower.indexOf(term);
+        if (contentHit[j] !== -1) { termMatched = true; score += 10; }
         if (!termMatched) { allMatch = false; break; }
       }
 
@@ -438,11 +507,34 @@
         if (titleLower.indexOf(query) !== -1) score += 80;
         else if (docLower.indexOf(query) !== -1) score += 40;
         else if (contentLower.indexOf(query) !== -1) score += 30;
-        matches.push({ entry: entry, score: score });
+        for (var r = 0; r < terms.length; r++) {
+          if (contentHit[r] !== -1) {
+            var contentFrom = contentHit[r] + terms[r].length;
+            score += repeatBonus(countOccurrences(contentLower, terms[r], REPEAT_STOP, contentFrom));
+          }
+        }
+        matches.push({
+          entry: entry,
+          score: score,
+          i: i,
+          tl: entry.t ? entry.t.length : 0,
+          ov: entry.u === entry.p ? 1 : 0
+        });
       }
     }
 
-    matches.sort(function (a, b) { return b.score - a.score; });
+    // Equal scores fall to a fixed order rather than the index order the sort
+    // happened to leave. The keys are global, so the comparator is a total order
+    // and its result does not depend on the pair the engine compares: an
+    // overview entry above a section entry, then the shorter title, then the
+    // earlier index. The index is unique, so it returns 0 only for the same
+    // entry.
+    matches.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.ov !== b.ov) return b.ov - a.ov;
+      if (a.tl !== b.tl) return a.tl - b.tl;
+      return a.i - b.i;
+    });
 
     // "This wiki" keeps only the current wiki's rows. A tree names the wiki in
     // the URL, so the current wiki's base is the prefix of exactly its own rows;
