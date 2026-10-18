@@ -5,6 +5,15 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-18
 
+* **Perf**: The search client lowercases each entry's match fields once as it
+  scans the index and debounces typing by a short pause, so a burst of
+  keystrokes triggers one search over prepared text rather than re-lowercasing
+  the whole index on every keystroke. Enter, the arrows and Escape stay
+  immediate, and the arrows and Enter flush a pending search first so they act
+  on the current query. Opening the modal or finishing the index load with a
+  query already present still shows results without another keystroke.
+  Ranking, result order and the DOM are unchanged. `design/rendering.md` says
+  so.
 * **Perf**: The server gzips a compressible response when the client sends
   `Accept-Encoding: gzip`: text pages, JSON, JavaScript and SVG, including the
   aggregate `search-index.json`, when the body is large enough to be worth it.

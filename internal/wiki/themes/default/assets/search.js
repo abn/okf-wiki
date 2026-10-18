@@ -2,6 +2,13 @@
   'use strict';
 
   var searchIndex = null;
+  // searchIndexLower mirrors searchIndex with title, doc and section lowercased,
+  // so runSearch matches without lowercasing every field of every entry on every
+  // keystroke. Content is the large field and dominates the index, so it is
+  // lowercased once per entry by lowerContent on first scan rather than copied
+  // whole at load: a session that prefetches the index but never searches then
+  // never holds the second large string per entry.
+  var searchIndexLower = null;
   // searchIndexPromise holds the in-flight index request. A caller that asks
   // while the first fetch is still loading must be handed that same request, not
   // a promise resolved with a searchIndex that is still null: runSearch would
@@ -19,6 +26,7 @@
   var lastActiveElement = null;
   var status = null;
   var announcedSet = null;
+  var inputTimer = null;
 
   // A tree of wikis publishes one aggregate index at the tree base and names it
   // in window.__WIKI_SEARCH. Its own base is still window.__WIKI_BASE, which is
@@ -42,6 +50,36 @@
     return;
   }
 
+  // buildLowerIndex mirrors the index with the three small match fields already
+  // lowercased. runSearch reads these instead of lowercasing the entry fields on
+  // every keystroke.
+  function buildLowerIndex(index) {
+    var lower = new Array(index.length);
+    for (var i = 0; i < index.length; i++) {
+      var entry = index[i];
+      lower[i] = {
+        t: entry.t ? entry.t.toLowerCase() : '',
+        d: entry.d ? entry.d.toLowerCase() : '',
+        s: entry.s ? entry.s.toLowerCase() : '',
+        c: null
+      };
+    }
+    return lower;
+  }
+
+  // lowerContent fills in one entry's lowercased content on first use and keeps
+  // it. The null in buildLowerIndex marks the not-yet-lowercased state, so an
+  // entry whose content is empty is cached as '' and not recomputed.
+  function lowerContent(i) {
+    var cached = searchIndexLower[i].c;
+    if (cached === null) {
+      var content = searchIndex[i].c;
+      cached = content ? content.toLowerCase() : '';
+      searchIndexLower[i].c = cached;
+    }
+    return cached;
+  }
+
   function fetchIndex() {
     if (searchIndex) return Promise.resolve(searchIndex);
     if (searchIndexPromise) return searchIndexPromise;
@@ -53,6 +91,7 @@
       })
       .then(function (data) {
         searchIndex = data || [];
+        searchIndexLower = buildLowerIndex(searchIndex);
         return searchIndex;
       })
       .catch(function (err) {
@@ -60,6 +99,7 @@
         // a failed load as "still loading" and retry on every keystroke.
         console.warn('Failed to load wiki search index:', err);
         searchIndex = [];
+        searchIndexLower = [];
         return searchIndex;
       });
     return searchIndexPromise;
@@ -96,6 +136,9 @@
 
   function closeSearch() {
     if (!backdrop.classList.contains('open')) return;
+    // A pending search would otherwise run after the dialog is hidden and
+    // announce its count from a closed live region.
+    if (inputTimer) { clearTimeout(inputTimer); inputTimer = null; }
     backdrop.classList.remove('open');
     backdrop.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
@@ -243,6 +286,11 @@
   }
 
   function runSearch() {
+    // A debounced search or a fetch continuation can outlive the dialog: Escape
+    // closes it while the timer or the request is still in flight. Writing the
+    // results then would speak into the live region of a hidden dialog, so a
+    // closed dialog runs nothing.
+    if (!backdrop.classList.contains('open')) return;
     var query = input.value.trim().toLowerCase();
     if (!query) {
       selectedIndex = -1;
@@ -267,10 +315,11 @@
     var matches = [];
     for (var i = 0; i < searchIndex.length; i++) {
       var entry = searchIndex[i];
-      var titleLower = entry.t ? entry.t.toLowerCase() : '';
-      var docLower = entry.d ? entry.d.toLowerCase() : '';
-      var secLower = entry.s ? entry.s.toLowerCase() : '';
-      var contentLower = entry.c ? entry.c.toLowerCase() : '';
+      var lower = searchIndexLower[i];
+      var titleLower = lower.t;
+      var docLower = lower.d;
+      var secLower = lower.s;
+      var contentLower = lowerContent(i);
       var allMatch = true;
       var score = 0;
 
@@ -508,11 +557,32 @@
   }
 
   backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeSearch(); });
-  input.addEventListener('input', runSearch);
+
+  // Typing runs one search a short pause after the last keystroke. The key
+  // listener is separate, so Escape closes at once, and the arrows and Enter
+  // flush a pending search first so they never act on the previous query's rows.
+  function scheduleSearch() {
+    if (inputTimer) clearTimeout(inputTimer);
+    // The handle is cleared when the timer fires, so flushSearch does not read
+    // a search that has already run as still pending and run it again.
+    inputTimer = setTimeout(function () {
+      inputTimer = null;
+      runSearch();
+    }, 100);
+  }
+
+  function flushSearch() {
+    if (!inputTimer) return;
+    clearTimeout(inputTimer);
+    inputTimer = null;
+    runSearch();
+  }
+
+  input.addEventListener('input', scheduleSearch);
   input.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); moveSelection(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); openSelected(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); flushSearch(); moveSelection(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); flushSearch(); moveSelection(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); flushSearch(); openSelected(); }
     else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
   });
 
