@@ -3,20 +3,17 @@ package wiki
 import (
 	"encoding/json"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yuin/goldmark/ast"
 )
 
-// SearchEntry is one search hit: a heading-anchored chunk of a page, or the
-// page itself when it produced no chunks. Title is the heading and Doc the
-// enclosing page, which differ whenever a hit is anchored mid-page.
-type SearchEntry struct {
-	URL     string `json:"u"` // deep link anchor or page url
-	PageURL string `json:"p"` // page url
-	Title   string `json:"t"` // heading title or page title
-	Doc     string `json:"d"` // enclosing page title
-	Section string `json:"s"` // section category (e.g. Architecture)
-	Content string `json:"c"` // extracted plain text
+// SearchPage is one page's metadata, held once in the index's page table. Its
+// entries refer to it by index, so a page's url and titles are not repeated on
+// every section it contributed.
+type SearchPage struct {
+	URL   string `json:"u"` // page url
+	Title string `json:"t"` // page title
 	// Site is the wiki's display title, set only on a tree's aggregate index so
 	// the client can head a group of results with the wiki they came from.
 	Site string `json:"w,omitempty"`
@@ -25,11 +22,62 @@ type SearchEntry struct {
 	SiteKey string `json:"k,omitempty"`
 }
 
+// SearchEntry is one search hit: a heading-anchored chunk of a page, or the
+// page itself when it produced no chunks. Page indexes the page table, and the
+// client rebuilds the deep link as the page url plus "#" plus Anchor, an empty
+// Anchor meaning the page url alone. Title is the heading and the page's title
+// is on its row, which differ whenever a hit is anchored mid-page.
+type SearchEntry struct {
+	Page    int    `json:"g"` // index into the page table
+	Anchor  string `json:"a"` // heading anchor, empty for the page itself
+	Title   string `json:"t"` // heading title or page title
+	Section string `json:"s"` // section category (e.g. Architecture)
+	Content string `json:"c"` // extracted plain text
+}
+
+// SearchIndex is the on-disk catalogue: a page table, and the entries that
+// refer to it.
+type SearchIndex struct {
+	Pages   []SearchPage  `json:"pages"`
+	Entries []SearchEntry `json:"entries"`
+}
+
 // rawSearchChunk is an unresolved text section extracted from a page's AST.
 type rawSearchChunk struct {
 	Heading string
 	Anchor  string
 	Text    string
+}
+
+// maxSearchChunkBytes bounds one chunk's indexed text. Content dominates the
+// index's bytes, and a page can hold a list or a log long enough that indexing
+// its tail buys no ranking the head has not already won. The cut falls on a
+// word boundary where one lies in the prefix and on a rune boundary otherwise,
+// so the rest is simply not indexed.
+const maxSearchChunkBytes = 12000
+
+// boundSearchText caps s at maxSearchChunkBytes bytes, dropping a partial rune
+// at the cut and then backing up to the last space, so a cut lands between
+// words when the prefix has one.
+func boundSearchText(s string) string {
+	if len(s) <= maxSearchChunkBytes {
+		return s
+	}
+	cut := s[:maxSearchChunkBytes]
+	// At most the rune straddling the cut can be partial, so step back over its
+	// continuation bytes to its first byte and drop it. Revalidating the whole
+	// prefix would discard everything from an earlier invalid byte onward.
+	if r, size := utf8.DecodeLastRuneInString(cut); r == utf8.RuneError && size <= 1 {
+		i := len(cut) - 1
+		for n := 0; n < utf8.UTFMax-1 && i > 0 && !utf8.RuneStart(cut[i]); n++ {
+			i--
+		}
+		cut = cut[:i]
+	}
+	if i := strings.LastIndexByte(cut, ' '); i > 0 {
+		cut = cut[:i]
+	}
+	return cut
 }
 
 // extractSearchChunks splits a page into one text chunk per heading, anchored
@@ -46,7 +94,7 @@ func extractSearchChunks(doc ast.Node, src []byte) []rawSearchChunk {
 			if h.Level == 1 {
 				continue
 			}
-			txt := cleanSearchText(currentText.String())
+			txt := boundSearchText(cleanSearchText(currentText.String()))
 			if txt != "" || currentHeading != "" {
 				chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt})
 			}
@@ -63,7 +111,7 @@ func extractSearchChunks(doc ast.Node, src []byte) []rawSearchChunk {
 		}
 	}
 
-	txt := cleanSearchText(currentText.String())
+	txt := boundSearchText(cleanSearchText(currentText.String()))
 	if txt != "" || currentHeading != "" {
 		chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt})
 	}
@@ -106,10 +154,10 @@ func cleanSearchText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// BuildSearchIndex flattens every page into one entry per heading-anchored
-// chunk.
-func (r *Renderer) BuildSearchIndex() []SearchEntry {
-	var index []SearchEntry
+// BuildSearchIndex flattens every page into one page-table row and one entry
+// per heading-anchored chunk.
+func (r *Renderer) BuildSearchIndex() SearchIndex {
+	index := SearchIndex{Pages: []SearchPage{}, Entries: []SearchEntry{}}
 	for _, s := range r.sections {
 		secTitle := s.Title
 		if secTitle == "" {
@@ -121,24 +169,22 @@ func (r *Renderer) BuildSearchIndex() []SearchEntry {
 			if docTitle == "" {
 				docTitle = p.Slug
 			}
+			page := len(index.Pages)
+			index.Pages = append(index.Pages, SearchPage{URL: pageURL, Title: docTitle})
 
 			if len(p.searchChunks) == 0 {
-				index = append(index, SearchEntry{
-					URL: pageURL, PageURL: pageURL, Title: docTitle, Doc: docTitle, Section: secTitle,
+				index.Entries = append(index.Entries, SearchEntry{
+					Page: page, Title: docTitle, Section: secTitle,
 				})
 				continue
 			}
 			for _, chunk := range p.searchChunks {
-				itemURL := pageURL
-				if chunk.Anchor != "" {
-					itemURL = pageURL + "#" + chunk.Anchor
-				}
 				itemTitle := chunk.Heading
 				if itemTitle == "" {
 					itemTitle = docTitle
 				}
-				index = append(index, SearchEntry{
-					URL: itemURL, PageURL: pageURL, Title: itemTitle, Doc: docTitle, Section: secTitle, Content: chunk.Text,
+				index.Entries = append(index.Entries, SearchEntry{
+					Page: page, Anchor: chunk.Anchor, Title: itemTitle, Section: secTitle, Content: chunk.Text,
 				})
 			}
 		}
@@ -151,16 +197,27 @@ func (r *Renderer) SearchIndexJSON() ([]byte, error) {
 	return json.Marshal(r.BuildSearchIndex())
 }
 
-// labelSearchIndex tags a wiki's own index with the wiki's display title and its
-// path under the tree root, so one aggregate index can group rows by wiki. It
-// is deliberately separate from BuildSearchIndex: a single bundle's index stays
-// unlabelled, and its JSON is unchanged.
-func labelSearchIndex(index []SearchEntry, site, key string) []SearchEntry {
-	out := make([]SearchEntry, len(index))
-	for i, e := range index {
-		e.Site = site
-		e.SiteKey = key
-		out[i] = e
+// mergeSearchIndex appends src to dst, rebasing every entry's page index into
+// dst's page table so one tree-wide table can hold the pages of many wikis.
+func mergeSearchIndex(dst, src *SearchIndex) {
+	base := len(dst.Pages)
+	dst.Pages = append(dst.Pages, src.Pages...)
+	for _, e := range src.Entries {
+		e.Page += base
+		dst.Entries = append(dst.Entries, e)
 	}
-	return out
+}
+
+// labelSearchIndex tags a wiki's page table with the wiki's display title and
+// its path under the tree root, so one aggregate index can group rows by wiki.
+// It is deliberately separate from BuildSearchIndex: a single bundle's index
+// stays unlabelled, and its JSON is unchanged.
+func labelSearchIndex(index SearchIndex, site, key string) SearchIndex {
+	pages := make([]SearchPage, len(index.Pages))
+	for i, p := range index.Pages {
+		p.Site = site
+		p.SiteKey = key
+		pages[i] = p
+	}
+	return SearchIndex{Pages: pages, Entries: index.Entries}
 }

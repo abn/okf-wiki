@@ -50,6 +50,33 @@
     return;
   }
 
+  // expandIndex turns the on-disk page table and its entries into the flat
+  // entry objects the rest of the file reads. A page's url and titles are held
+  // once and referenced by index, so the expansion shares the table's strings
+  // rather than copying them per entry, and the deep link is the page url plus
+  // the entry's anchor, an empty anchor being the page itself.
+  function expandIndex(data) {
+    var pages = (data && data.pages) || [];
+    var entries = (data && data.entries) || [];
+    var out = new Array(entries.length);
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      var page = pages[entry.g] || {};
+      var url = page.u || '';
+      out[i] = {
+        u: entry.a ? url + '#' + entry.a : url,
+        p: url,
+        t: entry.t || page.t,
+        d: page.t,
+        s: entry.s,
+        c: entry.c,
+        w: page.w,
+        k: page.k
+      };
+    }
+    return out;
+  }
+
   // buildLowerIndex mirrors the index with the three small match fields already
   // lowercased. runSearch reads these instead of lowercasing the entry fields on
   // every keystroke.
@@ -90,7 +117,7 @@
         return res.json();
       })
       .then(function (data) {
-        searchIndex = data || [];
+        searchIndex = expandIndex(data);
         searchIndexLower = buildLowerIndex(searchIndex);
         return searchIndex;
       })

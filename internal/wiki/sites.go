@@ -221,12 +221,13 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
 		return 0, nil
 	}
-	// The wiki rendered, so its entries join the tree's aggregate index, labelled
-	// with the wiki they came from. renderSites visits the wikis in sorted rel
-	// order, and this preserves that order. A root that is itself a wiki (rel "")
-	// has no separate aggregate to feed.
+	// The wiki rendered, so its pages and entries merge into the tree's
+	// aggregate index, labelled with the wiki they came from. renderSites
+	// visits the wikis in sorted rel order, and this preserves that order. A
+	// root that is itself a wiki (rel "") has no separate aggregate to feed.
 	if n.rel != "" {
-		r.aggregated = append(r.aggregated, labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)...)
+		index := labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)
+		mergeSearchIndex(&r.aggregated, &index)
 	}
 	return 1, nil
 }
@@ -265,20 +266,24 @@ func (r *Renderer) writeSiteRoot(root string) error {
 }
 
 // writeAggregateSearchIndex writes the tree's one search index at the tree base:
-// the labelled entries of every wiki that rendered, in the order renderSites
-// visited them. A search from any wiki of the tree therefore reaches all of
-// them, and each row says which wiki it came from. A tree with no readable wiki
-// still gets an empty catalogue, so a group page's search control answers
-// instead of fetching a 404. root is the output root the tree was written into.
+// the pages and entries of every wiki that rendered, in the order renderSites
+// visited them and with each entry's page index rebased onto the merged page
+// table. A search from any wiki of the tree therefore reaches all of them, and
+// each page says which wiki it came from. A tree with no readable wiki still
+// gets an empty catalogue, so a group page's search control answers instead of
+// fetching a 404. root is the output root the tree was written into.
 func (r *Renderer) writeAggregateSearchIndex(root string) error {
-	entries := r.aggregated
-	if entries == nil {
-		// Marshal an empty slice, not a nil one, so the catalogue is [] rather
-		// than null: the client parses it as a list either way, but a group page
-		// expecting an array should find one.
-		entries = []SearchEntry{}
+	index := r.aggregated
+	// Marshal empty slices, not nil ones, so the catalogue is an empty table
+	// rather than null: the client parses either, but a group page expecting
+	// pages and entries should find both.
+	if index.Pages == nil {
+		index.Pages = []SearchPage{}
 	}
-	b, err := json.Marshal(entries)
+	if index.Entries == nil {
+		index.Entries = []SearchEntry{}
+	}
+	b, err := json.Marshal(index)
 	if err != nil {
 		return err
 	}

@@ -89,9 +89,9 @@ type Renderer struct {
 	// multi-site tree it is the tree base, where one aggregate index spans every
 	// wiki. The page carries it as window.__WIKI_SEARCH.
 	searchBase string
-	// aggregated collects the labelled search entries of a tree render, in the
-	// order the wikis were visited, so the whole tree gets one index at its base.
-	aggregated []SearchEntry
+	// aggregated collects the search index of a tree render, wiki by wiki, so
+	// the whole tree gets one index at its base.
+	aggregated SearchIndex
 	// treeBase, siteRel, siteTitle and siteTrail describe a page's place in a
 	// multi-site tree. treeBase is the tree index's URL prefix, empty for a
 	// single bundle, so the brand and the breadcrumb trail mean "the deployment
