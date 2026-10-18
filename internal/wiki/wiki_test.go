@@ -271,6 +271,131 @@ func TestDefaultThemeSearchSharesTheInFlightFetch(t *testing.T) {
 	}
 }
 
+// TestDefaultThemeSearchLowercasesOnceAndDebounces pins the two performance
+// changes to the client. The scoring loop reads a lowercased mirror of the
+// index instead of lowercasing four fields of every entry on every keystroke,
+// and the input listener runs one search a short pause after the last
+// keystroke. Both are behavioural no-ops: the mirror is built at load and the
+// same ranking reads it, so the results and their order are unchanged. Go tests
+// cannot run the client, so this asserts the shape and that the scoring loop
+// carries no lowercasing of its own.
+func TestDefaultThemeSearchLowercasesOnceAndDebounces(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+
+	// The mirror is built on the load path that assigns the index, and the
+	// failure path leaves an empty mirror beside the empty index.
+	for _, want := range []string{
+		"function buildLowerIndex(index) {",
+		"searchIndexLower = buildLowerIndex(searchIndex);",
+		"searchIndexLower = [];",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("search.js has no %q, so the lowercased mirror is not built with the index", want)
+		}
+	}
+
+	// The scoring loop reads the mirror, content through the lazy per-entry
+	// helper, and lowercases nothing itself.
+	start := strings.Index(js, "function runSearch()")
+	end := strings.Index(js, "function groupMatches")
+	if start < 0 || end <= start {
+		t.Fatal("search.js does not have the expected runSearch and groupMatches functions")
+	}
+	runSearch := js[start:end]
+	// The query itself is still lowercased once per call. What must be gone is
+	// the per-entry lowercasing, which repeats the work for the whole index on
+	// every keystroke. buildLowerIndex holds those expressions now.
+	for _, gone := range []string{
+		"entry.t ? entry.t.toLowerCase()",
+		"entry.d ? entry.d.toLowerCase()",
+		"entry.s ? entry.s.toLowerCase()",
+		"entry.c ? entry.c.toLowerCase()",
+	} {
+		if strings.Contains(runSearch, gone) {
+			t.Errorf("runSearch still lowercases an entry field (%q), so the work repeats on every keystroke instead of once when the index loads", gone)
+		}
+	}
+	for _, want := range []string{
+		"var lower = searchIndexLower[i];",
+		"var contentLower = lowerContent(i);",
+	} {
+		if !strings.Contains(runSearch, want) {
+			t.Errorf("runSearch has no %q, so it does not read the precomputed mirror", want)
+		}
+	}
+
+	// The content field is the large one, so it is lowercased once per entry on
+	// first scan rather than copied whole at load.
+	if !strings.Contains(js, "function lowerContent(i) {") {
+		t.Error("search.js has no lowerContent, so the content field is not lowercased once per entry")
+	}
+
+	// Typing is debounced. The key listener stays separate, so Escape acts at
+	// once, and the arrows and Enter flush a pending search first.
+	for _, want := range []string{
+		"input.addEventListener('input', scheduleSearch);",
+		"inputTimer = setTimeout(function () {",
+		"function flushSearch() {",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("search.js has no %q, so the debounce or its flush path is missing", want)
+		}
+	}
+	if strings.Contains(js, "input.addEventListener('input', runSearch);") {
+		t.Error("search.js still binds the input listener to runSearch, so every keystroke scores the whole index")
+	}
+}
+
+// TestDefaultThemeSearchStopsOnClose pins the close paths. A debounced search
+// or a fetch continuation can outlive the dialog, and writing results then
+// speaks into the live region of a hidden dialog, so runSearch has to run
+// nothing while the dialog is closed. The debounce handle is cleared when the
+// timer fires, so the arrows and Enter do not re-run a search that has already
+// run. Go cannot run the client, so the guarded function bodies are what the
+// test asserts.
+func TestDefaultThemeSearchStopsOnClose(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+
+	// The guard sits in runSearch itself, the one place every debounced and
+	// deferred caller lands, so a continuation cannot write into a closed
+	// dialog.
+	run := jsFuncBody(t, js, "runSearch")
+	if !strings.Contains(run, "if (!backdrop.classList.contains('open')) return;") {
+		t.Error("runSearch does not return while the dialog is closed, so a debounced or deferred search writes into the hidden live region")
+	}
+
+	// flushSearch acts on inputTimer alone, so the timer has to clear the handle
+	// as it fires; otherwise a search that already ran looks pending and runs
+	// again on the next arrow or Enter.
+	sched := jsFuncBody(t, js, "scheduleSearch")
+	if !strings.Contains(sched, "inputTimer = null;") {
+		t.Error("scheduleSearch leaves the timer handle set after it fires, so flushSearch re-runs the search")
+	}
+}
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,

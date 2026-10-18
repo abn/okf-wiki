@@ -83,6 +83,10 @@ flowchart LR
    citations to a generated Sources section; see [Sources](#sources).
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
+   The client lowercases each entry's match fields once as it scans the index
+   and debounces typing, so a burst of keystrokes triggers one search over
+   prepared text rather than re-lowercasing the whole index on every keystroke;
+   Enter, the arrows and Escape stay immediate.
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
    In a multi-site tree, each wiki keeps its own index and the tree also gets an
