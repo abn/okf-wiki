@@ -83,18 +83,29 @@ flowchart LR
    citations to a generated Sources section; see [Sources](#sources).
 4. **Index.** Each page is split into heading-anchored text chunks and written
    to `search-index.json`, which the client search modal loads on first use.
-   The client lowercases each entry's match fields once as it scans the index
-   and debounces typing, so a burst of keystrokes triggers one search over
-   prepared text rather than re-lowercasing the whole index on every keystroke;
-   Enter, the arrows and Escape stay immediate.
+   The file is a page table plus the entries that refer to it: an entry names
+   its page by index and carries the heading, section and text, so a page's url
+   and titles are stored once however many sections it has. The deep link is the
+   page url plus the entry's anchor, an empty anchor being the page itself. The
+   client expands the table into the flat entries it scores, reading the page
+   fields through the table rather than copying them. A chunk's text is capped
+   at 12,000 bytes, cut at a word boundary where the prefix holds one and at a
+   rune boundary otherwise, so one unusually long section cannot dominate the
+   file. The client lowercases each entry's match
+   fields once as it scans the index and debounces typing, so a burst of
+   keystrokes triggers one search over prepared text rather than re-lowercasing
+   the whole index on every keystroke; Enter, the arrows and Escape stay
+   immediate.
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
    In a multi-site tree, each wiki keeps its own index and the tree also gets an
-   aggregate one at its base: the entries of every wiki that rendered, each
-   labelled with the wiki it came from, so a search from any wiki reaches all of
-   them. A wiki that was skipped contributes nothing to the aggregate. A content
-   root that is itself a wiki is a tree of one, whose index already sits at the
-   base; it gets no separate aggregate, so its search reads as one bundle's.
+   aggregate one at its base: the pages and entries of every wiki that rendered,
+   with the wikis' page tables merged into one and every entry rebased onto it,
+   and each page labelled with the wiki it came from, so a search from any wiki
+   reaches all of them. A wiki that was skipped contributes nothing to the
+   aggregate. A content root that is itself a wiki is a tree of one, whose index
+   already sits at the base; it gets no separate aggregate, so its search reads
+   as one bundle's.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,

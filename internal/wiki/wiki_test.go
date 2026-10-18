@@ -13,7 +13,58 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
+
+// flatEntry is the expanded form of a search entry: the page table's fields
+// joined back onto the entry, which is what the client builds at load and what
+// the pre-page-table index stored per entry.
+type flatEntry struct {
+	URL     string
+	PageURL string
+	Title   string
+	Doc     string
+	Section string
+	Content string
+	Site    string
+	SiteKey string
+}
+
+// flattenIndex expands a search index the way the client does, resolving each
+// entry's page and rebuilding its deep link, so a test can assert on what a
+// reader would get.
+func flattenIndex(t *testing.T, index SearchIndex) []flatEntry {
+	t.Helper()
+	out := make([]flatEntry, len(index.Entries))
+	for i, e := range index.Entries {
+		if e.Page < 0 || e.Page >= len(index.Pages) {
+			t.Fatalf("entry %d refers to page %d, out of range of %d pages", i, e.Page, len(index.Pages))
+		}
+		p := index.Pages[e.Page]
+		url := p.URL
+		if e.Anchor != "" {
+			url += "#" + e.Anchor
+		}
+		out[i] = flatEntry{
+			URL: url, PageURL: p.URL, Title: e.Title, Doc: p.Title,
+			Section: e.Section, Content: e.Content, Site: p.Site, SiteKey: p.SiteKey,
+		}
+	}
+	return out
+}
+
+func readSearchIndex(t *testing.T, path string) SearchIndex {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index SearchIndex
+	if err := json.Unmarshal(raw, &index); err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	return index
+}
 
 func TestLinkPath(t *testing.T) {
 	withRepo := &Renderer{cfg: Config{Repo: "/repo-root"}}
@@ -396,6 +447,56 @@ func TestDefaultThemeSearchStopsOnClose(t *testing.T) {
 		t.Error("scheduleSearch leaves the timer handle set after it fires, so flushSearch re-runs the search")
 	}
 }
+
+// TestDefaultThemeSearchExpandsPageTable pins the client's read of the index
+// format: the on-disk shape is a page table and entries that refer to it, and
+// the client expands it at load into the flat entry objects the scoring and
+// display code reads. Go cannot run the client, so the shape of the expansion
+// is what the test asserts, together with the deep link it rebuilds.
+func TestDefaultThemeSearchExpandsPageTable(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+
+	// The expansion is built from the page table and the entries, keyed by the
+	// entry's page index, and the load path assigns its result to the index the
+	// rest of the file reads.
+	for _, want := range []string{
+		"function expandIndex(data) {",
+		"var pages = (data && data.pages) || [];",
+		"var entries = (data && data.entries) || [];",
+		"var page = pages[entry.g] || {};",
+		"searchIndex = expandIndex(data);",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("search.js has no %q, so the page table is not expanded into entries", want)
+		}
+	}
+
+	// The deep link is the page url plus the entry's anchor, an empty anchor
+	// meaning the page url alone, which is what the old per-entry u held.
+	expand := jsFuncBody(t, js, "expandIndex")
+	for _, want := range []string{
+		"u: entry.a ? url + '#' + entry.a : url,",
+		"p: url,",
+		"d: page.t,",
+	} {
+		if !strings.Contains(expand, want) {
+			t.Errorf("expandIndex has no %q, so the entry it builds is not the old one", want)
+		}
+	}
+}
+
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,
@@ -603,23 +704,18 @@ func TestRenderRelocatesToTheBase(t *testing.T) {
 
 	// The search index is consumed as ready-made hrefs, so a stale prefix there
 	// sends every result to a path that does not exist.
-	raw, err := os.ReadFile(filepath.Join(site, "search-index.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var index []SearchEntry
-	if err := json.Unmarshal(raw, &index); err != nil {
-		t.Fatal(err)
-	}
-	if len(index) == 0 {
+	index := readSearchIndex(t, filepath.Join(site, "search-index.json"))
+	if len(index.Pages) == 0 || len(index.Entries) == 0 {
 		t.Fatal("search index is empty under a relocated base")
 	}
-	for _, e := range index {
+	for _, p := range index.Pages {
+		if !strings.HasPrefix(p.URL, "/docs/deep/") {
+			t.Fatalf("search page URL does not follow the base: %q", p.URL)
+		}
+	}
+	for _, e := range flattenIndex(t, index) {
 		if !strings.HasPrefix(e.URL, "/docs/deep/") {
 			t.Fatalf("search entry URL does not follow the base: %q", e.URL)
-		}
-		if !strings.HasPrefix(e.PageURL, "/docs/deep/") {
-			t.Fatalf("search entry PageURL does not follow the base: %q", e.PageURL)
 		}
 	}
 }
@@ -993,18 +1089,11 @@ func TestRenderBundledDocs(t *testing.T) {
 		}
 	}
 
-	raw, err := os.ReadFile(filepath.Join(out, "wiki", "search-index.json"))
-	if err != nil {
-		t.Fatalf("read search index: %v", err)
+	index := readSearchIndex(t, filepath.Join(out, "wiki", "search-index.json"))
+	if len(index.Entries) < 10 {
+		t.Fatalf("search index has only %d entries", len(index.Entries))
 	}
-	var index []SearchEntry
-	if err := json.Unmarshal(raw, &index); err != nil {
-		t.Fatalf("unmarshal search index: %v", err)
-	}
-	if len(index) < 10 {
-		t.Fatalf("search index has only %d entries", len(index))
-	}
-	for _, e := range index {
+	for _, e := range flattenIndex(t, index) {
 		if e.URL == "" || e.Doc == "" {
 			t.Fatalf("search entry missing URL/Doc: %+v", e)
 		}
@@ -1658,8 +1747,8 @@ func TestNestedContentPagesRender(t *testing.T) {
 		t.Errorf("guide section has %d pages, want 3", len(guide.Pages))
 	}
 	found := false
-	for _, e := range r.BuildSearchIndex() {
-		if strings.Contains(e.PageURL, "guide/setup/install.html") {
+	for _, p := range r.BuildSearchIndex().Pages {
+		if strings.Contains(p.URL, "guide/setup/install.html") {
 			found = true
 		}
 	}
@@ -3412,22 +3501,16 @@ func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
 		t.Fatalf("rendered %d wikis, want 4 readable ones", wikis)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(out, "family", "search-index.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var index []SearchEntry
-	if err := json.Unmarshal(raw, &index); err != nil {
-		t.Fatalf("aggregate index is not a search catalogue: %v", err)
-	}
-	if len(index) == 0 {
+	index := readSearchIndex(t, filepath.Join(out, "family", "search-index.json"))
+	if len(index.Entries) == 0 || len(index.Pages) == 0 {
 		t.Fatal("aggregate search index is empty")
 	}
+	flat := flattenIndex(t, index)
 
 	// Every entry names its wiki, and its URL is the root-relative page under
 	// that wiki's own base.
 	var order []string
-	for _, e := range index {
+	for _, e := range flat {
 		if e.Site == "" || e.SiteKey == "" {
 			t.Fatalf("aggregate entry is not labelled: %+v", e)
 		}
@@ -3447,7 +3530,7 @@ func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
 
 	// A phrase that exists only in the operations wiki is found under that wiki.
 	found := false
-	for _, e := range index {
+	for _, e := range flat {
 		if !strings.Contains(e.Content, "exampleneedle") {
 			continue
 		}
@@ -3464,7 +3547,7 @@ func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
 	}
 
 	// The skipped wiki contributes nothing.
-	for _, e := range index {
+	for _, e := range flat {
 		if e.SiteKey == "broken" || strings.Contains(e.URL, "/broken/") {
 			t.Errorf("a skipped wiki is in the aggregate index: %+v", e)
 		}
@@ -3472,31 +3555,22 @@ func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
 
 	// Each wiki's own index is still written at its own base, unlabelled, so a
 	// single wiki remains a site of its own.
-	own, err := os.ReadFile(filepath.Join(out, "family", "alpha", "search-index.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var ownEntries []map[string]json.RawMessage
-	if err := json.Unmarshal(own, &ownEntries); err != nil {
-		t.Fatal(err)
-	}
-	if len(ownEntries) == 0 {
+	own := readSearchIndex(t, filepath.Join(out, "family", "alpha", "search-index.json"))
+	if len(own.Pages) == 0 {
 		t.Fatal("the wiki's own index is empty")
 	}
-	for _, e := range ownEntries {
-		if _, ok := e["w"]; ok {
-			t.Errorf("the wiki's own index gained a site title: %s", own)
-		}
-		if _, ok := e["k"]; ok {
-			t.Errorf("the wiki's own index gained a site key: %s", own)
+	for _, p := range own.Pages {
+		if p.Site != "" || p.SiteKey != "" {
+			t.Errorf("the wiki's own index gained a site label: %+v", p)
 		}
 	}
 }
 
-// TestSingleBundleSearchIndexUnchanged pins backward compatibility: a
-// single-bundle index keeps exactly the six fields it had, so the added site
-// fields are omitted and the file's bytes are what the old shape would write.
-func TestSingleBundleSearchIndexUnchanged(t *testing.T) {
+// TestSingleBundleSearchIndexOmitsSiteFields pins the single-bundle shape: the
+// page table holds only the page url and title, so no site field is written and
+// the file's bytes are the pre-label shape. A page that contributed a chunk
+// appears once in the table however many entries refer to it.
+func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"),
 		"---\ntitle: Home\n---\n# Home\n\nA stable sentence lives here.\n")
@@ -3517,21 +3591,28 @@ func TestSingleBundleSearchIndexUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Unmarshal into the pre-change shape and re-marshal. If any new key leaked
-	// into the file it would be dropped here and the two would differ.
-	type legacyEntry struct {
-		URL     string `json:"u"`
-		PageURL string `json:"p"`
+	// Unmarshal into a shape without the site fields and re-marshal. If any new
+	// key leaked into the file it would be dropped here and the two would differ.
+	type barePage struct {
+		URL   string `json:"u"`
+		Title string `json:"t"`
+	}
+	type bareEntry struct {
+		Page    int    `json:"g"`
+		Anchor  string `json:"a"`
 		Title   string `json:"t"`
-		Doc     string `json:"d"`
 		Section string `json:"s"`
 		Content string `json:"c"`
 	}
-	var legacy []legacyEntry
-	if err := json.Unmarshal(raw, &legacy); err != nil {
+	type bareIndex struct {
+		Pages   []barePage  `json:"pages"`
+		Entries []bareEntry `json:"entries"`
+	}
+	var bare bareIndex
+	if err := json.Unmarshal(raw, &bare); err != nil {
 		t.Fatal(err)
 	}
-	again, err := json.Marshal(legacy)
+	again, err := json.Marshal(bare)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3540,6 +3621,185 @@ func TestSingleBundleSearchIndexUnchanged(t *testing.T) {
 	}
 	if strings.Contains(string(raw), `"w"`) || strings.Contains(string(raw), `"k"`) {
 		t.Errorf("single-bundle index carries site fields: %s", raw)
+	}
+}
+
+// TestSearchIndexPageTableDedup covers the page table: a page with two sections
+// contributes one row, however many entries point at it, so the page's url and
+// titles are stored once.
+func TestSearchIndexPageTableDedup(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
+		"---", "title: Home", "---", "# Home", "",
+		"## First", "", "alpha content", "",
+		"## Second", "", "beta content", "",
+	}, "\n"))
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := r.BuildSearchIndex()
+	if len(index.Pages) != 1 {
+		t.Fatalf("the page table has %d rows for one page, want 1", len(index.Pages))
+	}
+	if len(index.Entries) != 2 {
+		t.Fatalf("the page contributed %d entries, want 2", len(index.Entries))
+	}
+	for i, e := range index.Entries {
+		if e.Page != 0 {
+			t.Errorf("entry %d refers to page %d, want 0", i, e.Page)
+		}
+	}
+	if index.Pages[0].URL != "/wiki/index.html" || index.Pages[0].Title != "Home" {
+		t.Errorf("page row = %+v, want the home page url and title", index.Pages[0])
+	}
+}
+
+// TestAggregateSearchIndexRebasesPageTable covers the tree merge: two wikis'
+// page tables concatenate into one, every entry's page index is rebased into
+// the merged table, and each page carries the wiki it came from.
+func TestAggregateSearchIndexRebasesPageTable(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntype: Overview\ntitle: Alpha\n---\n# Alpha\n\n## First\n\nalphaneedle here.\n\n## Second\n\nalpha lore.\n")
+	mustMkdir(t, filepath.Join(dir, "beta"))
+	mustWrite(t, filepath.Join(dir, "beta", "index.md"),
+		"---\ntype: Overview\ntitle: Beta\n---\n# Beta\n\n## First\n\nbetaneedle here.\n\n## Second\n\nbeta lore.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	index := readSearchIndex(t, filepath.Join(out, "family", "search-index.json"))
+	if len(index.Pages) != 2 {
+		t.Fatalf("aggregate page table has %d rows, want 2", len(index.Pages))
+	}
+	if len(index.Entries) != 4 {
+		t.Fatalf("aggregate has %d entries, want 4", len(index.Entries))
+	}
+	// The page table is the concatenation of the wikis' tables in visit order.
+	if index.Pages[0].SiteKey != "alpha" || index.Pages[1].SiteKey != "beta" {
+		t.Fatalf("page table order = %q, %q, want alpha then beta", index.Pages[0].SiteKey, index.Pages[1].SiteKey)
+	}
+	for _, p := range index.Pages {
+		if p.Site != "Alpha" && p.Site != "Beta" {
+			t.Errorf("aggregate page has the wrong site title: %+v", p)
+		}
+		if !strings.Contains(p.URL, "/"+p.SiteKey+"/") {
+			t.Errorf("page url %q does not sit under its wiki %q", p.URL, p.SiteKey)
+		}
+	}
+	// A merge that forgot to rebase would leave beta's entries pointing at
+	// alpha's row, so each entry's page must name the wiki its content came from.
+	for i, e := range index.Entries {
+		if e.Page < 0 || e.Page >= len(index.Pages) {
+			t.Fatalf("entry %d points outside the page table: %d", i, e.Page)
+		}
+		want := "alpha"
+		if strings.Contains(e.Content, "beta") {
+			want = "beta"
+		}
+		if got := index.Pages[e.Page].SiteKey; got != want {
+			t.Errorf("entry %d (%q) points at page %d of %q, want %q", i, e.Content, e.Page, got, want)
+		}
+	}
+}
+
+// TestSearchIndexBoundsLongChunk covers the chunk bound: a section longer than
+// the cap is indexed up to a word boundary and no further, so no word is cut
+// in half and an outlier section cannot dominate the index.
+func TestSearchIndexBoundsLongChunk(t *testing.T) {
+	word := "lorem"
+	var b strings.Builder
+	for b.Len() < maxSearchChunkBytes*2 {
+		b.WriteString(word)
+		b.WriteByte(' ')
+	}
+	body := b.String()
+
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\n## Big\n\n"+body+"\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := r.BuildSearchIndex()
+	if len(index.Entries) != 1 {
+		t.Fatalf("the page contributed %d entries, want 1", len(index.Entries))
+	}
+	got := index.Entries[0].Content
+	if len(got) > maxSearchChunkBytes {
+		t.Fatalf("chunk is %d bytes, over the %d cap", len(got), maxSearchChunkBytes)
+	}
+	if !strings.HasPrefix(body, got) {
+		t.Error("the bounded chunk is not a prefix of the original text")
+	}
+	// The cut is a whole-word one: the original's next character after the cut
+	// is a space, so the chunk stops between words rather than inside one.
+	if next := body[len(got)]; next != ' ' {
+		t.Errorf("the cut landed mid-word: chunk ends %q, next byte %q", got[len(got)-8:], next)
+	}
+}
+
+// TestSearchIndexLongChunkShortStaysWhole is the other side of the bound: text
+// at or under the cap is indexed in full, so the common chunk is untouched.
+func TestSearchIndexLongChunkShortStaysWhole(t *testing.T) {
+	text := strings.Repeat("short clause ", 10)
+	if got := boundSearchText(text); got != text {
+		t.Errorf("a chunk under the cap was altered: %q", got)
+	}
+}
+
+// TestSearchIndexBoundsLongChunkWithEarlyInvalidByte covers a chunk whose
+// source carries a stray non-UTF-8 byte before the cut. Only the rune at the
+// cut may be partial, so the cut has to step back over that rune alone; a
+// validity check over the whole prefix would throw the section away from the
+// first invalid byte onward and index nothing.
+func TestSearchIndexBoundsLongChunkWithEarlyInvalidByte(t *testing.T) {
+	body := "\xff" + strings.Repeat("lorem ", maxSearchChunkBytes)
+	got := boundSearchText(body)
+	if got == "" {
+		t.Fatal("a long section with one early invalid byte was reduced to nothing")
+	}
+	if len(got) > maxSearchChunkBytes {
+		t.Errorf("chunk is %d bytes, over the %d cap", len(got), maxSearchChunkBytes)
+	}
+	if !strings.HasPrefix(body, got) {
+		t.Error("the bounded chunk is not a prefix of the original text")
+	}
+	if !strings.Contains(got, "lorem") {
+		t.Errorf("the chunk dropped the text around the invalid byte: %q", got[:min(len(got), 40)])
+	}
+}
+
+// TestSearchIndexBoundsLongChunkRuneBoundary covers a long run with no spaces
+// to cut at. The cut then lands on a rune boundary rather than a word one, and
+// the indexed text must still be valid UTF-8.
+func TestSearchIndexBoundsLongChunkRuneBoundary(t *testing.T) {
+	// One ASCII byte ahead of the runes puts the byte cap inside a multi-byte
+	// rune, which is the partial rune the cut has to step back over.
+	body := "x" + strings.Repeat("\u6f22", maxSearchChunkBytes)
+	got := boundSearchText(body)
+	if len(got) > maxSearchChunkBytes {
+		t.Errorf("chunk is %d bytes, over the %d cap", len(got), maxSearchChunkBytes)
+	}
+	if !utf8.ValidString(got) {
+		t.Errorf("the rune-boundary cut left invalid UTF-8 at %q", got[len(got)-8:])
+	}
+	if !strings.HasPrefix(body, got) {
+		t.Error("the bounded chunk is not a prefix of the original text")
+	}
+	if r, size := utf8.DecodeLastRuneInString(got); r == utf8.RuneError && size <= 1 {
+		t.Error("the chunk ends in a partial rune")
 	}
 }
 
@@ -3567,8 +3827,15 @@ func TestMultiSiteZeroWikisWritesEmptyAggregate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the tree base has no catalogue: %v", err)
 	}
-	if strings.TrimSpace(string(raw)) != "[]" {
-		t.Errorf("empty tree catalogue = %q, want []", raw)
+	if strings.Contains(string(raw), "null") {
+		t.Errorf("empty tree catalogue has a null table: %s", raw)
+	}
+	var index SearchIndex
+	if err := json.Unmarshal(raw, &index); err != nil {
+		t.Fatalf("empty tree catalogue is not a search index: %v", err)
+	}
+	if len(index.Pages) != 0 || len(index.Entries) != 0 {
+		t.Errorf("empty tree catalogue = %s, want empty pages and entries", raw)
 	}
 }
 
@@ -3596,25 +3863,15 @@ func TestMultiSiteRootWikiKeepsItsOwnIndex(t *testing.T) {
 	}
 	base := filepath.Join(out, "family")
 
-	// The base index is the wiki's own: every row is unlabelled, so the client
+	// The base index is the wiki's own: every page is unlabelled, so the client
 	// renders the flat list with no per-wiki headings.
-	raw, err := os.ReadFile(filepath.Join(base, "search-index.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var entries []map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &entries); err != nil {
-		t.Fatalf("base index is not a search catalogue: %v", err)
-	}
-	if len(entries) == 0 {
+	own := readSearchIndex(t, filepath.Join(base, "search-index.json"))
+	if len(own.Pages) == 0 || len(own.Entries) == 0 {
 		t.Fatal("the root wiki's own index is empty")
 	}
-	for _, e := range entries {
-		if _, ok := e["w"]; ok {
-			t.Errorf("the root wiki's own index gained a site title: %s", raw)
-		}
-		if _, ok := e["k"]; ok {
-			t.Errorf("the root wiki's own index gained a site key: %s", raw)
+	for _, p := range own.Pages {
+		if p.Site != "" || p.SiteKey != "" {
+			t.Errorf("the root wiki's own index gained a site label: %+v", p)
 		}
 	}
 

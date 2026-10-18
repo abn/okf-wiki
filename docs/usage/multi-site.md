@@ -118,7 +118,9 @@ live on the next page load. See [Live reload](cli.md#live-reload).
 
 Search spans the whole tree. Each wiki keeps its own `search-index.json`, so it
 remains a site of its own, and after every wiki has rendered the tree writes one
-aggregate index at its base. Every wiki and group fetches that aggregate, so a
+aggregate index at its base. The aggregate merges the wikis' page tables into
+one and rebases each entry onto it, so a page's url and titles are still stored
+once in the tree-wide file. Every wiki and group fetches that aggregate, so a
 term that appears in a sibling wiki is found from here and answers with a
 heading naming the wiki it came from. A wiki that could not be read contributes
 nothing to it. A content root that is itself a wiki is a tree of one: its own
