@@ -208,6 +208,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   around a Chroma-highlighted one, each with a `language-*` class on the inner
   `code` element
 
+`diagrams.js` adds a `code-copy` button to every `pre` in the prose (code and
+  text blocks), top right, carrying `aria-label` and `data-copy` for feedback.
+
 ### Classes the clients write
 
 `search.js` builds `search-empty-state`, `search-empty-hint`, `search-quick-links`,

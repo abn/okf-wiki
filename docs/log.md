@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-14
 
+* **Feature**: Code and text blocks carry a copy button in their top-right
+  corner, added client-side and a11y-compliant (a real button with an
+  accessible name and focus ring). It uses the same copy glyph as the diagram
+  toolbar and is hidden when printing. `design/rendering.md` and
+  `reference/themes.md` say so.
+
 * **Feature**: A full width reading mode, toggled by an icon beside the theme
   toggle, lets the article take the width the sidebars held. The rails collapse
   into the breadcrumb bar's drawer and On this page control, and the choice is

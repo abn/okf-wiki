@@ -886,7 +886,58 @@
     });
   }
 
-  function initAll() { initLightbox(); renderAll(); }
+  // Copy a code block's source to the clipboard. The button sits in the
+  // block's top-right corner and carries its own feedback, so no text is added
+  // to the code surface.
+  function copyCode(pre, btn) {
+    var code = pre.querySelector('code');
+    var src = (code ? code.textContent : pre.textContent) || '';
+    src = src.replace(/\n$/, '');
+    var done = function (ok) {
+      btn.setAttribute('data-copy', ok ? 'ok' : 'fail');
+      btn.setAttribute('aria-label', ok ? 'Copied' : 'Copy failed');
+      btn.title = ok ? 'Copied' : 'Copy failed';
+      setTimeout(function () {
+        btn.removeAttribute('data-copy');
+        btn.setAttribute('aria-label', 'Copy code');
+        btn.title = 'Copy code';
+      }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(src).then(function () { done(true); }, function () { done(false); });
+      return;
+    }
+    done(false);
+  }
+
+  // A copy affordance on every code or text block. The button is appended to
+  // the block so it stays put while the code scrolls sideways.
+  function enhanceCodeBlocks() {
+    var blocks = document.querySelectorAll('article.prose pre');
+    for (var i = 0; i < blocks.length; i++) {
+      var pre = blocks[i];
+      if (pre.classList.contains('mermaid')) continue;
+      if (pre.dataset.codeEnhanced) continue;
+      pre.dataset.codeEnhanced = '1';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'code-copy';
+      btn.setAttribute('aria-label', 'Copy code');
+      btn.title = 'Copy code';
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+        '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
+        '<path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var owner = e.currentTarget && e.currentTarget.parentNode;
+        if (owner) copyCode(owner, e.currentTarget);
+      });
+      pre.appendChild(btn);
+    }
+  }
+
+  function initAll() { initLightbox(); renderAll(); enhanceCodeBlocks(); }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAll);
   } else {

@@ -810,6 +810,26 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   font-family: var(--font-code); font-size: 13.5px; line-height: 1.7;
 }
 .prose pre.code code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+/* A code block carries its own copy affordance in its top-right corner, the
+   same glyph as the diagram toolbar. It is positioned against the block so it
+   stays put while the code scrolls sideways. */
+.prose pre.code { position: relative; }
+.code-copy {
+  position: absolute; top: var(--space-2); right: var(--space-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: color-mix(in srgb, var(--color-code-bg) 80%, transparent);
+  color: var(--color-code-fg); border: 1px solid var(--color-code-line);
+  border-radius: var(--radius-md); cursor: pointer;
+  opacity: 0.7; transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.prose pre.code:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
+.code-copy:hover { color: var(--color-accent-text); border-color: var(--color-accent-ring); }
+.code-copy:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.code-copy[data-copy="ok"] { color: var(--color-accent-text); border-color: var(--color-accent-ring); opacity: 1; }
+.code-copy[data-copy="fail"] { color: var(--status-danger-text); border-color: var(--status-danger-text); opacity: 1; }
+/* Indented code blocks and any other pre in the prose get the same treatment. */
+article.prose pre { position: relative; }
 
 .chroma .err { color: #FCA5A5; }
 .chroma .lnlinks { outline: none; text-decoration: none; color: inherit; }
@@ -1185,7 +1205,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 @media print {
   .site-header, .breadcrumb-bar, .sidebar, .search-modal-backdrop,
   .theme-toggle, .skip-link, .toc, .toc-aside, .toc-btn, .toc-panel,
-  .mermaid-actions, .heading-anchor, .prevnext, .page-download, .tag-controls {
+  .mermaid-actions, .code-copy, .heading-anchor, .prevnext, .page-download, .tag-controls {
     display: none !important;
   }
   .layout, .content { display: block; max-width: none; min-height: 0; }

@@ -58,6 +58,10 @@ flowchart LR
    Mermaid fences pass through as `<pre class="mermaid">` for the browser to
    render.
 
+   Every code and text block (`pre.code`, highlighted or not, and any other
+   `pre` in the prose) carries a copy button in its top-right corner, added
+   client-side by `diagrams.js`; it is hidden when printing.
+
    The browser draws each diagram into a card: a toolbar naming the type, a
    zoom group and the copy and expand affordances, then the drawing. Every
    type renders at one size, and a diagram opens fitted to the card, so its
