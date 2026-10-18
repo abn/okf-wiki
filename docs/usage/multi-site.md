@@ -116,15 +116,17 @@ live on the next page load. See [Live reload](cli.md#live-reload).
 
 ## The search index
 
-Search spans the whole tree. Each wiki keeps its own `search-index.json`, so it
-remains a site of its own, and after every wiki has rendered the tree writes one
-aggregate index at its base. The aggregate merges the wikis' page tables into
-one and rebases each entry onto it, so a page's url and titles are still stored
-once in the tree-wide file. Every wiki and group fetches that aggregate, so a
-term that appears in a sibling wiki is found from here and answers with a
-heading naming the wiki it came from. A wiki that could not be read contributes
-nothing to it. A content root that is itself a wiki is a tree of one: its own
-index is the one at the base, with no aggregate written over it.
+Search spans the whole tree. Each wiki keeps its own `search-index.json` and
+the text companion `search-content.json`, so it remains a site of its own, and
+after every wiki has rendered the tree writes one aggregate pair at its base.
+The aggregate merges the wikis' page tables into one and rebases each entry onto
+it, so a page's url and titles are still stored once in the tree-wide file, and
+its content file concatenates the wikis' entry texts in the aggregate's entry
+order. Every wiki and group fetches that aggregate, so a term that appears in a
+sibling wiki is found from here and answers with a heading naming the wiki it
+came from. A wiki that could not be read contributes nothing to it. A content
+root that is itself a wiki is a tree of one: its own index is the one at the
+base, with no aggregate written over it.
 
 The modal can be narrowed to the current wiki with the All wikis / This wiki
 toggle in its footer. The toggle appears only in a tree, where the aggregate

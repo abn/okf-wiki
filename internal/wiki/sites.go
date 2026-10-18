@@ -271,7 +271,9 @@ func (r *Renderer) writeSiteRoot(root string) error {
 // table. A search from any wiki of the tree therefore reaches all of them, and
 // each page says which wiki it came from. A tree with no readable wiki still
 // gets an empty catalogue, so a group page's search control answers instead of
-// fetching a 404. root is the output root the tree was written into.
+// fetching a 404. The entries' texts are written beside it as
+// search-content.json, in the same order as the aggregate's entries. root is
+// the output root the tree was written into.
 func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	index := r.aggregated
 	// Marshal empty slices, not nil ones, so the catalogue is an empty table
@@ -291,7 +293,14 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "search-index.json"), b, 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "search-index.json"), b, 0o644); err != nil {
+		return err
+	}
+	content, err := json.Marshal(contentFromIndex(index))
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "search-content.json"), content, 0o644)
 }
 
 // writeCatalog writes the index for a group directory: its direct children,

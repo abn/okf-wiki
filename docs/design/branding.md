@@ -27,7 +27,8 @@ document contract:
 - the class names and ids the clients look for, listed in the stylesheet's header
   comment
 - the template fields listed below
-- `search-index.json` and its shape
+- the search index pair, `search-index.json` and `search-content.json`, and
+  their shape
 - the mermaid contract: `pre.mermaid` in, rendered SVG plus a lightbox out
 
 That split is the point. A theme that only wants a different skin restyles the

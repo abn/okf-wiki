@@ -40,6 +40,8 @@ sequenceDiagram
     S-->>U: page + ?v= asset links
     U->>S: GET /wiki/search-index.json
     Note over U: loaded once, on first focus
+    U->>S: GET /wiki/search-content.json
+    Note over U,S: page text loads behind the light index
     U->>U: filter chunks locally
 ```
 

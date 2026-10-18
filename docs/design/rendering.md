@@ -81,39 +81,46 @@ flowchart LR
 
    Footnotes whose label matches a `sources[]` id are rewritten into numbered
    citations to a generated Sources section; see [Sources](#sources).
-4. **Index.** Each page is split into heading-anchored text chunks and written
-   to `search-index.json`, which the client search modal loads on first use.
-   The file is a page table plus the entries that refer to it: an entry names
-   its page by index and carries the heading, section and text, so a page's url
-   and titles are stored once however many sections it has. The deep link is the
-   page url plus the entry's anchor, an empty anchor being the page itself. The
-   client expands the table into the flat entries it scores, reading the page
-   fields through the table rather than copying them. A chunk's text is capped
-   at 12,000 bytes, cut at a word boundary where the prefix holds one and at a
-   rune boundary otherwise, so one unusually long section cannot dominate the
-   file. The client lowercases each entry's match
-   fields once as it scans the index and debounces typing, so a burst of
-   keystrokes triggers one search over prepared text rather than re-lowercasing
-   the whole index on every keystroke; Enter, the arrows and Escape stay
-   immediate.
+4. **Index.** Each page is split into heading-anchored text chunks, and the
+   catalogue is written as two files that load at different speeds.
+   `search-index.json` is a page table plus the entries that refer to it: an
+   entry names its page by index and carries the heading, section and anchor,
+   so a page's url and titles are stored once however many sections it has.
+   `search-content.json` carries the entry texts in entry order. The deep link
+   is the page url plus the entry's anchor, an empty anchor being the page
+   itself. The client expands the table into the flat entries it scores,
+   reading the page fields through the table rather than copying them, and
+   searches titles, documents and sections as soon as the light index arrives.
+   It fetches `search-content.json` in the background, attaches each text to
+   its entry by position, and ignores the file whole if its count does not
+   match the index. An open query is re-run when the texts arrive, so content
+   matches join the results without a keystroke, while a failed text load
+   leaves the light index answering. A chunk's text is capped at 12,000 bytes,
+   cut at a word boundary where the prefix holds one and at a rune boundary
+   otherwise, so one unusually long section cannot dominate the file. The
+   client lowercases each entry's match fields once as
+   it scans the index and debounces typing, so a burst of keystrokes triggers
+   one search over prepared text rather than re-lowercasing the whole index on
+   every keystroke; Enter, the arrows and Escape stay immediate.
+
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
-   In a multi-site tree, each wiki keeps its own index and the tree also gets an
-   aggregate one at its base: the pages and entries of every wiki that rendered,
-   with the wikis' page tables merged into one and every entry rebased onto it,
-   and each page labelled with the wiki it came from, so a search from any wiki
-   reaches all of them. A wiki that was skipped contributes nothing to the
-   aggregate. A content root that is itself a wiki is a tree of one, whose index
-   already sits at the base; it gets no separate aggregate, so its search reads
-   as one bundle's.
+   In a multi-site tree, each wiki keeps its own index and content file, and
+   the tree also gets an aggregate pair at its base: the pages and entries of
+   every wiki that rendered, with the wikis' page tables merged into one and
+   every entry rebased onto it, and each page labelled with the wiki it came
+   from, so a search from any wiki reaches all of them. A wiki that was skipped
+   contributes nothing to the aggregate. A content root that is itself a wiki
+   is a tree of one, whose index already sits at the base; it gets no separate
+   aggregate, so its search reads as one bundle's.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
    fonts, tokens, the search and diagram clients, favicon), the Mermaid vendor
-   bundle when the bundle has a diagram, `search-index.json`, `tags.json`, and
-   a `theme.json` recording which theme produced the output. The output
-   directory is emptied first, so a page removed from the bundle does not
-   linger.
+   bundle when the bundle has a diagram, `search-index.json`,
+   `search-content.json`, `tags.json`, and a `theme.json` recording which theme
+   produced the output. The output directory is emptied first, so a page
+   removed from the bundle does not linger.
 
 ## Themes
 
@@ -260,10 +267,11 @@ A response is gzipped when the request carries `Accept-Encoding: gzip`, the
 content type is text-like (`text/*`, JSON, JavaScript, and SVG), and the body is
 large enough to be worth compressing. A body below a small floor passes through
 uncompressed, since gzip's framing would grow it. The coding is chosen per RFC
-9110, so an explicit `gzip;q=0` refuses gzip even beside a `*`. The aggregate
-`search-index.json` is the large response this exists for. Images, fonts and
-other already-compressed bytes pass through, as does a range request, which
-would have to decompress a whole representation to answer a slice. Vary records
+9110, so an explicit `gzip;q=0` refuses gzip even beside a `*`. The search index
+split is what this exists for: `search-content.json` carries most of the bytes
+and the light `search-index.json` arrives first. Images, fonts and other
+already-compressed bytes pass through, as does a range request, which would
+have to decompress a whole representation to answer a slice. Vary records
 `Accept-Encoding`, and the compressed and uncompressed forms carry different
 `ETag`s. A conditional request revalidates to a `304` carrying the tag of the
 coding the response would use, so a cache keeps the two apart while either

@@ -66,6 +66,37 @@ func readSearchIndex(t *testing.T, path string) SearchIndex {
 	return index
 }
 
+// readSearchContent reads the companion file that carries the entry texts.
+func readSearchContent(t *testing.T, path string) SearchContent {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var content SearchContent
+	if err := json.Unmarshal(raw, &content); err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	return content
+}
+
+// readSearchIndexWithContent reads a wiki's light index and the text companion
+// beside it, attaching each text to its entry by position, which is what the
+// client does when the background fetch arrives.
+func readSearchIndexWithContent(t *testing.T, dir string) SearchIndex {
+	t.Helper()
+	index := readSearchIndex(t, filepath.Join(dir, "search-index.json"))
+	content := readSearchContent(t, filepath.Join(dir, "search-content.json"))
+	if content.Count != len(index.Entries) || len(content.Texts) != len(index.Entries) {
+		t.Fatalf("search content carries %d texts (n=%d) for %d entries",
+			len(content.Texts), content.Count, len(index.Entries))
+	}
+	for i := range index.Entries {
+		index.Entries[i].Content = content.Texts[i]
+	}
+	return index
+}
+
 func TestLinkPath(t *testing.T) {
 	withRepo := &Renderer{cfg: Config{Repo: "/repo-root"}}
 	noRepo := &Renderer{}
@@ -493,6 +524,91 @@ func TestDefaultThemeSearchExpandsPageTable(t *testing.T) {
 	} {
 		if !strings.Contains(expand, want) {
 			t.Errorf("expandIndex has no %q, so the entry it builds is not the old one", want)
+		}
+	}
+}
+
+// TestDefaultThemeSearchLoadsContentInTheBackground pins the split on the
+// client: the light index renders results at once, the entry texts are fetched
+// separately and joined onto the entries when they arrive, and the join re-runs
+// an open query so content matches appear without a keystroke. Go cannot run the
+// client, so this asserts the shape of the background load.
+func TestDefaultThemeSearchLoadsContentInTheBackground(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+
+	// The companion file is fetched beside the index, under the same base and
+	// cache-busting version the index was fetched from.
+	if !strings.Contains(js, "fetch(searchBase + 'search-content.json' + v)") {
+		t.Error("search.js does not fetch the entry texts from the content companion")
+	}
+	// The light index starts the text load once it resolves, so the open, hover
+	// and focus triggers that load the index also start the texts.
+	indexBody := jsFuncBody(t, js, "fetchIndex")
+	if !strings.Contains(indexBody, "fetchContent();") {
+		t.Error("the index load does not start the background text load")
+	}
+	// The in-flight request is memoized, so a second trigger does not start a
+	// second fetch.
+	if !strings.Contains(js, "if (searchContentPromise) return searchContentPromise;") {
+		t.Error("search.js has no guard against a second content fetch")
+	}
+
+	// The texts are joined by position, and a count that does not match the
+	// index is ignored whole rather than misattached.
+	apply := jsFuncBody(t, js, "applyContent")
+	for _, want := range []string{
+		"n !== searchIndex.length",
+		"texts.length !== searchIndex.length",
+		"searchIndex[i].c = texts[i] || '';",
+		"searchIndexLower = buildLowerIndex(searchIndex);",
+		"runSearch();",
+	} {
+		if !strings.Contains(apply, want) {
+			t.Errorf("applyContent has no %q, so the texts are not joined and the search re-run", want)
+		}
+	}
+	// The re-run is marked, so the announcement guard can tell it from a
+	// keystroke.
+	if !strings.Contains(js, "contentRefresh = true;") || !strings.Contains(js, "contentRefresh = false;") {
+		t.Error("the background re-run is not marked for the announcement guard")
+	}
+	// The guard compares the result signature, not only the count, so a refresh
+	// that swaps rows for others of the same size is still announced.
+	ann := jsFuncBody(t, js, "announceResults")
+	guardAt := strings.Index(ann, "if (contentRefresh && key === lastAnnouncedKey) return;")
+	if guardAt < 0 {
+		t.Error("the announcement guard does not compare the result set, so a refresh that swaps rows of the same count says nothing")
+	}
+	keyAt := strings.Index(ann, "key += '|' + currentResults[i].u;")
+	if keyAt < 0 || keyAt > guardAt {
+		t.Error("the announcement builds the result signature after the guard, so the guard compares a stale key")
+	}
+
+	// The selected row survives the background re-run: applyContent records its
+	// url before re-running, and renderResults selects it again when it is still
+	// in the results, falling back to the first row otherwise.
+	if !strings.Contains(apply, "refreshSelection = selectedIndex >= 0 && currentResults[selectedIndex]") {
+		t.Error("applyContent does not record the selected row before re-running the search")
+	}
+	render := jsFuncBody(t, js, "renderResults")
+	for _, want := range []string{
+		"if (contentRefresh && refreshSelection) {",
+		"if (currentResults[s].u === refreshSelection) { selectedIndex = s; break; }",
+	} {
+		if !strings.Contains(render, want) {
+			t.Errorf("renderResults has no %q, so a background refresh resets the keyboard selection", want)
 		}
 	}
 }
@@ -3501,7 +3617,7 @@ func TestMultiSiteAggregatesSearchIndex(t *testing.T) {
 		t.Fatalf("rendered %d wikis, want 4 readable ones", wikis)
 	}
 
-	index := readSearchIndex(t, filepath.Join(out, "family", "search-index.json"))
+	index := readSearchIndexWithContent(t, filepath.Join(out, "family"))
 	if len(index.Entries) == 0 || len(index.Pages) == 0 {
 		t.Fatal("aggregate search index is empty")
 	}
@@ -3593,6 +3709,7 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 
 	// Unmarshal into a shape without the site fields and re-marshal. If any new
 	// key leaked into the file it would be dropped here and the two would differ.
+	// The entry text is not part of the index: it travels in search-content.json.
 	type barePage struct {
 		URL   string `json:"u"`
 		Title string `json:"t"`
@@ -3602,7 +3719,6 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 		Anchor  string `json:"a"`
 		Title   string `json:"t"`
 		Section string `json:"s"`
-		Content string `json:"c"`
 	}
 	type bareIndex struct {
 		Pages   []barePage  `json:"pages"`
@@ -3621,6 +3737,99 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 	}
 	if strings.Contains(string(raw), `"w"`) || strings.Contains(string(raw), `"k"`) {
 		t.Errorf("single-bundle index carries site fields: %s", raw)
+	}
+}
+
+// TestSearchContentFileAlignsWithPerWikiIndex covers the companion file: it sits
+// beside the light index, its count matches the entry count, and each text
+// belongs to the entry at the same position.
+func TestSearchContentFileAlignsWithPerWikiIndex(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\n## Alpha\n\nalphaonly phrase here.\n\n## Beta\n\nbetaonly phrase here.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+
+	site := filepath.Join(out, "wiki")
+	index := readSearchIndex(t, filepath.Join(site, "search-index.json"))
+	content := readSearchContent(t, filepath.Join(site, "search-content.json"))
+	if content.Count != len(index.Entries) {
+		t.Fatalf("search content n = %d, index has %d entries", content.Count, len(index.Entries))
+	}
+	if len(content.Texts) != len(index.Entries) {
+		t.Fatalf("search content carries %d texts, index has %d entries", len(content.Texts), len(index.Entries))
+	}
+	if len(index.Entries) != 2 {
+		t.Fatalf("the page contributed %d entries, want 2", len(index.Entries))
+	}
+	// Positional alignment: the text at each row is the text of the entry whose
+	// heading is there.
+	for i, e := range index.Entries {
+		want := strings.ToLower(e.Title) + "only"
+		if !strings.Contains(content.Texts[i], want) {
+			t.Errorf("content[%d] for entry %q = %q, want it to carry %q", i, e.Title, content.Texts[i], want)
+		}
+	}
+}
+
+// TestSearchIndexOmitsContentKey covers the split: the light index is written
+// without the entry text, and the text lives in the companion file. A "c" key
+// left in the index would carry the bytes the split exists to defer.
+func TestSearchIndexOmitsContentKey(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n\n## Alpha\n\nalphaonly phrase here.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	assertNoContentKey(t, filepath.Join(out, "wiki", "search-index.json"))
+
+	// The same holds for a tree's aggregate at its base.
+	tree := treeSearchFixture(t)
+	tout := t.TempDir()
+	tr, err := New(Config{Content: tree, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.RenderSites(tout); err != nil {
+		t.Fatal(err)
+	}
+	assertNoContentKey(t, filepath.Join(tout, "family", "search-index.json"))
+}
+
+// assertNoContentKey fails when any entry in the index at path carries a c key.
+func assertNoContentKey(t *testing.T, path string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var probe struct {
+		Entries []map[string]json.RawMessage `json:"entries"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	if len(probe.Entries) == 0 {
+		t.Fatalf("%s has no entries to check", path)
+	}
+	for i, e := range probe.Entries {
+		if _, ok := e["c"]; ok {
+			t.Errorf("%s entry %d still carries a c key", path, i)
+		}
 	}
 }
 
@@ -3677,7 +3886,7 @@ func TestAggregateSearchIndexRebasesPageTable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	index := readSearchIndex(t, filepath.Join(out, "family", "search-index.json"))
+	index := readSearchIndexWithContent(t, filepath.Join(out, "family"))
 	if len(index.Pages) != 2 {
 		t.Fatalf("aggregate page table has %d rows, want 2", len(index.Pages))
 	}
@@ -3708,6 +3917,42 @@ func TestAggregateSearchIndexRebasesPageTable(t *testing.T) {
 		}
 		if got := index.Pages[e.Page].SiteKey; got != want {
 			t.Errorf("entry %d (%q) points at page %d of %q, want %q", i, e.Content, e.Page, got, want)
+		}
+	}
+}
+
+// TestAggregateSearchContentAlignsAcrossWikis covers the tree's companion file:
+// the texts of every wiki's entries are concatenated in the aggregate's entry
+// order, so the text at each position belongs to that entry's wiki.
+func TestAggregateSearchContentAlignsAcrossWikis(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntype: Overview\ntitle: Alpha\n---\n# Alpha\n\n## First\n\nalphaneedle here.\n")
+	mustMkdir(t, filepath.Join(dir, "beta"))
+	mustWrite(t, filepath.Join(dir, "beta", "index.md"),
+		"---\ntype: Overview\ntitle: Beta\n---\n# Beta\n\n## First\n\nbetaneedle here.\n")
+
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+
+	base := filepath.Join(out, "family")
+	index := readSearchIndex(t, filepath.Join(base, "search-index.json"))
+	content := readSearchContent(t, filepath.Join(base, "search-content.json"))
+	if content.Count != len(index.Entries) || len(content.Texts) != len(index.Entries) {
+		t.Fatalf("aggregate content has %d texts (n=%d) for %d entries",
+			len(content.Texts), content.Count, len(index.Entries))
+	}
+	for i, e := range index.Entries {
+		site := index.Pages[e.Page].SiteKey
+		if !strings.Contains(content.Texts[i], site+"needle") {
+			t.Errorf("content[%d] = %q, want the text of entry %d under %s", i, content.Texts[i], i, site)
 		}
 	}
 }
