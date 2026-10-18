@@ -613,6 +613,124 @@ func TestDefaultThemeSearchLoadsContentInTheBackground(t *testing.T) {
 	}
 }
 
+// TestDefaultThemeSearchRanksWholeWordsAndRepeats pins the ranking additions:
+// a whole word outranks a word start outranks a mid-word hit in the title and
+// the document, a repeated content term scores above a single mention, and an
+// equal score breaks by the page's own entry, the shorter title and then the
+// original index. The matching set and the existing weights must not move, so
+// they are pinned here too. Go cannot run the client, so this asserts the shape
+// and that the repeat count sits after the term loop, where only a matched
+// entry pays for it.
+func TestDefaultThemeSearchRanksWholeWordsAndRepeats(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "search.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no search.js")
+	}
+
+	// The helpers that grade a boundary and a repeat count.
+	for _, want := range []string{
+		"function isWordChar(ch) {",
+		"function wordHitKind(field, term) {",
+		"function countOccurrences(field, term, stop, from) {",
+		"function repeatBonus(count) {",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("search.js has no %q, so a ranking helper is missing", want)
+		}
+	}
+	// The largest bucket is the maximum, so a separate cap above it would be a
+	// branch no count can reach.
+	if strings.Contains(js, "REPEAT_CAP") {
+		t.Error("repeatBonus carries a cap no bucket can reach")
+	}
+
+	run := jsFuncBody(t, js, "runSearch")
+
+	// The boundary grade is taken on the title and the document, and the repeat
+	// count on the content.
+	for _, want := range []string{
+		"wordHitKind(titleLower, term)",
+		"wordHitKind(docLower, term)",
+		"repeatBonus(countOccurrences(contentLower, terms[r], REPEAT_STOP, contentFrom))",
+	} {
+		if !strings.Contains(run, want) {
+			t.Errorf("runSearch has no %q, so the boundary or repeat bonus is not applied", want)
+		}
+	}
+	// The repeat count is an extra scan of the content, so it must sit after the
+	// term loop: an entry that fails a later term pays nothing for it.
+	termLoopEnd := strings.Index(run, "if (!termMatched) { allMatch = false; break; }")
+	repeatAt := strings.Index(run, "repeatBonus(countOccurrences(")
+	if termLoopEnd < 0 || repeatAt < termLoopEnd {
+		t.Error("runSearch counts content repeats before the entry is known to match, so a failed entry still pays for the count")
+	}
+
+	// The field weights and the phrase bonus are unchanged: a title hit still
+	// beats a document, section or content hit by the same margins.
+	for _, want := range []string{
+		"if (titleLower.indexOf(term) !== -1) {",
+		"score += 45;",
+		"score += 40;",
+		"if (titleKind === 2) score += 25;",
+		"else if (titleKind === 1) score += 15;",
+		"if (docKind === 2) score += 12;",
+		"else if (docKind === 1) score += 8;",
+		"if (secLower.indexOf(term) !== -1) { termMatched = true; score += 15; }",
+		"if (contentHit[j] !== -1) { termMatched = true; score += 10; }",
+		"if (titleLower.indexOf(query) !== -1) score += 80;",
+		"else if (docLower.indexOf(query) !== -1) score += 40;",
+		"else if (contentLower.indexOf(query) !== -1) score += 30;",
+	} {
+		if !strings.Contains(run, want) {
+			t.Errorf("runSearch has no %q, so a field weight or the phrase bonus moved", want)
+		}
+	}
+
+	// The comparator breaks a tie with global keys, in order: the overview entry,
+	// the title length, the original index. The last key is unique, so the order
+	// does not depend on the engine's sort being stable.
+	for _, want := range []string{
+		"if (b.score !== a.score) return b.score - a.score;",
+		"if (a.ov !== b.ov) return b.ov - a.ov;",
+		"if (a.tl !== b.tl) return a.tl - b.tl;",
+		"return a.i - b.i;",
+	} {
+		if !strings.Contains(run, want) {
+			t.Errorf("runSearch has no %q, so the tie-break is not total", want)
+		}
+	}
+	// Scoping the overview key to two rows that share a page is not transitive:
+	// A before B, B before C and C before A at once, so the engine's comparison
+	// order decides the result.
+	if strings.Contains(run, "a.entry.p === b.entry.p && a.ov !== b.ov") {
+		t.Error("the tie-break still scopes the overview key to one page, so the comparator is not a total order")
+	}
+	// Each match carries the keys the comparator reads.
+	for _, want := range []string{
+		"i: i,",
+		"tl: entry.t ? entry.t.length : 0,",
+		"ov: entry.u === entry.p ? 1 : 0",
+	} {
+		if !strings.Contains(run, want) {
+			t.Errorf("runSearch pushes no %q, so the comparator cannot read it", want)
+		}
+	}
+	// The score-only sort left ties to the index order the scan produced. Its
+	// return pins the regression.
+	if strings.Contains(js, "matches.sort(function (a, b) { return b.score - a.score; });") {
+		t.Error("search.js still sorts on the score alone, so equal scores fall to whatever order the engine leaves")
+	}
+}
+
 func TestThemeOverrideLayersOverTheDefault(t *testing.T) {
 	// A recolour-only theme: one replaced asset, everything else inherited.
 	dir := writeTheme(t,

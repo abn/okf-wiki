@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-18
 
+* **Feature**: Search ranks a whole-word match above one found mid-word, and a
+  term an entry repeats in its text above a single mention, on top of the
+  existing title, document, section and content weights. Equal scores break on
+  global keys, an overview entry before a section entry, then the shorter title,
+  then the earlier index. The set of matching entries, the grouping and the caps
+  are unchanged. `design/rendering.md` says so.
 * **Perf**: The search catalogue is split so the page text no longer holds up
   the first result. `search-index.json` keeps the page table and each entry's
   heading, section and anchor; the entry texts move to the companion
