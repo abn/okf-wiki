@@ -16,6 +16,10 @@
   // microtasks the loop never yields to the event loop, so the tab hangs and the
   // request it is waiting for can never complete.
   var searchIndexPromise = null;
+  // searchContentPromise holds the in-flight background request for the entry
+  // texts. It is kept once it settles, so a second trigger never refetches it,
+  // and a text load that fails leaves the light index answering.
+  var searchContentPromise = null;
   var selectedIndex = -1;
   var currentResults = [];
   // currentGroups is null for a flat list (a single bundle, or a tag search) and
@@ -23,6 +27,15 @@
   // list the keyboard walks, so ArrowUp/ArrowDown/Enter are unaffected by the
   // grouping.
   var currentGroups = null;
+  // contentRefresh is set while the background texts re-run the search, and
+  // refreshSelection is the url of the row selected when the refresh started,
+  // so the same row is selected again after the render rather than the list
+  // jumping to the first result.
+  var contentRefresh = false;
+  var refreshSelection = null;
+  // lastAnnouncedKey is the url signature of the set the live region last
+  // spoke: a refresh that leaves the set alone has nothing new to say.
+  var lastAnnouncedKey = null;
   var lastActiveElement = null;
   var status = null;
   var announcedSet = null;
@@ -69,7 +82,9 @@
         t: entry.t || page.t,
         d: page.t,
         s: entry.s,
-        c: entry.c,
+        // Content arrives later, in search-content.json, and is attached to
+        // this entry in place when it does.
+        c: '',
         w: page.w,
         k: page.k
       };
@@ -119,6 +134,8 @@
       .then(function (data) {
         searchIndex = expandIndex(data);
         searchIndexLower = buildLowerIndex(searchIndex);
+        // The light index is searchable now; the texts load behind it.
+        fetchContent();
         return searchIndex;
       })
       .catch(function (err) {
@@ -130,6 +147,59 @@
         return searchIndex;
       });
     return searchIndexPromise;
+  }
+
+  // fetchContent starts the background request for the entry texts. It is
+  // deliberately not awaited: results from the light index are shown at once,
+  // and the texts join the search when they arrive. The in-flight request, and
+  // a failed one, are memoized so the open, hover and focus triggers share one
+  // fetch and a failure is not retried on every keystroke.
+  function fetchContent() {
+    if (searchContentPromise) return searchContentPromise;
+    var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
+    searchContentPromise = fetch(searchBase + 'search-content.json' + v)
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        applyContent(data);
+        return searchIndex;
+      })
+      .catch(function (err) {
+        // The light index still answers, so a failed text load is not a failed
+        // search. Keeping the settled promise stops a later trigger retrying.
+        console.warn('Failed to load wiki search content:', err);
+        return searchIndex;
+      });
+    return searchContentPromise;
+  }
+
+  // applyContent joins the texts onto the entries by position. A file whose
+  // count does not match the index came from another render, and attaching its
+  // texts row by row would put the wrong text on the wrong entry, so it is
+  // ignored whole. With the texts in place the lowercased content cache is
+  // rebuilt, and an open query is re-run so content matches join without a
+  // keystroke.
+  function applyContent(data) {
+    var texts = (data && data.c) || [];
+    var n = data && data.n;
+    if (n !== searchIndex.length || texts.length !== searchIndex.length) {
+      console.warn('Wiki search content does not match the index, ignoring it');
+      return;
+    }
+    for (var i = 0; i < texts.length; i++) {
+      searchIndex[i].c = texts[i] || '';
+    }
+    searchIndexLower = buildLowerIndex(searchIndex);
+    if (!backdrop.classList.contains('open')) return;
+    var query = input.value.trim();
+    if (!query) return;
+    refreshSelection = selectedIndex >= 0 && currentResults[selectedIndex] ? currentResults[selectedIndex].u : null;
+    contentRefresh = true;
+    runSearch();
+    contentRefresh = false;
+    refreshSelection = null;
   }
 
   // setScope flips the All-wikis / This-wiki toggle and announces the state.
@@ -471,6 +541,14 @@
   // reader can reach, rather than of the matches the index holds.
   function announceResults() {
     var count = currentResults.length;
+    // The background texts re-run the search, which lands here again. The
+    // signature is the result set and not only its size: a refresh that swaps
+    // rows for others of the same count has changed what the reader can reach
+    // and is spoken, while a set the reader has just heard is not repeated.
+    var key = String(count);
+    for (var i = 0; i < currentResults.length; i++) key += '|' + currentResults[i].u;
+    if (contentRefresh && key === lastAnnouncedKey) return;
+    lastAnnouncedKey = key;
     var text;
     if (count === 0) {
       text = 'No results';
@@ -485,8 +563,6 @@
         else if (sites.length > 1) text += ' in ' + sites.join(', ');
       }
     }
-    var key = String(count);
-    for (var i = 0; i < currentResults.length; i++) key += '|' + currentResults[i].u;
     announce(text, key);
   }
 
@@ -504,6 +580,15 @@
     }
 
     selectedIndex = 0;
+    // A background text refresh re-runs the search under a reader who may
+    // already have arrowed to a row. The same row is selected again when it is
+    // still in the results, so the refresh does not move the selection; otherwise
+    // the list falls back to its first row.
+    if (contentRefresh && refreshSelection) {
+      for (var s = 0; s < currentResults.length; s++) {
+        if (currentResults[s].u === refreshSelection) { selectedIndex = s; break; }
+      }
+    }
     var html = '<div class="search-results-list" role="listbox">';
     if (currentGroups) {
       // A wiki's rows sit in their own role="group", labelled by a heading. The

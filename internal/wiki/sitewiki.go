@@ -273,6 +273,14 @@ func (r *Renderer) renderInto(out, site string) error {
 		return err
 	}
 
+	content, err := r.SearchContentJSON()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(site, "search-content.json"), content, 0o644); err != nil {
+		return err
+	}
+
 	tags, err := r.TagsJSON()
 	if err != nil {
 		return err

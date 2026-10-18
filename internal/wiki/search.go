@@ -32,14 +32,28 @@ type SearchEntry struct {
 	Anchor  string `json:"a"` // heading anchor, empty for the page itself
 	Title   string `json:"t"` // heading title or page title
 	Section string `json:"s"` // section category (e.g. Architecture)
-	Content string `json:"c"` // extracted plain text
+	// Content is the extracted plain text. It is held in memory so the entry is
+	// one object throughout a render, but it is not written into the index: it
+	// is most of the index's bytes, so it travels in the companion
+	// search-content.json, which the client joins onto the entries in the
+	// background.
+	Content string `json:"-"`
 }
 
 // SearchIndex is the on-disk catalogue: a page table, and the entries that
-// refer to it.
+// refer to it. Entry text is not part of it; SearchContent holds that.
 type SearchIndex struct {
 	Pages   []SearchPage  `json:"pages"`
 	Entries []SearchEntry `json:"entries"`
+}
+
+// SearchContent is the companion file to SearchIndex: every entry's text, in
+// entry order. It is separate because the text is the largest part of the
+// catalogue and a reader can search titles, documents and sections before it
+// arrives.
+type SearchContent struct {
+	Count int      `json:"n"` // number of entries the texts align with
+	Texts []string `json:"c"` // text of entry 0, entry 1, ...
 }
 
 // rawSearchChunk is an unresolved text section extracted from a page's AST.
@@ -192,9 +206,26 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 	return index
 }
 
-// SearchIndexJSON returns the JSON representation of the search index.
+// SearchIndexJSON returns the JSON representation of the search index, without
+// entry text.
 func (r *Renderer) SearchIndexJSON() ([]byte, error) {
 	return json.Marshal(r.BuildSearchIndex())
+}
+
+// SearchContentJSON returns the JSON representation of the entry texts, in the
+// same order as the index's entries.
+func (r *Renderer) SearchContentJSON() ([]byte, error) {
+	return json.Marshal(contentFromIndex(r.BuildSearchIndex()))
+}
+
+// contentFromIndex collects an index's entry texts into the companion file
+// shape, aligned by position with its entries.
+func contentFromIndex(index SearchIndex) SearchContent {
+	texts := make([]string, len(index.Entries))
+	for i, e := range index.Entries {
+		texts[i] = e.Content
+	}
+	return SearchContent{Count: len(index.Entries), Texts: texts}
 }
 
 // mergeSearchIndex appends src to dst, rebasing every entry's page index into
