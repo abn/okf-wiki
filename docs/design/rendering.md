@@ -241,6 +241,19 @@ moves every file's modification time; without an `ETag` an unchanged asset would
 be answered with a full `200` on the next request. The content hash does not move
 when only the time did, so an unchanged file revalidates to a `304`.
 
+A response is gzipped when the request carries `Accept-Encoding: gzip`, the
+content type is text-like (`text/*`, JSON, JavaScript, and SVG), and the body is
+large enough to be worth compressing. A body below a small floor passes through
+uncompressed, since gzip's framing would grow it. The coding is chosen per RFC
+9110, so an explicit `gzip;q=0` refuses gzip even beside a `*`. The aggregate
+`search-index.json` is the large response this exists for. Images, fonts and
+other already-compressed bytes pass through, as does a range request, which
+would have to decompress a whole representation to answer a slice. Vary records
+`Accept-Encoding`, and the compressed and uncompressed forms carry different
+`ETag`s. A conditional request revalidates to a `304` carrying the tag of the
+coding the response would use, so a cache keeps the two apart while either
+validator names the same unchanged resource.
+
 The wordmark's mark is an `<img>` in the header, so the browser would discover it
 only after the stylesheets and the body parse and it would paint a step behind
 everything else. A `rel="preload"` in the head starts it beside the CSS, at high

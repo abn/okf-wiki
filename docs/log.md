@@ -3,6 +3,17 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-18
+
+* **Perf**: The server gzips a compressible response when the client sends
+  `Accept-Encoding: gzip`: text pages, JSON, JavaScript and SVG, including the
+  aggregate `search-index.json`, when the body is large enough to be worth it.
+  Images, fonts, small bodies and range requests pass through uncompressed. The
+  compressed and uncompressed forms carry separate `ETag`s and
+  `Vary: Accept-Encoding`, and a `304` carries the tag of the coding the
+  response would use, so a cache keeps the two codings apart.
+  `design/rendering.md` says so.
+
 ## 2026-10-14
 
 * **Feature**: Code and text blocks carry a copy button in their top-right
