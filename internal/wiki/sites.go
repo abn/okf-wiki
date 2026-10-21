@@ -136,6 +136,9 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 			if err := r.writeAggregateSearchIndex(tmp); err != nil {
 				return err
 			}
+			if err := r.writeAggregateGraph(tmp); err != nil {
+				return err
+			}
 		}
 		return r.writeRootRedirect(tmp)
 	})
@@ -228,6 +231,8 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 	if n.rel != "" {
 		index := labelSearchIndex(sub.BuildSearchIndex(), title, n.rel)
 		mergeSearchIndex(&r.aggregated, &index)
+		graph := sub.BuildGraph()
+		mergeGraph(&r.aggregatedGraph, &graph, title, n.rel)
 	}
 	return 1, nil
 }
@@ -301,6 +306,33 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "search-content.json"), content, 0o644)
+}
+
+// writeAggregateGraph writes the tree's one graph catalogue at the tree base,
+// with each wiki's node IDs prefixed by its path so equal slugs in two wikis
+// stay distinct. Like the aggregate search index it is written after every wiki
+// has rendered, and a tree with no readable wiki still gets an empty catalogue
+// rather than a missing file. root is the output root the tree was written into.
+func (r *Renderer) writeAggregateGraph(root string) error {
+	graph := r.aggregatedGraph
+	if graph.Version == 0 {
+		graph.Version = graphVersion
+	}
+	if graph.Nodes == nil {
+		graph.Nodes = []GraphNode{}
+	}
+	if graph.Edges == nil {
+		graph.Edges = []GraphEdge{}
+	}
+	b, err := json.Marshal(graph)
+	if err != nil {
+		return err
+	}
+	dir := r.cfg.sitePath(root)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "graph.json"), b, 0o644)
 }
 
 // writeCatalog writes the index for a group directory: its direct children,

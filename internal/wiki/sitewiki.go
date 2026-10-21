@@ -57,6 +57,10 @@ type Page struct {
 	Body         string // rendered HTML, H1 still present; RenderPage strips it
 	TOC          []TOCEntry
 	searchChunks []rawSearchChunk
+	// links are the page's in-bundle Markdown links, in document order, with
+	// the heading anchor of the section they sit in. The graph catalogue is
+	// built from them; rendering itself only needs the rewritten href.
+	links []pageLink
 }
 
 // TOCEntry is a level-two heading in the page body. Deeper headings are link
@@ -92,6 +96,9 @@ type Renderer struct {
 	// aggregated collects the search index of a tree render, wiki by wiki, so
 	// the whole tree gets one index at its base.
 	aggregated SearchIndex
+	// aggregatedGraph collects the graph of a tree render the same way, with
+	// each wiki's node IDs namespaced by its path.
+	aggregatedGraph GraphIndex
 	// treeBase, siteRel, siteTitle and siteTrail describe a page's place in a
 	// multi-site tree. treeBase is the tree index's URL prefix, empty for a
 	// single bundle, so the brand and the breadcrumb trail mean "the deployment
@@ -278,6 +285,14 @@ func (r *Renderer) renderInto(out, site string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(site, "search-content.json"), content, 0o644); err != nil {
+		return err
+	}
+
+	graph, err := r.GraphJSON()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(site, "graph.json"), graph, 0o644); err != nil {
 		return err
 	}
 
@@ -468,13 +483,30 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	src := body
 	usedIDs := map[string]bool{}
 	var h1 string
+	// currentAnchor follows the heading the walk has most recently entered, so
+	// a link can be recorded against the section a reader finds it in. The H1
+	// is skipped like everywhere else, leaving links above the first heading
+	// anchored to the page itself.
+	currentAnchor := ""
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
 		switch nn := n.(type) {
 		case *ast.Link:
-			nn.Destination = []byte(r.linkPath(p.Slug, string(nn.Destination)))
+			href := string(nn.Destination)
+			nn.Destination = []byte(r.linkPath(p.Slug, href))
+			if markdownTarget(href) {
+				if to, ok := r.graphTarget(string(nn.Destination)); ok && to != p.Slug {
+					var text strings.Builder
+					collectText(nn, src, &text)
+					p.links = append(p.links, pageLink{
+						To:     to,
+						Anchor: currentAnchor,
+						Text:   strings.TrimSpace(text.String()),
+					})
+				}
+			}
 		case *ast.Image:
 			// An image destination is a file in the bundle, and is copied into
 			// the site. Rewriting it the way a link is rewritten is what stops
@@ -492,6 +524,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 			headingVal := headingText(n, src)
 			id := uniqueID(slugify(headingVal), usedIDs)
 			h.SetAttribute([]byte("id"), []byte(id))
+			currentAnchor = id
 			// The table of contents stops at level two. Deeper headings keep
 			// their ids as link targets but stay out of the navigation, which
 			// is what keeps it short on a deeply nested page.

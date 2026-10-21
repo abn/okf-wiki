@@ -3471,7 +3471,7 @@ func TestMultiSiteGroupAssetsSitAtTheBase(t *testing.T) {
 	baseDir := filepath.Join(out, "family")
 	for _, rel := range []string{
 		"wiki.css", "tokens.css", "fonts.css", "favicon.svg", "search.js",
-		"diagrams.js", "brand-mark.svg", "search-index.json", "tags.json",
+		"diagrams.js", "brand-mark.svg", "search-index.json", "graph.json", "tags.json",
 	} {
 		if _, err := os.Stat(filepath.Join(baseDir, rel)); err != nil {
 			t.Errorf("group asset %s is not under the base: %v", rel, err)
