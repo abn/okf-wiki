@@ -16,6 +16,7 @@ flowchart LR
     C --> D["goldmark render"]
     D --> E["callouts, code, mermaid"]
     E --> F["search index"]
+    E --> H["graph catalogue"]
     E --> G["wiki/*.html"]
     F --> G
 ```
@@ -122,14 +123,25 @@ flowchart LR
    contributes nothing to the aggregate. A content root that is itself a wiki
    is a tree of one, whose index already sits at the base; it gets no separate
    aggregate, so its search reads as one bundle's.
+
+   The structural graph is collected into `graph.json` in the same pass: one
+   node per page and per tag, one edge per in-bundle Markdown link and per
+   frontmatter tag. A page node is `page:` plus the slug, a tag node is `tag:`
+   plus the tag slug, and a link edge carries the heading anchor of the section
+   the link sits in and the link text. An in-bundle link whose target the bundle
+   does not contain becomes a stub node with no URL, so a broken link stays
+   visible instead of dropping out of the catalogue. In a tree each wiki keeps
+   its own file, and the tree writes an aggregate at its base with every node ID
+   prefixed by the wiki's path, so equal slugs in two wikis stay distinct. See
+   [Graph catalogue](../reference/graph.md).
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
    fonts, tokens, the search and diagram clients, favicon), the Mermaid vendor
    bundle when the bundle has a diagram, `search-index.json`,
-   `search-content.json`, `tags.json`, and a `theme.json` recording which theme
-   produced the output. The output directory is emptied first, so a page
-   removed from the bundle does not linger.
+   `search-content.json`, `graph.json`, `tags.json`, and a `theme.json` recording
+   which theme produced the output. The output directory is emptied first, so a
+   page removed from the bundle does not linger.
 
 ## Themes
 
