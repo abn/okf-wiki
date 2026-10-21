@@ -173,16 +173,10 @@ func cleanSearchText(s string) string {
 func (r *Renderer) BuildSearchIndex() SearchIndex {
 	index := SearchIndex{Pages: []SearchPage{}, Entries: []SearchEntry{}}
 	for _, s := range r.sections {
-		secTitle := s.Title
-		if secTitle == "" {
-			secTitle = "Overview"
-		}
+		secTitle := sectionHeading(s)
 		for _, p := range s.Pages {
 			pageURL := r.cfg.base() + p.Slug + ".html"
-			docTitle := p.Title
-			if docTitle == "" {
-				docTitle = p.Slug
-			}
+			docTitle := pageTitle(p)
 			page := len(index.Pages)
 			index.Pages = append(index.Pages, SearchPage{URL: pageURL, Title: docTitle})
 
