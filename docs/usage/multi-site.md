@@ -138,6 +138,16 @@ and reaches every wiki in the tree, a sibling branch as much as the wikis below
 the group. The tag catalogue stays per wiki, and `#tag` searches the current
 wiki's tags, because a tag page is a page of the wiki that carries the tag.
 
+## The graph catalogue
+
+Each wiki writes its own `graph.json` beside its search catalogue, and after
+every wiki has rendered the tree writes one aggregate at its base. The aggregate
+prefixes every node ID with the wiki's path under the tree root, so two wikis
+can both own an `index` page, and a node's URL already points into the wiki it
+came from. A wiki that could not be read contributes nothing. A tree whose root
+is itself a wiki keeps that wiki's own catalogue at the base, with no aggregate
+written over it.
+
 ## What it is not
 
 Links and tags do not cross between wikis. A link inside one wiki resolves
