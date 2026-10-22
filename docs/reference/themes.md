@@ -133,9 +133,10 @@ its `graphApp` subtree, its SVG layers and the `graph.js` tag are present
 without a theme doing anything. A theme that replaces `template.html` should
 keep a control pointing at `{{.GraphHref}}`; without it the view still exists at
 that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`, `graphKind`, `graphTags`,
-`graphTagsSummary`, `graphTagsMenu`, `graphLabels`, `graphFit`,
-`graphClearFocus`, `graphDownload`, `graphStatus`, `graphSvg`, `graphEdges`,
-`graphNodes`, `graphList`, `graphListStatus`, `graphListNodes`,
+`graphTagsSummary`, `graphTagsMenu`, `graphSections`, `graphTagHubs`,
+`graphLabels`, `graphFit`, `graphClearFocus`, `graphDownload`, `graphStatus`,
+`graphSvg`, `graphSectionLayer`, `graphEdges`, `graphNodes`, `graphList`,
+`graphListStatus`, `graphListNodes`,
 `graphListEdges`, `graphListNodesTitle`, `graphListEdgesTitle`, `graphDetails`,
 and the optional inline `graphData`.
 

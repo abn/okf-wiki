@@ -149,6 +149,9 @@ flowchart LR
    on back and forward. A list beside the drawing exposes the visible nodes and
    edges as node buttons and edge text, and follows the same filters. It keeps
    focus in one roving tab stop and caps its first page on a large catalogue.
+   In Sections mode the drawing is a deterministic grid of section cells, with
+   tag hubs and missing pages in their own cells; collapsing tag hubs drops
+   their nodes and edges without dropping the tag filter.
 
    Every content page also gets a **Connections** panel inside the article. The
    renderer indexes the recorded page links by target after the bundle is
