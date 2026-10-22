@@ -53,6 +53,23 @@ frontmatter tags.
 The page carries no page text and no embeddings. It is the structural layer,
 and the search catalogue remains the place for text.
 
+## List view
+
+At wide widths a **List view** sits beside the drawing. At narrow widths it
+follows the drawing instead. It lists the nodes and edges that match the
+current Filter, Show, Tags and focus, with connection counts on each node, and
+the link text and heading anchor on link edges. The counts in the status line
+stay in step with the drawing.
+
+Select a node in the list to select it in the drawing, open its details and
+focus its neighbourhood. The list marks the current node. Node rows are normal
+buttons; the node list is one tab stop, and the arrow keys move between rows.
+The structure can therefore be read and navigated without the SVG.
+
+A large catalogue shows a first page of rows with a **Show all** button in each
+section. The status line gives the full counts. The list follows the URL state;
+it does not add another parameter.
+
 ## Shareable view state
 
 The graph writes its view state into the URL. Focus, depth, Show, Filter and
@@ -62,10 +79,11 @@ Defaults are omitted, so a plain `graph.html` stays plain. Repeated `tag`
 parameters narrow to pages carrying every named tag.
 
 Back and forward restore the controls, the tag checks and the focus state.
-Pan and zoom are not in the URL. Changing Show, Tags, focus or Show all adds a
-history entry. Typing in Filter replaces the current entry so a long
-query does not create one entry per keystroke; back and forward move between
-the discrete states around it.
+Pan and zoom are not in the URL. Changing Show, Tags or focus adds a history
+entry. The toolbar's Show all also adds one; the list's Show all only expands
+rows. Typing in Filter replaces the current entry so a long query does not
+create one entry per keystroke; back and forward move between the discrete
+states around it.
 
 ## Local graph and backlinks
 

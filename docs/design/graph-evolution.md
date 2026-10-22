@@ -40,7 +40,7 @@ the semantic layer.
   neighbourhood in the graph view.
 - [x] Shareable graph state: focus, depth, kind, text and tags in the URL, with
   working back and forward.
-- [ ] Accessible list view: a table or list of nodes, edges and connections
+- [x] Accessible list view: a table or list of nodes, edges and connections
   beside the drawing.
 - [ ] Search integration: open a search hit in the graph, and highlight graph
   matches from the search modal.
@@ -73,6 +73,6 @@ the semantic layer.
 
 ## Current
 
-Local graph and backlinks, and shareable view state, are shipped. The next item
-is an accessible list view beside the drawing: nodes, edges and connections in
-a table or list that does not depend on the SVG.
+Local graph and backlinks, shareable view state, and the accessible list view
+are shipped. The next item is search integration: open a search hit in the
+graph and highlight graph matches from the search modal.

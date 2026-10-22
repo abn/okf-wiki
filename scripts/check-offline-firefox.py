@@ -112,6 +112,24 @@ def main():
             driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.is-focus-far"),
             "the local graph did not fade nodes outside the neighbourhood",
         )
+        must(
+            "10 nodes" in driver.find_element(By.ID, "graphListStatus").text,
+            "the list did not follow the focus",
+        )
+        must(
+            len(driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-node"))
+            == 10,
+            "the list did not narrow to the focus set",
+        )
+        must(
+            len(
+                driver.find_elements(
+                    By.CSS_SELECTOR, '#graphListNodes .graph-list-node[tabindex="0"]'
+                )
+            )
+            == 1,
+            "the list has more than one tab stop",
+        )
         driver.find_element(By.ID, "graphFit").click()
         time.sleep(0.3)
         must(
@@ -169,6 +187,15 @@ def main():
             ".map((box) => box.value).sort();"
         )
         must(selected_tags == ["graph", "usage"], "wrong tags selected from the URL")
+        must(
+            len(driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-node"))
+            == 1,
+            "the list did not follow the filtered graph",
+        )
+        must(
+            "1 node" in driver.find_element(By.ID, "graphListStatus").text,
+            "the list status did not follow the filtered graph",
+        )
 
         driver.get(base + "graph.html")
         wait_for(driver, ".graph-node-group")
@@ -222,9 +249,69 @@ def main():
         must(menu_right <= viewport + 1, "the tag menu overflowed the tablet viewport")
         driver.set_window_size(1440, 1000)
 
+        check_page(driver, base + "graph.html", ".graph-list-node")
+        must(
+            len(driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-node")) > 0,
+            "the list has no nodes",
+        )
+        must(
+            len(driver.find_elements(By.CSS_SELECTOR, "#graphListEdges .graph-list-edge")) > 0,
+            "the list has no edges",
+        )
+        first = driver.find_element(By.CSS_SELECTOR, "#graphListNodes .graph-list-node")
+        first_id = first.get_attribute("data-id")
+        driver.execute_script("arguments[0].focus();", first)
+        first.send_keys(Keys.ARROW_DOWN)
+        must(
+            driver.execute_script(
+                "return document.activeElement.getAttribute('data-id');"
+            )
+            != first_id,
+            "the list arrow keys did not move to the next node",
+        )
+        must(
+            len(
+                driver.find_elements(
+                    By.CSS_SELECTOR, '#graphListNodes .graph-list-node[tabindex="0"]'
+                )
+            )
+            == 1,
+            "the list roving tab stop drifted",
+        )
+        driver.find_element(
+            By.CSS_SELECTOR,
+            '#graphListNodes button[data-id="page:usage/graph"]',
+        ).click()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: d.find_element(By.ID, "graphDetails").is_displayed()
+        )
+        must(
+            driver.find_element(By.CSS_SELECTOR, "#graphDetails h2").text == "Graph view",
+            "selecting a list node did not open its details",
+        )
+        must(
+            driver.find_element(
+                By.CSS_SELECTOR, '#graphListNodes [aria-current="true"]'
+            ).get_attribute("data-id")
+            == "page:usage/graph",
+            "the selected list node is not marked current",
+        )
+        must(
+            driver.execute_script(
+                "return document.activeElement.getAttribute('data-id');"
+            )
+            == "page:usage/graph",
+            "selecting a list node moved keyboard focus away from it",
+        )
+
         check_page(driver, base + "graph.html?tag=no-such-tag", ".graph-node-group")
         WebDriverWait(driver, 5).until(
             lambda d: "Not in this graph" in d.find_element(By.ID, "graphStatus").text
+        )
+        must(
+            driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-empty"),
+            "the list has no empty state",
         )
 
         check_page(

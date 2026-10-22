@@ -5,6 +5,14 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-22
 
+* **Feature**: The graph view gains a list beside the drawing, with the visible
+  nodes and edges, connection counts, link text and edge anchors. Selecting a
+  list node opens the same details and focus as the drawing, and the list
+  follows Filter, Show, Tags, focus and the URL state. Node rows use one roving
+  tab stop, and a large catalogue caps its first page with Show all buttons. At
+  narrow widths the list stacks below the drawing. `usage/graph.md`,
+  `reference/graph.md`, `design/rendering.md`, `reference/themes.md`,
+  `usage/offline.md` and `design/graph-evolution.md` say so.
 * **Feature**: The graph view keeps focus, depth, Show, Filter and Tags in the
   query string and restores them on back and forward. Tags are a real filter:
   repeated `tag` parameters narrow to pages carrying every named tag, and the
