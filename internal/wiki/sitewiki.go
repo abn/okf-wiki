@@ -93,6 +93,10 @@ type Renderer struct {
 	// multi-site tree it is the tree base, where one aggregate index spans every
 	// wiki. The page carries it as window.__WIKI_SEARCH.
 	searchBase string
+	// graphPage marks the synthetic view page, so the shell widens the content
+	// column and the header control reads as current. Only the graph page's
+	// shell sets it.
+	graphPage bool
 	// aggregated collects the search index of a tree render, wiki by wiki, so
 	// the whole tree gets one index at its base.
 	aggregated SearchIndex
@@ -195,6 +199,9 @@ func (r *Renderer) Sections() []Section { return r.sections }
 // never exposes a directory with files missing. Only a single bundle swaps its
 // own directory; a multi-site tree swaps the output root through RenderSites.
 func (r *Renderer) RenderAll(out string) error {
+	if err := graphCollision(r.cfg.Content); err != nil {
+		return err
+	}
 	site, err := r.cfg.SiteDir(out)
 	if err != nil {
 		return err
@@ -294,6 +301,19 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 	if err := os.WriteFile(filepath.Join(site, "graph.json"), graph, 0o644); err != nil {
 		return err
+	}
+
+	// The view is one page at the render root: the bundle base for a single
+	// bundle, and the tree base for the root wiki of a tree. A wiki below the
+	// root leaves it to the tree, so every header points at one catalogue.
+	if !r.nested || r.siteRel == "" {
+		var inline []byte
+		if r.cfg.InlineGraph {
+			inline = graph
+		}
+		if err := r.graphShell().writeGraphPage(site, inline); err != nil {
+			return err
+		}
 	}
 
 	tags, err := r.TagsJSON()

@@ -111,6 +111,15 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// A root that is itself a wiki renders its own graph page at the tree base,
+	// where the view reserves graph.html. A Markdown page or a static file of
+	// that name would be overwritten, so name the collision before any output is
+	// built. A wiki below the root keeps its graph.md: the view is not there.
+	if root.wiki {
+		if err := graphCollision(root.abs); err != nil {
+			return 0, err
+		}
+	}
 	wikis := 0
 	err = swapDir(out, func(tmp string) error {
 		// A group index has no bundle of its own, so it renders through the
@@ -137,6 +146,9 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 				return err
 			}
 			if err := r.writeAggregateGraph(tmp); err != nil {
+				return err
+			}
+			if err := r.writeTreeGraphPage(tmp, root); err != nil {
 				return err
 			}
 		}
@@ -314,17 +326,7 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 // has rendered, and a tree with no readable wiki still gets an empty catalogue
 // rather than a missing file. root is the output root the tree was written into.
 func (r *Renderer) writeAggregateGraph(root string) error {
-	graph := r.aggregatedGraph
-	if graph.Version == 0 {
-		graph.Version = graphVersion
-	}
-	if graph.Nodes == nil {
-		graph.Nodes = []GraphNode{}
-	}
-	if graph.Edges == nil {
-		graph.Edges = []GraphEdge{}
-	}
-	b, err := json.Marshal(graph)
+	b, err := graphJSON(r.aggregatedGraph)
 	if err != nil {
 		return err
 	}
@@ -333,6 +335,40 @@ func (r *Renderer) writeAggregateGraph(root string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "graph.json"), b, 0o644)
+}
+
+// writeTreeGraphPage writes the tree's one graph view at the tree base, beside
+// the aggregate catalogue it fetches. A group root has no wiki of its own to
+// render it, so it is built here from the tree renderer; the root's title names
+// the view's breadcrumb, and the tree base is where every wiki's header points.
+// A root that is itself a wiki writes the page from its own render, where its
+// pages are already in place.
+func (r *Renderer) writeTreeGraphPage(out string, root *siteNode) error {
+	title, _ := r.siteMeta(root)
+	shell := &Renderer{
+		md:           r.md,
+		cfg:          r.cfg,
+		theme:        r.theme,
+		generatedAt:  r.generatedAt,
+		assetVersion: r.assetVersion,
+		treeBase:     r.cfg.base(),
+		siteRel:      "",
+		siteTitle:    title,
+		graphPage:    true,
+	}
+	var inline []byte
+	if r.cfg.InlineGraph {
+		b, err := graphJSON(r.aggregatedGraph)
+		if err != nil {
+			return err
+		}
+		inline = b
+	}
+	dir := r.cfg.sitePath(out)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return shell.writeGraphPage(dir, inline)
 }
 
 // writeCatalog writes the index for a group directory: its direct children,

@@ -82,6 +82,11 @@ type Config struct {
 	// each directory holding an index.md is rendered at its own path, and every
 	// other directory is a group given a generated index of its children.
 	MultiSite bool
+	// InlineGraph embeds the graph catalogue in the graph page, so the view
+	// needs no second request. That helps where a viewer blocks fetch of a
+	// sibling file. The page carries the whole catalogue; a served site leaves
+	// this off and fetches graph.json when the view opens.
+	InlineGraph bool
 }
 
 // base returns the URL prefix, normalised to a leading and a trailing slash so

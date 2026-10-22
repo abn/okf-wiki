@@ -57,6 +57,9 @@
     </div>
     <div class="nav-cluster">
       {{if .TopNav}}<nav class="top-nav" aria-label="Site">{{.TopNav}}</nav>{{end}}
+      <a class="icon-btn graph-btn" href="{{.GraphHref}}" aria-label="Knowledge graph" title="Knowledge graph"{{if .GraphPage}} aria-current="page"{{end}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="8" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8.3 6.8 15.7 7.6M7.6 8.2 10.4 15.7M16.5 10.2 12.2 16.3"/></svg>
+      </a>
       <button type="button" class="icon-btn search-btn" id="searchBtn" aria-label="Search documentation" aria-keyshortcuts="Control+k Meta+k /">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <span class="search-btn-text">Search</span>
@@ -86,8 +89,8 @@
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="layout wrap{{if not .Nav}} layout-solo{{end}}">
   {{if .Nav}}<aside class="sidebar" id="sideDrawer">{{.Nav}}{{if or .TopNavInternal .TopNavExternal}}<div class="side-links">{{if .TopNavInternal}}<p class="side-links-title">On this wiki</p>{{.TopNavInternal}}{{end}}{{if .TopNavExternal}}<p class="side-links-title">Elsewhere</p>{{.TopNavExternal}}{{end}}</div>{{end}}</aside>{{end}}
-  <main class="content" id="main">
-    <article class="prose">
+  <main class="content{{if .GraphPage}} content-graph{{end}}" id="main">
+    <article class="prose{{if .GraphPage}} prose-graph{{end}}">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}
       <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
       {{if .Description}}<p class="page-lead">{{.Description}}</p>{{end}}

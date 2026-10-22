@@ -2,7 +2,11 @@ package wiki
 
 import (
 	"encoding/json"
+	"fmt"
+	"html/template"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -181,7 +185,120 @@ func addStubNode(g *GraphIndex, byID map[string]int, slug string) int {
 
 // GraphJSON returns the JSON representation of the structural graph.
 func (r *Renderer) GraphJSON() ([]byte, error) {
-	return json.Marshal(r.BuildGraph())
+	return graphJSON(r.BuildGraph())
+}
+
+// graphJSON marshals a catalogue with its empty arrays present, so a consumer
+// always finds nodes and edges rather than null.
+func graphJSON(g GraphIndex) ([]byte, error) {
+	if g.Version == 0 {
+		g.Version = graphVersion
+	}
+	if g.Nodes == nil {
+		g.Nodes = []GraphNode{}
+	}
+	if g.Edges == nil {
+		g.Edges = []GraphEdge{}
+	}
+	return json.Marshal(g)
+}
+
+// graphShell returns a copy of the renderer for the graph view: no sections, so
+// the page has no sidebar and the drawing gets the full width. The tree fields
+// stay, so a root wiki's view carries the tree base and names its tree.
+func (r *Renderer) graphShell() *Renderer {
+	shell := *r
+	shell.sections = nil
+	shell.graphPage = true
+	return &shell
+}
+
+// RenderGraphPage wraps the graph view in the themed shell. inline carries the
+// catalogue when the view is inlined; nil leaves the client to fetch graph.json.
+// The client asset is part of the theme, so it carries the same version query as
+// every other asset.
+func (r *Renderer) RenderGraphPage(inline []byte) (string, error) {
+	if len(inline) > 0 && !json.Valid(inline) {
+		return "", fmt.Errorf("graph page: inline catalogue is not valid JSON")
+	}
+	return r.RenderPage(Page{
+		Slug:        "graph",
+		Title:       "Knowledge graph",
+		Description: "Pages and tags as nodes, links and tags as edges.",
+		Body:        r.graphPageBody(inline),
+		Synthetic:   true,
+	})
+}
+
+// graphPageBody is the view's markup: a control row, the SVG the client fills,
+// a details panel, and the optional inline catalogue. Every value that comes
+// from configuration is HTML-escaped here; the catalogue is JSON, whose encoder
+// escapes the angle brackets that could close the script element.
+func (r *Renderer) graphPageBody(inline []byte) string {
+	base := r.graphBase()
+	var b strings.Builder
+	b.WriteString(`<div class="graph-app" id="graphApp" data-graph-base="`)
+	b.WriteString(template.HTMLEscapeString(base))
+	b.WriteString(`">`)
+	b.WriteString(`<div class="graph-toolbar" role="group" aria-label="Graph controls">`)
+	b.WriteString(`<label class="graph-field"><span class="graph-field-label">Filter</span>`)
+	b.WriteString(`<input type="search" id="graphFilter" placeholder="Title, section or tag" autocomplete="off" spellcheck="false"></label>`)
+	b.WriteString(`<label class="graph-field"><span class="graph-field-label">Show</span>`)
+	b.WriteString(`<select id="graphKind"><option value="all">All nodes</option><option value="page">Pages</option>`)
+	b.WriteString(`<option value="tag">Tags</option><option value="stub">Missing pages</option></select></label>`)
+	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
+	b.WriteString(`<button type="button" class="graph-fit" id="graphFit">Fit view</button>`)
+	b.WriteString(`<button type="button" class="graph-download" id="graphDownload">Download JSON</button>`)
+	b.WriteString(`<a class="graph-raw" href="`)
+	b.WriteString(template.HTMLEscapeString(base + "graph.json"))
+	b.WriteString(`">Raw JSON</a>`)
+	b.WriteString(`</div>`)
+	b.WriteString(`<p class="graph-status" id="graphStatus" role="status">Loading the graph...</p>`)
+	b.WriteString(`<div class="graph-canvas"><svg id="graphSvg" viewBox="0 0 1000 700" role="group" aria-labelledby="graphTitle graphDesc" preserveAspectRatio="xMidYMid meet">`)
+	b.WriteString(`<title id="graphTitle">Knowledge graph</title><desc id="graphDesc">Pages and tags as nodes. Drag a node to move it, scroll to zoom, drag the background to pan, and use the arrow keys to move between nodes.</desc>`)
+	b.WriteString(`<g id="graphEdges"></g><g id="graphNodes"></g></svg></div>`)
+	b.WriteString(`<aside class="graph-details" id="graphDetails" aria-live="polite" hidden></aside>`)
+	b.WriteString(`</div>`)
+	b.WriteString(`<noscript><p class="graph-noscript">The graph needs JavaScript. The raw catalogue is available at <a href="`)
+	b.WriteString(template.HTMLEscapeString(base + "graph.json"))
+	b.WriteString(`">graph.json</a>.</p></noscript>`)
+	if len(inline) > 0 {
+		b.WriteString(`<script type="application/json" id="graphData">`)
+		b.Write(inline)
+		b.WriteString(`</script>`)
+	}
+	b.WriteString(`<script src="`)
+	b.WriteString(template.HTMLEscapeString(base + "graph.js?v=" + r.AssetVersion()))
+	b.WriteString(`" defer></script>`)
+	return b.String()
+}
+
+// graphCollision reports a file in a bundle root that owns the graph view's
+// path. The view reserves graph.html, so a graph.md page or a static file of
+// that name would be overwritten; the render fails instead and names the file,
+// before any output is built.
+func graphCollision(dir string) error {
+	for _, name := range []string{"graph.md", "graph.html"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return fmt.Errorf("the graph view needs graph.html, which collides with %s; rename that file", name)
+		}
+	}
+	return nil
+}
+
+// writeGraphPage renders the view as graph.html in dir. A page or static file
+// already at that path is a collision: replacing a reader's page silently would
+// be worse than failing the render and naming the path.
+func (r *Renderer) writeGraphPage(dir string, inline []byte) error {
+	target := filepath.Join(dir, "graph.html")
+	if _, err := os.Stat(target); err == nil {
+		return fmt.Errorf("the graph view needs graph.html, which is already occupied; rename that file")
+	}
+	body, err := r.RenderGraphPage(inline)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, []byte(body), 0o644)
 }
 
 // markdownTarget reports whether href names a Markdown file, which is what

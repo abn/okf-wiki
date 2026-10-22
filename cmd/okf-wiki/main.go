@@ -204,6 +204,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Brand.Sections, "sections", env("OKF_WIKI_SECTIONS", ""), "section order as id:Title pairs")
 	fs.StringVar(&c.Brand.NavLinks, "nav-links", env("OKF_WIKI_NAV_LINKS", ""), "header links as Label=URL pairs")
 	fs.BoolVar(&c.MultiSite, "multi-site", envBool("OKF_WIKI_MULTI_SITE", false), "treat the content directory as a tree of wikis")
+	fs.BoolVar(&c.InlineGraph, "graph-inline", envBool("OKF_WIKI_GRAPH_INLINE", false), "embed the graph catalogue in the graph page")
 	return c
 }
 
