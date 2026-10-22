@@ -114,12 +114,22 @@ demand rather than with every page. `--graph-inline` embeds the same bytes in
 the page and the client reads them instead, which removes the second request.
 An offline render embeds it automatically.
 
-The page also accepts `focus` and `depth` query parameters. A page's Connections
-panel uses them to open the graph around that page, for example
-`graph.html?focus=page:usage/graph&depth=1`. Focus selects the node, fades
-everything outside its neighbourhood, and offers Show all. `depth` is clamped to
-1 through 3. This is a focus link, not the full shareable filter state that is
-still on the evolution list.
+The page carries its view state in the query string. Defaults are omitted.
+
+| Parameter | Meaning |
+| --- | --- |
+| `focus` | node ID to select and focus, for example `page:usage/graph` |
+| `depth` | focus distance in hops, clamped to 1 through 3 when `focus` is present |
+| `kind` | `all`, `page`, `tag` or `stub`; absent means all nodes |
+| `q` | text matched against title, section, tag, ID and site |
+| `tag` | tag slug, repeated for more tags; a page must carry every named tag |
+
+Repeated tags combine with AND. A page's Connections panel uses `focus` and
+`depth` to open the graph around that page, for example
+`graph.html?focus=page:usage/graph&depth=1`. An unknown focus shows a message
+rather than failing. An unknown tag stays in the tag list, marked as missing,
+so a reader can remove it. The client writes these parameters on change and
+restores them on back and forward. Pan and zoom are not stored.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

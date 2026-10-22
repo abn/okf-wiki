@@ -38,7 +38,7 @@ the semantic layer.
 
 - [x] Local graph and backlinks: a page's Connections panel and a focused
   neighbourhood in the graph view.
-- [ ] Shareable graph state: focus, depth, kind, text and tags in the URL, with
+- [x] Shareable graph state: focus, depth, kind, text and tags in the URL, with
   working back and forward.
 - [ ] Accessible list view: a table or list of nodes, edges and connections
   beside the drawing.
@@ -73,6 +73,6 @@ the semantic layer.
 
 ## Current
 
-Local graph and backlinks are the first shipped item. The next item is the
-remaining shareable filter state: focus and depth can already be bookmarked,
-while kind, text and tags are not yet in the URL.
+Local graph and backlinks, and shareable view state, are shipped. The next item
+is an accessible list view beside the drawing: nodes, edges and connections in
+a table or list that does not depend on the SVG.

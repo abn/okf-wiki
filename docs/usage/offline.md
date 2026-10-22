@@ -32,7 +32,8 @@ environment equivalent is `OKF_WIKI_OFFLINE=true`.
   `fetch` of a sibling file is blocked.
 - The graph catalogue is embedded, so the graph view needs no request. The
   page's Connections panel and its Local graph link use the same embedded
-  catalogue and relative URLs.
+  catalogue and relative URLs. Graph filter state stays in the URL, and back
+  and forward work from `file://`.
 - Pages with a diagram load `vendor/mermaid-bundle.min.js`, a classic build of
   Mermaid and ELK. Pages without a diagram do not load it. There is no CDN
   fallback from `file://`; if the runtime is missing, the render fails rather

@@ -132,10 +132,10 @@ The graph page body is rendered by the renderer, not by a theme template, so
 its `graphApp` subtree, its SVG layers and the `graph.js` tag are present
 without a theme doing anything. A theme that replaces `template.html` should
 keep a control pointing at `{{.GraphHref}}`; without it the view still exists at
-that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`,
-`graphKind`, `graphLabels`, `graphFit`, `graphClearFocus`, `graphDownload`, `graphStatus`,
-`graphSvg`, `graphEdges`, `graphNodes`, `graphDetails`, and the optional inline
-`graphData`.
+that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`, `graphKind`, `graphTags`,
+`graphTagsSummary`, `graphTagsMenu`, `graphLabels`, `graphFit`,
+`graphClearFocus`, `graphDownload`, `graphStatus`, `graphSvg`, `graphEdges`,
+`graphNodes`, `graphDetails`, and the optional inline `graphData`.
 
 The `{{.Connections}}` field is static page HTML. A template that omits it drops
 the backlinks and the Local graph entry point, while the graph page itself

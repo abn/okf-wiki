@@ -247,6 +247,7 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<label class="graph-field"><span class="graph-field-label">Show</span>`)
 	b.WriteString(`<select id="graphKind"><option value="all">All nodes</option><option value="page">Pages</option>`)
 	b.WriteString(`<option value="tag">Tags</option><option value="stub">Missing pages</option></select></label>`)
+	b.WriteString(`<details class="graph-tags" id="graphTags"><summary class="graph-tags-summary" id="graphTagsSummary">Tags: any</summary><div class="graph-tags-menu" id="graphTagsMenu" role="group" aria-label="Filter by tag"></div></details>`)
 	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
 	b.WriteString(`<button type="button" class="graph-fit" id="graphFit">Fit view</button>`)
 	b.WriteString(`<a class="graph-fit" id="graphClearFocus" href="`)

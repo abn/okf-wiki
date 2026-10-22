@@ -144,7 +144,9 @@ flowchart LR
    third-party runtime; the default theme's `graph.js` lays it out in SVG and
    reads only the fields the schema documents. It opens a dense catalogue on a
    readable patch rather than on the whole cloud, thins names and edges as the
-   view zooms out, and frames a node's neighbourhood when one is selected.
+   view zooms out, and frames a node's neighbourhood when one is selected. It
+   keeps focus, depth, kind, text and tags in the query string and restores them
+   on back and forward.
 
    Every content page also gets a **Connections** panel inside the article. The
    renderer indexes the recorded page links by target after the bundle is

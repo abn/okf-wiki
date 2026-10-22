@@ -23,6 +23,10 @@ frontmatter tags.
 - **Filter** narrows by title, section, tag, or node ID. Matching nodes stay
   lit and the rest fade.
 - **Show** switches between all nodes, pages, tags, and missing pages.
+- **Tags** opens a checkbox list of the bundle's tags. A page has to carry every
+  selected tag; selected tag hubs stay visible. The count beside each tag is
+  the number of pages that carry it. A tag named in the URL but absent from the
+  graph still appears in the list, marked as missing, so it can be removed.
 - A dense catalogue opens on a readable patch around a page with a typical
   number of connections, not on the whole cloud. **Fit view** draws the
   catalogue as a map, trimming the outermost percentile so one stranded page
@@ -49,18 +53,33 @@ frontmatter tags.
 The page carries no page text and no embeddings. It is the structural layer,
 and the search catalogue remains the place for text.
 
+## Shareable view state
+
+The graph writes its view state into the URL. Focus, depth, Show, Filter and
+Tags share one link, for example
+`graph.html?focus=page:usage/graph&depth=1&kind=page&q=graph&tag=usage&tag=graph`.
+Defaults are omitted, so a plain `graph.html` stays plain. Repeated `tag`
+parameters narrow to pages carrying every named tag.
+
+Back and forward restore the controls, the tag checks and the focus state.
+Pan and zoom are not in the URL. Changing Show, Tags, focus or Show all adds a
+history entry. Typing in Filter replaces the current entry so a long
+query does not create one entry per keystroke; back and forward move between
+the discrete states around it.
+
 ## Local graph and backlinks
 
 Every content page has a **Connections** panel near the foot. It lists the
 pages that link to the current one, with the source page, its section, the
-heading the link sits under, and the text of the link. A page with no incoming links says so, which is useful for
-finding orphans. The panel is static HTML; it works with JavaScript off.
+heading the link sits under, and the text of the link. A page with no incoming
+links says so, which is useful for finding orphans. The panel is static HTML;
+it works with JavaScript off.
 
 The same panel has a **Local graph** link. It opens the graph focused on the
 current page and its direct neighbours. The URL names the node and depth, for
 example `graph.html?focus=page:usage/graph&depth=1`. The focus node is selected
 and its neighbourhood is lit while the rest of the graph fades. **Show all**
-returns to the whole catalogue.
+clears the focus, fits the graph and keeps the current filters.
 
 Backlinks are collected within one wiki. Cross-wiki edges are still on the
 [graph evolution](../design/graph-evolution.md) list.
