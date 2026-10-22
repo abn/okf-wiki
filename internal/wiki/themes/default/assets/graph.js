@@ -7,6 +7,15 @@
   var NS = 'http://www.w3.org/2000/svg';
   var W = 1000;
   var H = 700;
+  // Below this text size an edge is a grey wash rather than a structure.
+  var EDGE_MIN_TEXT_PX = 4;
+  var LABEL_LIMIT = 50;
+  var LOCAL_VIEW_NODES = 250;
+  // Screen pixels per world unit for the first view and for a focused
+  // neighbourhood. Names are drawn at 11 screen pixels, so these set how much
+  // of the graph fits on screen at a readable size.
+  var READABLE_SCALE = 0.9;
+  var FOCUS_SCALE = 0.45;
 
   var svg = document.getElementById('graphSvg');
   var edgeLayer = document.getElementById('graphEdges');
@@ -29,6 +38,20 @@
     raw: '',
     selected: null,
     tabbable: null,
+    adj: Object.create(null),
+    focus: null,
+    focusCount: 0,
+    focusHops: 0,
+    anchor: null,
+    overview: false,
+    query: '',
+    labelScale: 0,
+    cullView: null,
+    dragMoved: false,
+    dragFrom: null,
+    scale: 1,
+    labelFrame: 0,
+    widths: Object.create(null),
     view: { x: 0, y: 0, w: W, h: H },
     step: 0,
     totalTicks: 0,
@@ -70,7 +93,7 @@
   function load() {
     var text = inlineCatalogue();
     if (text) {
-      start(text, 'the page');
+      start(text);
       return;
     }
     setStatus('Loading the graph...');
@@ -79,14 +102,14 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.text();
       })
-      .then(function (raw) { start(raw, 'graph.json'); })
+      .then(function (raw) { start(raw); })
       .catch(function (err) {
         var detail = err && err.message ? err.message : 'the request failed';
         setStatus('The graph could not be loaded (' + detail + '). The raw file is at ' + base + 'graph.json.', true);
       });
   }
 
-  function start(raw, source) {
+  function start(raw) {
     var data;
     try {
       data = JSON.parse(raw);
@@ -110,6 +133,7 @@
         tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
         stub: !!n.stub,
         site: n.site ? String(n.site) : '',
+        matched: true,
         degree: 0,
         x: 0,
         y: 0,
@@ -143,21 +167,159 @@
       return;
     }
 
+    state.adj = Object.create(null);
+    state.nodes.forEach(function (n) { state.adj[n.id] = []; });
+    state.edges.forEach(function (e) {
+      state.adj[e.from.id].push({ node: e.to, dir: 'out' });
+      state.adj[e.to.id].push({ node: e.from, dir: 'in' });
+    });
+    state.anchor = starterPage();
+
     download.disabled = false;
+    sizeWorld();
     layoutInitial();
     draw();
     simulateThenRender();
-    setStatus('Loaded from ' + source + '.');
-    applyFilter();
   }
 
+  // The view opens on a page with a typical number of connections rather than
+  // the busiest one: a hub's neighbourhood is the densest part of the drawing,
+  // which is the opposite of a readable first screen.
+  function starterPage() {
+    var pages = state.nodes.filter(function (n) { return n.kind === 'page' && !n.stub; });
+    if (!pages.length) pages = state.nodes;
+    var degrees = pages.map(function (n) { return n.degree; }).sort(function (a, b) { return a - b; });
+    var median = degrees[Math.floor(degrees.length / 2)];
+    var cap = Math.max(4, median + 2);
+    var best = null;
+    pages.forEach(function (n) {
+      if (n.degree > cap) return;
+      if (!best || n.degree > best.degree) best = n;
+    });
+    return best;
+  }
+
+  // A fixed 1000 by 700 world is enough for a small bundle and far too small
+  // for a dense one. Giving each node the area its spring length asks for is
+  // what stops the layout from saturating against the walls.
+  function targetArea(n) {
+    // The area per node the circles and names need, including the gaps.
+    return n * 110 * 110 / 0.7;
+  }
+
+  function sizeWorld() {
+    var n = Math.max(1, state.nodes.length);
+    W = Math.max(1000, Math.round(Math.sqrt(targetArea(n))));
+    H = Math.max(700, Math.round(W * 0.7));
+  }
+
+  // The 1st and 99th percentile of a coordinate, so one stranded page cannot
+  // decide the scale of the whole drawing.
+  function percentileRange(values) {
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var lo = Math.floor((sorted.length - 1) * 0.01);
+    var hi = Math.floor((sorted.length - 1) * 0.99);
+    return { min: sorted[lo], max: sorted[hi] };
+  }
+
+  // A force layout settles where its springs and repulsion balance, which on a
+  // densely linked bundle can be far tighter than the drawing was designed
+  // around. Scaling the settled cloud to the area its spring length asks for
+  // gives every layout the density its labels and circles expect, without
+  // asking the simulation for thousands more ticks.
+  function normaliseLayout() {
+    if (state.nodes.length < 200 || !state.edges.length) return;
+    var xr = percentileRange(state.nodes.map(function (n) { return n.x; }));
+    var yr = percentileRange(state.nodes.map(function (n) { return n.y; }));
+    var minX = xr.min;
+    var maxX = xr.max;
+    var minY = yr.min;
+    var maxY = yr.max;
+    var area = (maxX - minX) * (maxY - minY);
+    if (!area) return;
+    var target = targetArea(state.nodes.length);
+    var factor = Math.max(0.25, Math.min(6, Math.sqrt(target / area)));
+    if (Math.abs(factor - 1) < 0.05) return;
+
+    var cx = (minX + maxX) / 2;
+    var cy = (minY + maxY) / 2;
+    state.nodes.forEach(function (n) {
+      n.x = cx + (n.x - cx) * factor;
+      n.y = cy + (n.y - cy) * factor;
+    });
+
+    // The percentiles decide the scale, but a stranded page still has a real
+    // position, so the world is sized from the full extent after scaling.
+    var realMinX = Infinity;
+    var realMinY = Infinity;
+    var realMaxX = -Infinity;
+    var realMaxY = -Infinity;
+    state.nodes.forEach(function (n) {
+      realMinX = Math.min(realMinX, n.x);
+      realMinY = Math.min(realMinY, n.y);
+      realMaxX = Math.max(realMaxX, n.x);
+      realMaxY = Math.max(realMaxY, n.y);
+    });
+    var shiftX = 60 - realMinX;
+    var shiftY = 60 - realMinY;
+    state.nodes.forEach(function (n) {
+      n.x += shiftX;
+      n.y += shiftY;
+    });
+    W = Math.max(W, Math.round(realMaxX - realMinX) + 120);
+    H = Math.max(H, Math.round(realMaxY - realMinY) + 120);
+  }
+
+  // Placing nodes by index leaves every linked pair at a random distance, so a
+  // dense graph spends its whole simulation pulling edges across the world.
+  // Walking the catalogue puts each page beside the page that links to it,
+  // which leaves the forces a short distance to refine and keeps a
+  // neighbourhood compact when it is selected later.
   function layoutInitial() {
-    var n = state.nodes.length;
+    var seen = Object.create(null);
+    var queue = [];
+    var start = state.anchor || state.nodes[0];
+    seen[start.id] = true;
+    start.x = W / 2;
+    start.y = H / 2;
+    start.vx = 0;
+    start.vy = 0;
+    queue.push(start);
+
+    for (var qi = 0; qi < queue.length; qi++) {
+      var current = queue[qi];
+      var links = state.adj[current.id] || [];
+      var children = [];
+      for (var li = 0; li < links.length; li++) {
+        var next = links[li].node;
+        if (seen[next.id]) continue;
+        seen[next.id] = true;
+        children.push(next);
+      }
+      var k = children.length;
+      if (!k) continue;
+      var base = Math.atan2(current.y - H / 2, current.x - W / 2);
+      if (!isFinite(base)) base = qi * 2.399963;
+      var radius = 110 + Math.min(20, k) * 10;
+      for (var j = 0; j < k; j++) {
+        var a = base + (j - (k - 1) / 2) * (Math.PI * 2 / Math.max(6, k)) + (qi % 3) * 0.2;
+        var child = children[j];
+        child.x = current.x + Math.cos(a) * radius;
+        child.y = current.y + Math.sin(a) * radius;
+        child.vx = 0;
+        child.vy = 0;
+        queue.push(child);
+      }
+    }
+
+    // Pages in a component the walk never reached still need a place to
+    // start; the halo around the main cloud is enough for the forces to take
+    // over.
     var golden = Math.PI * (3 - Math.sqrt(5));
-    var radius = Math.min(W, H) * 0.42;
-    state.nodes.forEach(function (node, i) {
-      var r = radius * Math.sqrt((i + 0.5) / n);
+    var left = state.nodes.filter(function (node) { return !seen[node.id]; });
+    left.forEach(function (node, i) {
       var a = i * golden;
+      var r = Math.min(W, H) * 0.25 * Math.sqrt((i + 0.5) / Math.max(1, left.length));
       node.x = W / 2 + Math.cos(a) * r;
       node.y = H / 2 + Math.sin(a) * r;
       node.vx = 0;
@@ -234,7 +396,7 @@
       var dy = e.to.y - e.from.y;
       var d = Math.sqrt(dx * dx + dy * dy) || 0.01;
       var target = e.kind === 'tag' ? 70 : 110;
-      var force = (d - target) * 0.011;
+      var force = (d - target) * 0.02;
       var fx = (dx / d) * force;
       var fy = (dy / d) * force;
       e.from.vx += fx;
@@ -258,8 +420,16 @@
         n.vy = 0;
         return;
       }
-      n.vx *= 0.87;
-      n.vy *= 0.87;
+      n.vx *= 0.8;
+      n.vy *= 0.8;
+      // A stiff spring on a long edge can overshoot by hundreds of units in
+      // one tick, and a hub with many edges can oscillate forever. Capping the
+      // step keeps the cloud settling instead of sloshing.
+      var speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+      if (speed > 12) {
+        n.vx *= 12 / speed;
+        n.vy *= 12 / speed;
+      }
       n.x += n.vx;
       n.y += n.vy;
       if (n.x < 20) { n.x = 20; n.vx *= -0.4; }
@@ -296,13 +466,16 @@
       circle.addEventListener('focus', function () { setTabbable(n); });
       circle.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        swallowClick = false;
-        select(n);
+        if (swallowClick) {
+          swallowClick = false;
+          return;
+        }
+        select(n, true);
       });
       circle.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter' || ev.key === ' ') {
           ev.preventDefault();
-          select(n);
+          select(n, true);
           return;
         }
         if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
@@ -330,23 +503,24 @@
       label.setAttribute('y', String(-r - 5));
       label.textContent = labelText(n.title);
       g.appendChild(label);
+      n.label = label;
 
       nodeLayer.appendChild(g);
       n.el = g;
       n.circle = circle;
     });
 
-    applyLabels();
     renderPositions();
-    placeLabels();
+    applyLabels();
   }
 
-  function renderPositions() {
+  function renderPositions(withEdges) {
     state.nodes.forEach(function (n) {
       if (n.el) {
         n.el.setAttribute('transform', 'translate(' + n.x.toFixed(2) + ',' + n.y.toFixed(2) + ')');
       }
     });
+    if (withEdges === false) return;
     state.edgeElements.forEach(function (item) {
       var e = item.edge;
       item.el.setAttribute('x1', e.from.x.toFixed(2));
@@ -358,38 +532,87 @@
 
   function simulateThenRender() {
     var n = state.nodes.length;
-    state.totalTicks = n > 600 ? 120 : n > 300 ? 200 : 400;
+    // A larger world needs fewer ticks than a cramped one, because the walk
+    // already starts near the density the springs ask for.
+    state.totalTicks = n > 1200 ? 300 : n > 600 ? 280 : n > 300 ? 260 : 320;
     state.step = 0;
 
     if (n <= 250) {
       for (; state.step < state.totalTicks; state.step++) tick();
-      fitView();
+      normaliseLayout();
+      initialView();
       renderPositions();
-      placeLabels();
+      applyFilter();
       return;
     }
 
     setStatus('Laying out ' + n + ' nodes...');
+    var paint = 0;
     function frame() {
       var end = Math.min(state.step + 4, state.totalTicks);
       for (; state.step < end; state.step++) tick();
-      renderPositions();
-      if (state.step < state.totalTicks) {
+      var done = state.step >= state.totalTicks;
+      paint += 1;
+      // Node and edge coordinates are most of the DOM work and cannot be read
+      // while the cloud is still moving, so a dense layout writes them every
+      // few frames and draws the edges once, at the end.
+      if (done || n <= 1200 || paint % 4 === 0) renderPositions(done || n <= 600);
+      if (!done) {
         requestAnimationFrame(frame);
         return;
       }
-      fitView();
+      normaliseLayout();
+      initialView();
       renderPositions();
       applyFilter();
     }
     requestAnimationFrame(frame);
   }
 
+  function updateEdgeVisibility() {
+    app.classList.toggle('hide-edges', !state.focus && 11 * state.scale < EDGE_MIN_TEXT_PX);
+  }
+
   function applyView() {
     svg.setAttribute('viewBox', state.view.x + ' ' + state.view.y + ' ' + state.view.w + ' ' + state.view.h);
+    var cw = svg.clientWidth || 1000;
+    var ch = svg.clientHeight || 700;
+    state.scale = Math.min(cw / state.view.w, ch / state.view.h) || 1;
+    updateEdgeVisibility();
+    scheduleLabels();
+  }
+
+  // A dense graph opens on a readable patch around a typical page, not on the
+  // whole cloud: at this scale the circles separate and names fit. Fit view
+  // remains the map, and selecting a node reframes its neighbourhood.
+  function initialView() {
+    if (!state.nodes.length) {
+      fitView();
+      return;
+    }
+    fitView();
+    if (!state.anchor) return;
+    // A fit that would draw the edges as specks is not a useful first screen,
+    // whether the catalogue is large or the canvas is narrow.
+    if (state.nodes.length <= LOCAL_VIEW_NODES && 11 * state.scale >= EDGE_MIN_TEXT_PX) return;
+    var cw = svg.clientWidth || 1000;
+    var ch = svg.clientHeight || 700;
+    centerOn(state.anchor, cw / READABLE_SCALE, ch / READABLE_SCALE);
+  }
+
+  function centerOn(n, w, h) {
+    var x = n.x - w / 2;
+    var y = n.y - h / 2;
+    x = W > w ? Math.max(0, Math.min(W - w, x)) : (W - w) / 2;
+    y = H > h ? Math.max(0, Math.min(H - h, y)) : (H - h) / 2;
+    state.overview = false;
+    state.view = { x: x, y: y, w: w, h: h };
+    applyView();
+    updateStatus();
   }
 
   function fitView() {
+    state.overview = true;
     if (!state.nodes.length) {
       state.view = { x: 0, y: 0, w: W, h: H };
       applyView();
@@ -399,23 +622,84 @@
     var minY = Infinity;
     var maxX = -Infinity;
     var maxY = -Infinity;
-    state.nodes.forEach(function (n) {
-      var r = nodeRadius(n) + 28;
-      minX = Math.min(minX, n.x - r);
-      minY = Math.min(minY, n.y - r);
-      maxX = Math.max(maxX, n.x + r);
-      maxY = Math.max(maxY, n.y + r);
-    });
-    var pad = 20;
-    minX -= pad;
-    minY -= pad;
-    maxX += pad;
-    maxY += pad;
+    if (state.nodes.length > 200) {
+      // An overview should not let one stranded page decide the scale, so the
+      // edges of the bounding box are trimmed to the first and last percent.
+      var xr = percentileRange(state.nodes.map(function (n) { return n.x; }));
+      var yr = percentileRange(state.nodes.map(function (n) { return n.y; }));
+      minX = xr.min;
+      maxX = xr.max;
+      minY = yr.min;
+      maxY = yr.max;
+      var pad = 80;
+      minX -= pad;
+      minY -= pad;
+      maxX += pad;
+      maxY += pad;
+    } else {
+      state.nodes.forEach(function (n) {
+        var r = nodeRadius(n) + 28;
+        minX = Math.min(minX, n.x - r);
+        minY = Math.min(minY, n.y - r);
+        maxX = Math.max(maxX, n.x + r);
+        maxY = Math.max(maxY, n.y + r);
+      });
+      minX -= 20;
+      minY -= 20;
+      maxX += 20;
+      maxY += 20;
+    }
     state.view = {
       x: minX,
       y: minY,
       w: Math.max(240, maxX - minX),
       h: Math.max(180, maxY - minY)
+    };
+    applyView();
+    updateStatus();
+  }
+
+  // The padded extent of a set of nodes, in world units.
+  function boundsOf(ids) {
+    var minX = Infinity;
+    var minY = Infinity;
+    var maxX = -Infinity;
+    var maxY = -Infinity;
+    state.nodes.forEach(function (n) {
+      if (ids[n.id] == null) return;
+      var r = nodeRadius(n) + 30;
+      minX = Math.min(minX, n.x - r);
+      minY = Math.min(minY, n.y - r);
+      maxX = Math.max(maxX, n.x + r);
+      maxY = Math.max(maxY, n.y + r);
+    });
+    return {
+      minX: minX,
+      minY: minY,
+      maxX: maxX,
+      maxY: maxY,
+      w: maxX - minX,
+      h: maxY - minY
+    };
+  }
+
+  // Fit the view to one neighbourhood, keeping the canvas aspect so the text
+  // is not scaled down by letterboxing.
+  function fitBounds(ids) {
+    var b = boundsOf(ids);
+    if (b.minX === Infinity) return;
+    var w = Math.max(320, b.w);
+    var h = Math.max(240, b.h);
+    var cw = svg.clientWidth || 1000;
+    var ch = svg.clientHeight || 700;
+    if (w / h < cw / ch) w = h * cw / ch;
+    else h = w * ch / cw;
+    state.overview = false;
+    state.view = {
+      x: (b.minX + b.maxX) / 2 - w / 2,
+      y: (b.minY + b.maxY) / 2 - h / 2,
+      w: w,
+      h: h
     };
     applyView();
   }
@@ -424,28 +708,40 @@
     if (kind.value === 'page' && (n.kind !== 'page' || n.stub)) return false;
     if (kind.value === 'tag' && n.kind !== 'tag') return false;
     if (kind.value === 'stub' && !n.stub) return false;
-    var q = filter.value.trim().toLowerCase();
+    var q = state.query;
     if (!q) return true;
     var hay = (n.title + ' ' + n.id + ' ' + n.section + ' ' + n.tags.join(' ') + ' ' + n.site).toLowerCase();
     return hay.indexOf(q) !== -1;
   }
 
   function applyFilter() {
-    var shown = 0;
+    state.query = filter.value.trim().toLowerCase();
     state.nodes.forEach(function (n) {
-      var ok = matches(n);
-      if (ok) shown += 1;
-      if (n.el) n.el.classList.toggle('is-dim', !ok);
+      n.matched = matches(n);
+      if (n.el) n.el.classList.toggle('is-dim', !n.matched);
     });
     state.edgeElements.forEach(function (item) {
-      var ok = matches(item.edge.from) && matches(item.edge.to);
-      item.el.classList.toggle('is-dim', !ok);
+      item.el.classList.toggle('is-dim', !(item.edge.from.matched && item.edge.to.matched));
     });
-    placeLabels();
+    scheduleLabels();
     ensureTabbable();
+    updateStatus();
+  }
+
+  function updateStatus() {
     var total = state.nodes.length;
-    var text = 'Showing ' + shown + ' of ' + total + (total === 1 ? ' node' : ' nodes') +
-      '. Scroll to zoom, drag the background to pan, or select Fit view.';
+    var shown = 0;
+    state.nodes.forEach(function (n) { if (n.matched) shown += 1; });
+    var text = 'Showing ' + shown + ' of ' + total + (total === 1 ? ' node' : ' nodes') + '.';
+    if (state.focus && state.selected) {
+      text += ' Focused on ' + state.selected.title + ': ' + state.focusCount +
+        (state.focusCount === 1 ? ' node' : ' nodes') + ' within ' +
+        state.focusHops + (state.focusHops === 1 ? ' hop' : ' hops') + '. Press Escape to clear.';
+    } else if (state.overview && total > LOCAL_VIEW_NODES) {
+      text += ' Overview zoom. Select a node or zoom in for its neighbourhood.';
+    } else {
+      text += ' Scroll to zoom, drag the background to pan, or select Fit view.';
+    }
     setStatus(text);
     var desc = document.getElementById('graphDesc');
     if (desc) desc.textContent = 'Pages and tags as nodes. ' + text +
@@ -457,44 +753,167 @@
     placeLabels();
   }
 
-  // Labels are placed greedily, the busiest nodes first. A label that would
-  // overlap one already placed is hidden rather than drawn on top of it; the
-  // node still reveals its name on hover or selection, and the panel has the
-  // full title. This keeps a dense graph legible without dropping any node.
+  function scheduleLabels() {
+    if (state.labelFrame) return;
+    state.labelFrame = requestAnimationFrame(function () {
+      state.labelFrame = 0;
+      placeLabels();
+    });
+  }
+
+  // An edge whose endpoints are both off-screen cannot be read, and a dense
+  // graph has thousands of them crossing a local view. An edge that leaves
+  // the view is kept, so the connection to what is outside stays visible.
+  function cullEdges() {
+    var scale = state.scale || 1;
+    var view = state.view;
+    var last = state.cullView;
+    if (last && Math.abs(view.x - last.x) < 40 && Math.abs(view.y - last.y) < 40 &&
+        Math.abs(view.w - last.w) < 1 && Math.abs(view.h - last.h) < 1 &&
+        Math.abs(scale - last.scale) < 0.01) return;
+    state.cullView = { x: view.x, y: view.y, w: view.w, h: view.h, scale: scale };
+    var margin = 30 / scale;
+    var x0 = view.x - margin;
+    var x1 = view.x + view.w + margin;
+    var y0 = view.y - margin;
+    var y1 = view.y + view.h + margin;
+    state.edgeElements.forEach(function (item) {
+      var e = item.edge;
+      var fromIn = e.from.x >= x0 && e.from.x <= x1 && e.from.y >= y0 && e.from.y <= y1;
+      var toIn = e.to.x >= x0 && e.to.x <= x1 && e.to.y >= y0 && e.to.y <= y1;
+      item.el.classList.toggle('is-culled', !fromIn && !toIn);
+    });
+  }
+
+  // Labels are placed greedily, the busiest nodes and the selection first. A
+  // name is drawn only when it fits without covering another name or another
+  // node, and both tests use the drawn text rather than a character count. A
+  // dense view therefore shows fewer names, and the node still reveals its
+  // own on hover or selection. The names keep their screen size at every zoom.
   function placeLabels() {
+    cullEdges();
+    var scale = state.scale || 1;
+    var fontWorld = 11 / scale;
+    var relayout = state.labelScale !== scale;
+    state.labelScale = scale;
     var order = state.nodes.slice().sort(function (a, b) {
+      if (a === state.selected) return -1;
+      if (b === state.selected) return 1;
       return b.degree - a.degree || a.title.localeCompare(b.title);
     });
-    var boxes = [];
     order.forEach(function (n) {
-      var label = n.el && n.el.querySelector('.graph-label');
+      var label = n.label;
       if (!label) return;
-      if (!labels.checked || !matches(n)) {
-        label.classList.add('is-colliding');
-        return;
+      label.classList.add('is-colliding');
+      if (relayout) {
+        label.style.fontSize = fontWorld + 'px';
+        label.setAttribute('y', String(-(nodeRadius(n) + 4 / scale + fontWorld * 0.2)));
       }
+    });
+    if (!labels.checked || !state.nodes.length) return;
+
+    var grid = circleGrid();
+    var boxes = [];
+    var placed = 0;
+    for (var i = 0; i < order.length && placed < LABEL_LIMIT; i++) {
+      var n = order[i];
+      if (!n.matched) continue;
+      if (state.focus && state.focus[n.id] == null) continue;
+      var view = state.view;
+      var margin = 40 / scale;
+      if (n.x < view.x - margin || n.x > view.x + view.w + margin ||
+          n.y < view.y - margin || n.y > view.y + view.h + margin) continue;
+      var label = n.label;
+      if (!label) continue;
       var text = label.textContent || '';
-      var w = Math.max(18, text.length * 5.6);
-      var h = 13;
+      var w = labelWidth(label, text) / scale;
+      if (!w) continue;
       var r = nodeRadius(n);
+      var gap = 4 / scale;
+      var boxH = fontWorld;
       var rect = {
-        x: n.x - w / 2 - 2,
-        y: n.y - r - 5 - h,
-        w: w + 4,
-        h: h + 2
+        x: n.x - w / 2 - 1,
+        y: n.y - r - gap - boxH,
+        w: w + 2,
+        h: boxH + 1
       };
-      var collides = false;
-      for (var i = 0; i < boxes.length; i++) {
-        var b = boxes[i];
-        if (rect.x < b.x + b.w && rect.x + rect.w > b.x &&
-            rect.y < b.y + b.h && rect.y + rect.h > b.y) {
-          collides = true;
-          break;
+      var chosen = n === state.selected;
+      if (!chosen && coversCircle(grid, rect)) continue;
+      if (!chosen && coversBox(boxes, rect)) continue;
+      boxes.push(rect);
+      placed += 1;
+      label.classList.remove('is-colliding');
+    }
+  }
+
+  var measureCanvas = null;
+
+  function labelWidth(label, text) {
+    if (state.widths[text]) return state.widths[text];
+    var w = 0;
+    if (!measureCanvas) measureCanvas = document.createElement('canvas');
+    var ctx = measureCanvas.getContext && measureCanvas.getContext('2d');
+    if (ctx) {
+      var cs = window.getComputedStyle(label);
+      try {
+        // Always measure at the screen size the name is drawn at; the world
+        // width then follows from the zoom.
+        ctx.font = '11px ' + (cs.fontFamily || 'sans-serif');
+        w = ctx.measureText(text).width;
+      } catch (e) {
+        w = 0;
+      }
+    }
+    if (!w) w = text.length * 5.6;
+    state.widths[text] = w;
+    return w;
+  }
+
+  function circleGrid() {
+    var cell = 64;
+    var cells = Object.create(null);
+    state.nodes.forEach(function (n) {
+      var key = Math.floor(n.x / cell) + ',' + Math.floor(n.y / cell);
+      (cells[key] || (cells[key] = [])).push(n);
+    });
+    return { cell: cell, cells: cells };
+  }
+
+  function coversCircle(grid, rect) {
+    var cell = grid.cell;
+    var x0 = Math.floor(rect.x / cell);
+    var x1 = Math.floor((rect.x + rect.w) / cell);
+    var y0 = Math.floor(rect.y / cell);
+    var y1 = Math.floor((rect.y + rect.h) / cell);
+    for (var gx = x0; gx <= x1; gx++) {
+      for (var gy = y0; gy <= y1; gy++) {
+        var bucket = grid.cells[gx + ',' + gy];
+        if (!bucket) continue;
+        for (var i = 0; i < bucket.length; i++) {
+          var n = bucket[i];
+          // A faded node is context, not an obstacle: names of the focus set
+          // or of a filter's matches may sit over the pages it hides.
+          if (n.el && n.el.classList.contains('is-dim')) continue;
+          if (state.focus && state.focus[n.id] == null) continue;
+          var r = nodeRadius(n) + 1;
+          var cx = Math.max(rect.x, Math.min(n.x, rect.x + rect.w));
+          var cy = Math.max(rect.y, Math.min(n.y, rect.y + rect.h));
+          var dx = cx - n.x;
+          var dy = cy - n.y;
+          if (dx * dx + dy * dy < r * r) return true;
         }
       }
-      label.classList.toggle('is-colliding', collides);
-      if (!collides) boxes.push(rect);
-    });
+    }
+    return false;
+  }
+
+  function coversBox(boxes, rect) {
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (rect.x < b.x + b.w && rect.x + rect.w > b.x &&
+          rect.y < b.y + b.h && rect.y + rect.h > b.y) return true;
+    }
+    return false;
   }
 
   function setTabbable(node) {
@@ -507,12 +926,16 @@
   // Roving tabindex: one node is in the tab order at a time, and the arrow keys
   // move between the nodes a filter leaves visible. Enter or Space opens the
   // details, so a large graph is one tab stop rather than one per page.
+  function reachable(n) {
+    return n.el && !n.el.classList.contains('is-dim') && !n.el.classList.contains('is-focus-far');
+  }
+
   function ensureTabbable() {
     var current = state.tabbable;
-    if (current && current.el && !current.el.classList.contains('is-dim')) return;
+    if (current && reachable(current)) return;
     for (var i = 0; i < state.nodes.length; i++) {
       var n = state.nodes[i];
-      if (n.el && !n.el.classList.contains('is-dim')) {
+      if (reachable(n)) {
         setTabbable(n);
         return;
       }
@@ -529,7 +952,7 @@
     for (var i = 0; i < total; i++) {
       idx = (idx + step + total) % total;
       var candidate = state.nodes[idx];
-      if (candidate.el && !candidate.el.classList.contains('is-dim')) {
+      if (reachable(candidate)) {
         setTabbable(candidate);
         candidate.circle.focus();
         return;
@@ -538,16 +961,116 @@
   }
 
   function focusEdge(last) {
-    var visible = state.nodes.filter(function (n) {
-      return n.el && !n.el.classList.contains('is-dim');
-    });
+    var visible = state.nodes.filter(reachable);
     if (!visible.length) return;
     var node = last ? visible[visible.length - 1] : visible[0];
     setTabbable(node);
     node.circle.focus();
   }
 
-  function select(n) {
+  // Walk the catalogue outward from one node. Two hops is the useful size for
+  // a page; a tag hub is narrower and would otherwise pull in most of the
+  // bundle through its own pages.
+  function bfs(node, hops) {
+    var seen = Object.create(null);
+    var order = [node];
+    seen[node.id] = 0;
+    for (var i = 0; i < order.length; i++) {
+      var current = order[i];
+      var depth = seen[current.id];
+      if (depth >= hops) continue;
+      var links = state.adj[current.id] || [];
+      for (var j = 0; j < links.length; j++) {
+        var next = links[j].node;
+        if (seen[next.id] == null) {
+          seen[next.id] = depth + 1;
+          order.push(next);
+        }
+      }
+    }
+    return { ids: seen, size: order.length };
+  }
+
+  function applyFocus() {
+    var ids = state.focus;
+    state.nodes.forEach(function (n) {
+      if (n.el) n.el.classList.toggle('is-focus-far', !!ids && ids[n.id] == null);
+    });
+    app.classList.toggle('has-focus', !!ids);
+    updateEdgeVisibility();
+    state.edgeElements.forEach(function (item) {
+      var e = item.edge;
+      var on = !ids || (ids[e.from.id] != null && ids[e.to.id] != null);
+      item.el.classList.toggle('is-focus-far', !on);
+    });
+    ensureTabbable();
+    scheduleLabels();
+  }
+
+  function focusOn(n, fit) {
+    var hops = n.kind === 'tag' ? 1 : 2;
+    var found = bfs(n, hops);
+    if (found.size > 120 && hops > 1) {
+      hops = 1;
+      found = bfs(n, hops);
+    }
+    state.focus = found.ids;
+    state.focusCount = found.size;
+    state.focusHops = hops;
+    applyFocus();
+    if (fit && found.size <= 300) {
+      var bounds = boundsOf(found.ids);
+      var cw = svg.clientWidth || 1000;
+      var ch = svg.clientHeight || 700;
+      var focusW = cw / FOCUS_SCALE;
+      var focusH = ch / FOCUS_SCALE;
+      // A neighbourhood that reaches across the whole drawing cannot be fitted
+      // without losing the shapes, so stay with the node and let the panel
+      // carry the list of far connections.
+      if (bounds.w <= focusW && bounds.h <= focusH) {
+        fitBounds(found.ids);
+      } else {
+        centerOn(n, focusW, focusH);
+      }
+    }
+    updateStatus();
+  }
+
+  function clearFocus() {
+    state.focus = null;
+    state.focusCount = 0;
+    state.focusHops = 0;
+    applyFocus();
+  }
+
+  function directionLabel(dirs) {
+    if (dirs['in'] && dirs.out) return 'linked both ways';
+    return dirs.out ? 'linked from this page' : 'links to this page';
+  }
+
+  function connections(n) {
+    var links = state.adj[n.id] || [];
+    var merged = Object.create(null);
+    var list = [];
+    var incoming = 0;
+    var outgoing = 0;
+    links.forEach(function (link) {
+      if (link.dir === 'in') incoming += 1;
+      else outgoing += 1;
+      var entry = merged[link.node.id];
+      if (!entry) {
+        entry = { node: link.node, dirs: Object.create(null) };
+        merged[link.node.id] = entry;
+        list.push(entry);
+      }
+      entry.dirs[link.dir] = true;
+    });
+    list.sort(function (a, b) { return a.node.title.localeCompare(b.node.title); });
+    return { list: list, incoming: incoming, outgoing: outgoing };
+  }
+
+  function select(n, withView) {
+    var keepFocus = details.contains(document.activeElement);
     state.selected = n;
     setTabbable(n);
     state.nodes.forEach(function (m) {
@@ -562,18 +1085,14 @@
     details.appendChild(heading);
 
     var title = document.createElement('h2');
+    title.tabIndex = -1;
     title.textContent = n.title;
     details.appendChild(title);
 
-    var incoming = 0;
-    var outgoing = 0;
-    state.edges.forEach(function (e) {
-      if (e.to === n) incoming += 1;
-      if (e.from === n) outgoing += 1;
-    });
+    var links = connections(n);
     var meta = document.createElement('p');
     meta.className = 'graph-details-meta';
-    var bits = [incoming + ' incoming', outgoing + ' outgoing'];
+    var bits = [links.incoming + ' incoming', links.outgoing + ' outgoing'];
     if (n.site) bits.push(n.site);
     meta.textContent = bits.join(' / ');
     details.appendChild(meta);
@@ -590,6 +1109,44 @@
       details.appendChild(row);
     }
 
+    if (links.list.length) {
+      var caption = document.createElement('p');
+      caption.className = 'graph-details-kind';
+      caption.textContent = links.list.length === 1 ? '1 connection' : links.list.length + ' connections';
+      details.appendChild(caption);
+
+      var list = document.createElement('ul');
+      list.className = 'graph-neighbours';
+      var shown = 0;
+      function addConnection(entry) {
+        var item = document.createElement('li');
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'graph-neighbour';
+        button.textContent = entry.node.title;
+        button.setAttribute('aria-label', entry.node.title + ', ' + directionLabel(entry.dirs));
+        button.addEventListener('click', function () { select(entry.node, true); });
+        item.appendChild(button);
+        list.appendChild(item);
+      }
+      for (; shown < Math.min(40, links.list.length); shown++) addConnection(links.list[shown]);
+      details.appendChild(list);
+      if (shown < links.list.length) {
+        var more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'graph-more';
+        more.textContent = 'Show all ' + links.list.length + ' connections';
+        more.addEventListener('click', function () {
+          var start = shown;
+          for (; shown < links.list.length; shown++) addConnection(links.list[shown]);
+          more.remove();
+          var added = list.children[start];
+          if (added) added.querySelector('button').focus();
+        });
+        details.appendChild(more);
+      }
+    }
+
     if (n.stub) {
       var note = document.createElement('p');
       note.textContent = 'This page is linked from the bundle but does not exist in it.';
@@ -603,7 +1160,17 @@
       open.textContent = n.kind === 'tag' ? 'Open tag page' : 'Open page';
       details.appendChild(open);
     }
+
+    var clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'graph-clear';
+    clear.textContent = 'Clear selection';
+    clear.addEventListener('click', clearSelection);
+    details.appendChild(clear);
+
     details.hidden = false;
+    if (keepFocus) title.focus();
+    focusOn(n, !!withView);
   }
 
   function clearSelection() {
@@ -611,8 +1178,10 @@
     state.nodes.forEach(function (n) {
       if (n.el) n.el.classList.remove('is-selected');
     });
+    clearFocus();
     details.hidden = true;
     details.textContent = '';
+    updateStatus();
   }
 
   function toSvg(clientX, clientY) {
@@ -628,11 +1197,16 @@
     if (ev.button !== 0) return;
     ev.stopPropagation();
     ev.preventDefault();
+    swallowClick = false;
     state.dragging = n;
+    state.dragMoved = false;
+    state.dragFrom = { x: ev.clientX, y: ev.clientY };
     n.fixed = true;
     n.circle.setPointerCapture(ev.pointerId);
     svg.classList.add('is-dragging');
-    select(n);
+    // A drag should not reframe the view under the pointer, but the rest of
+    // the graph can still fade to the dragged node's neighbourhood.
+    select(n, false);
   }
 
   filter.addEventListener('input', applyFilter);
@@ -669,8 +1243,10 @@
   svg.addEventListener('wheel', function (ev) {
     ev.preventDefault();
     var v = state.view;
+    var previousW = v.w;
     var factor = Math.exp(ev.deltaY * 0.0015);
-    var nextW = Math.min(4000, Math.max(180, v.w * factor));
+    var maxW = Math.max(W, 4000);
+    var nextW = Math.min(maxW, Math.max(180, v.w * factor));
     var nextH = nextW * (v.h / v.w);
     var pt = toSvg(ev.clientX, ev.clientY);
     v.x = pt.x - (pt.x - v.x) * (nextW / v.w);
@@ -678,6 +1254,10 @@
     v.w = nextW;
     v.h = nextH;
     applyView();
+    if (state.overview && nextW < previousW) {
+      state.overview = false;
+      updateStatus();
+    }
   }, { passive: false });
 
   svg.addEventListener('pointerdown', function (ev) {
@@ -711,6 +1291,11 @@
       return;
     }
     if (state.dragging) {
+      var slop = ev.pointerType === 'touch' ? 10 : 3;
+      if (Math.abs(ev.clientX - state.dragFrom.x) > slop ||
+          Math.abs(ev.clientY - state.dragFrom.y) > slop) {
+        state.dragMoved = true;
+      }
       var pt = toSvg(ev.clientX, ev.clientY);
       state.dragging.x = pt.x;
       state.dragging.y = pt.y;
@@ -725,12 +1310,16 @@
       svg.classList.remove('is-panning');
       if (svg.hasPointerCapture(ev.pointerId)) svg.releasePointerCapture(ev.pointerId);
       if (panned) swallowClick = true;
+      state.cullView = null;
     }
     if (state.dragging) {
+      var moved = state.dragMoved;
       state.dragging.fixed = false;
       state.dragging = null;
+      state.dragMoved = false;
+      state.cullView = null;
       svg.classList.remove('is-dragging');
-      swallowClick = true;
+      if (moved) swallowClick = true;
     }
     if (state.nodes.length) placeLabels();
   }
@@ -739,6 +1328,23 @@
 
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape' && state.selected) clearSelection();
+  });
+
+  // A local face swaps in after first paint; widths measured against the
+  // fallback would keep names overlapping for the life of the page.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      state.widths = Object.create(null);
+      scheduleLabels();
+    });
+  }
+
+  window.addEventListener('resize', function () {
+    applyView();
+    if (!state.overview || !state.anchor || 11 * state.scale >= EDGE_MIN_TEXT_PX) return;
+    var cw = svg.clientWidth || 1000;
+    var ch = svg.clientHeight || 700;
+    centerOn(state.anchor, cw / READABLE_SCALE, ch / READABLE_SCALE);
   });
 
   load();

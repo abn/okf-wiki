@@ -1265,11 +1265,14 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 .graph-canvas svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .graph-canvas svg.is-panning, .graph-canvas svg.is-dragging { cursor: grabbing; }
 .graph-edge {
-  stroke: var(--color-line-control); stroke-width: 1; stroke-opacity: .45;
+  stroke: var(--color-line-control); stroke-width: 1; stroke-opacity: .16;
   pointer-events: none; transition: opacity var(--dur) var(--ease);
 }
-.graph-edge.tag { stroke: var(--color-accent-text); stroke-dasharray: 3 3; stroke-opacity: .3; }
+.graph-edge.tag { stroke: var(--color-accent-text); stroke-dasharray: 3 3; stroke-opacity: .14; }
 .graph-edge.is-dim { opacity: .08; }
+.graph-edge.is-focus-far { opacity: .04; }
+.graph-edge.is-culled { display: none; }
+.graph-app.has-focus .graph-edge:not(.is-focus-far) { stroke-opacity: .65; }
 .graph-node-group { transition: opacity var(--dur) var(--ease); }
 .graph-node-group circle {
   fill: var(--color-accent-text); stroke: var(--color-surface-sunken);
@@ -1280,6 +1283,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   fill: var(--color-surface-sunken); stroke: var(--status-danger-text); stroke-dasharray: 3 2;
 }
 .graph-node-group.is-dim { opacity: .18; }
+.graph-node-group.is-focus-far { opacity: .14; }
 .graph-node-group.is-selected circle, .graph-node-group circle:focus-visible {
   stroke: var(--focus-ring); stroke-width: 3; outline: none;
 }
@@ -1289,6 +1293,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   stroke-linejoin: round; pointer-events: none; user-select: none;
 }
 .graph-app.hide-labels .graph-label { display: none; }
+.graph-app.hide-edges .graph-edge { display: none; }
 .graph-label.is-colliding { display: none; }
 .graph-node-group:hover .graph-label.is-colliding,
 .graph-node-group.is-selected .graph-label.is-colliding { display: block; }
@@ -1317,6 +1322,25 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   font-weight: var(--fw-medium); text-decoration: none;
 }
 .graph-app .graph-open:hover { color: var(--color-on-accent); background: var(--color-heading); }
+.graph-neighbours {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: 0 0 var(--space-3); padding: 0; list-style: none;
+  max-height: 260px; overflow-y: auto;
+}
+.graph-neighbour, .graph-clear, .graph-more {
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+  background: var(--color-surface-sunken); border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill); padding: 4px var(--space-3); cursor: pointer;
+}
+.graph-neighbour:hover, .graph-clear:hover, .graph-more:hover {
+  color: var(--color-heading); border-color: var(--color-accent-ring);
+  background: var(--color-accent-soft);
+}
+.graph-clear, .graph-more {
+  display: inline-flex; align-items: center; min-height: 36px;
+  margin-top: var(--space-3); padding: 0 var(--space-4);
+  color: var(--color-heading); background: var(--color-surface);
+}
 .graph-noscript { margin-top: var(--space-3); color: var(--color-text-muted); }
 .graph-btn { padding: 0 var(--space-2); text-decoration: none; }
 .graph-btn[aria-current="page"] { color: var(--color-accent-text); background: var(--color-accent-soft); }

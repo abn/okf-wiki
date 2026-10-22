@@ -5,6 +5,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-22
 
+* **Fix**: The graph view opens a dense catalogue on a readable patch around
+  a page with a typical number of connections rather than fitting every node.
+  Selecting a node fades the rest, frames its neighbourhood when that fits, and
+  lists its connections in the panel. Names keep their screen size, are dropped
+  where they would cover another name or node, and edges are culled off-screen
+  and hidden at overview zoom unless a node is selected. `usage/graph.md`
+  and `design/rendering.md` say so.
 * **Feature**: The header gains a graph control. It opens `graph.html` at the
   render root, which draws `graph.json` on demand: pages and tags as nodes,
   links and tags as edges, with filter, kind, label, detail and download
