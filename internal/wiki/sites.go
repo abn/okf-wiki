@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -31,7 +32,7 @@ type treeCrumb struct {
 // group index that lists what is below it.
 func (r *Renderer) siteCrumb(n *siteNode) treeCrumb {
 	title, _ := r.siteMeta(n)
-	return treeCrumb{Title: title, Href: siteBase(r.cfg.base(), n.rel)}
+	return treeCrumb{Title: title, Href: r.siteHomeURL(n.rel)}
 }
 
 // isWikiRoot reports whether a directory is a wiki root. The marker is an
@@ -227,6 +228,12 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 	// share the tree, so only the whole tree turns over.
 	site := cfg.sitePath(root)
 	if err := sub.renderInto(root, site); err != nil {
+		// A missing or incomplete diagram runtime is a deployment-wide
+		// configuration error. Skipping the wiki would publish a tree that is
+		// silently missing a wiki, and the next wiki would fail the same way.
+		if errors.Is(err, errVendorRuntime) {
+			return 0, err
+		}
 		// The bundle loaded but a page or an asset failed. The partial output is
 		// removed, so a skipped wiki leaves nothing behind for the server to
 		// serve as though it had rendered.
@@ -279,7 +286,14 @@ func (r *Renderer) writeSiteRoot(root string) error {
 	if err := r.theme.WriteTo(dir); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "tags.json"), []byte("[]\n"), 0o644)
+	tags := []byte("[]\n")
+	if err := os.WriteFile(filepath.Join(dir, "tags.json"), tags, 0o644); err != nil {
+		return err
+	}
+	if r.cfg.Offline {
+		return writeJSData(dir, "tags.js", "__WIKI_TAGS", []byte("[]"))
+	}
+	return nil
 }
 
 // writeAggregateSearchIndex writes the tree's one search index at the tree base:
@@ -317,7 +331,16 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "search-content.json"), content, 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "search-content.json"), content, 0o644); err != nil {
+		return err
+	}
+	if r.cfg.Offline {
+		if err := writeJSData(dir, "search-index.js", "__WIKI_SEARCH_INDEX", b); err != nil {
+			return err
+		}
+		return writeJSData(dir, "search-content.js", "__WIKI_SEARCH_CONTENT", content)
+	}
+	return nil
 }
 
 // writeAggregateGraph writes the tree's one graph catalogue at the tree base,
@@ -379,7 +402,6 @@ func (r *Renderer) writeTreeGraphPage(out string, root *siteNode) error {
 // a card that 404s is worse than the wiki being absent. The failure is reported
 // by the caller through SkippedSites, not silently dropped here.
 func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) error {
-	base := r.cfg.base()
 	var b strings.Builder
 	var wikis, folders []*siteNode
 	for _, c := range n.children {
@@ -400,7 +422,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) err
 			fmt.Fprintf(&b, `<li class="site-item"><a class="site-link" href="%s">`+
 				`<span class="site-name">%s</span><span class="site-badge site-badge-wiki">Wiki</span></a>`+
 				`<p class="site-desc">%s</p></li>`,
-				template.HTMLEscapeString(siteBase(base, c.rel)),
+				template.HTMLEscapeString(r.siteHomeURL(c.rel)),
 				template.HTMLEscapeString(title),
 				template.HTMLEscapeString(desc))
 		}
@@ -417,7 +439,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) err
 				`<span class="folder-name">%s</span>`+
 				`<span class="folder-arrow" aria-hidden="true">&#8594;</span>`+
 				`<span class="folder-desc">%s</span></a></li>`,
-				template.HTMLEscapeString(siteBase(base, c.rel)),
+				template.HTMLEscapeString(r.siteHomeURL(c.rel)),
 				template.HTMLEscapeString(title),
 				template.HTMLEscapeString(desc))
 		}
@@ -429,7 +451,7 @@ func (r *Renderer) writeCatalog(root string, n *siteNode, trail []treeCrumb) err
 	if err != nil {
 		return err
 	}
-	dir := Config{Base: siteBase(base, n.rel)}.sitePath(root)
+	dir := Config{Base: siteBase(r.cfg.base(), n.rel)}.sitePath(root)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}

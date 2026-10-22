@@ -93,9 +93,9 @@ These are the keys the default theme publishes, and the ones worth replacing:
 | `fonts.css` | `@font-face` declarations, pointing at `fonts/`. |
 | `fonts/` | the font files themselves. |
 | `brand-mark.svg` `favicon.svg` | the header mark and the browser icon. |
-| `search.js` | the search client. Theme-agnostic; the default's works unchanged. |
+| `search.js` | the search client. Theme-agnostic; the default's works unchanged. A replacement must keep the offline data-script branch, or search returns nothing from a `file://` folder. |
 | `graph.js` | the graph view client. The graph page body loads it, not the template; a theme that inherits it keeps the drawing and its controls. |
-| `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. The default declares a light set in `:root` and redeclares the whole set under both dark grounds, since one value cannot serve both; a theme that declares them once gets one palette in both. |
+| `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. The default declares a light set in `:root` and redeclares the whole set under both dark grounds, since one value cannot serve both; a theme that declares them once gets one palette in both. It is loaded as a classic deferred script; a theme that changes the template should keep that or the diagram source stays unrendered. |
 
 A theme may add keys the default does not have. A key only the default declares
 cannot be removed except by dropping it. A theme that drops `graph.js` leaves
@@ -326,6 +326,13 @@ tree base for a wiki or group of a multi-site tree, where one view and one
 aggregate span every wiki, and `{{.Base}}` for a single bundle.
 `{{.GraphPage}}` is true on the view itself, so a theme can widen the column and
 mark the header control current; the default's template does both.
+
+An offline render changes the base pair rather than adding a third one.
+`{{.Base}}` is relative to `{{.DocBase}}`, the path from the page to the render
+root that the template writes into `<base>`. `{{.PageHref}}` is the page's own
+path under that root, for in-document links; an inline theme script that builds
+a fragment must use it. The renderer rewrites fragment-only `<a>` links in the
+finished page.
 
 The breadcrumb keeps the same markup in both cases, and only a tree adds a
 prefix. A single bundle reads `Docs / section / page`. A tree page reads

@@ -121,7 +121,7 @@ func (r *Renderer) RenderTagPage(t tagListing, all []tagListing) (string, error)
 // is required to have, so they are absent rather than guessed.
 func (r *Renderer) tagPageBody(t tagListing, all []tagListing, dep int, now time.Time) string {
 	var b strings.Builder
-	base := r.cfg.base()
+	base := r.urlBase()
 	titles := map[string]string{}
 	for _, s := range r.sections {
 		titles[s.ID] = s.Title
@@ -429,7 +429,7 @@ func (r *Renderer) TagsJSON() ([]byte, error) {
 	for _, t := range r.tagListings() {
 		out = append(out, tagJSON{
 			Display: t.Display,
-			URL:     r.cfg.base() + "tags/" + t.Slug + ".html",
+			URL:     r.urlBase() + "tags/" + t.Slug + ".html",
 			Pages:   len(t.Pages),
 		})
 	}

@@ -48,6 +48,10 @@
   var base = window.__WIKI_BASE || '/wiki/';
   var searchBase = window.__WIKI_SEARCH || base;
   var multiSite = !!window.__WIKI_SEARCH && window.__WIKI_SEARCH !== window.__WIKI_BASE;
+  // Offline pages cannot fetch a sibling JSON file, so they carry their
+  // catalogues as classic data scripts instead.
+  var offline = !!window.__WIKI_OFFLINE;
+  var dataScripts = {};
   var scopeAll = true;
 
   var searchBtn = document.getElementById('searchBtn');
@@ -122,30 +126,58 @@
     return cached;
   }
 
+  // loadData loads one offline catalogue as a classic script and resolves with
+  // the global it assigns. The same URL is loaded once.
+  function loadData(url, global) {
+    if (window[global]) return Promise.resolve(window[global]);
+    if (dataScripts[url]) return dataScripts[url];
+    dataScripts[url] = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.onload = function () {
+        if (window[global]) resolve(window[global]);
+        else reject(new Error('data script did not define ' + global));
+      };
+      s.onerror = function () { reject(new Error('could not load ' + url)); };
+      document.head.appendChild(s);
+    });
+    return dataScripts[url];
+  }
+
+  function useIndex(data) {
+    searchIndex = expandIndex(data);
+    searchIndexLower = buildLowerIndex(searchIndex);
+    // The light index is searchable now; the texts load behind it.
+    fetchContent();
+    return searchIndex;
+  }
+
+  function indexFailed(err) {
+    // An empty catalogue rather than a null one, so runSearch does not treat a
+    // failed load as "still loading" and retry on every keystroke.
+    console.warn('Failed to load wiki search index:', err);
+    searchIndex = [];
+    searchIndexLower = [];
+    return searchIndex;
+  }
+
   function fetchIndex() {
     if (searchIndex) return Promise.resolve(searchIndex);
     if (searchIndexPromise) return searchIndexPromise;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
+    if (offline) {
+      searchIndexPromise = loadData(searchBase + 'search-index.js' + v, '__WIKI_SEARCH_INDEX')
+        .then(useIndex)
+        .catch(indexFailed);
+      return searchIndexPromise;
+    }
     searchIndexPromise = fetch(searchBase + 'search-index.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
-      .then(function (data) {
-        searchIndex = expandIndex(data);
-        searchIndexLower = buildLowerIndex(searchIndex);
-        // The light index is searchable now; the texts load behind it.
-        fetchContent();
-        return searchIndex;
-      })
-      .catch(function (err) {
-        // An empty catalogue rather than a null one, so runSearch does not treat
-        // a failed load as "still loading" and retry on every keystroke.
-        console.warn('Failed to load wiki search index:', err);
-        searchIndex = [];
-        searchIndexLower = [];
-        return searchIndex;
-      });
+      .then(useIndex)
+      .catch(indexFailed);
     return searchIndexPromise;
   }
 
@@ -154,24 +186,34 @@
   // and the texts join the search when they arrive. The in-flight request, and
   // a failed one, are memoized so the open, hover and focus triggers share one
   // fetch and a failure is not retried on every keystroke.
+  function useContent(data) {
+    applyContent(data);
+    return searchIndex;
+  }
+
+  function contentFailed(err) {
+    // The light index still answers, so a failed text load is not a failed
+    // search. Keeping the settled promise stops a later trigger retrying.
+    console.warn('Failed to load wiki search content:', err);
+    return searchIndex;
+  }
+
   function fetchContent() {
     if (searchContentPromise) return searchContentPromise;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
+    if (offline) {
+      searchContentPromise = loadData(searchBase + 'search-content.js' + v, '__WIKI_SEARCH_CONTENT')
+        .then(useContent)
+        .catch(contentFailed);
+      return searchContentPromise;
+    }
     searchContentPromise = fetch(searchBase + 'search-content.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
-      .then(function (data) {
-        applyContent(data);
-        return searchIndex;
-      })
-      .catch(function (err) {
-        // The light index still answers, so a failed text load is not a failed
-        // search. Keeping the settled promise stops a later trigger retrying.
-        console.warn('Failed to load wiki search content:', err);
-        return searchIndex;
-      });
+      .then(useContent)
+      .catch(contentFailed);
     return searchContentPromise;
   }
 
@@ -353,6 +395,19 @@
     if (tagsPromise) return tagsPromise;
     var v = window.__WIKI_ASSET ? '?v=' + window.__WIKI_ASSET : '';
     var base = window.__WIKI_BASE || '/wiki/';
+    if (offline) {
+      tagsPromise = loadData(base + 'tags.js' + v, '__WIKI_TAGS')
+        .then(function (data) {
+          tagsIndex = data || [];
+          return tagsIndex;
+        })
+        .catch(function (err) {
+          console.warn('Failed to load wiki tag catalogue:', err);
+          tagsIndex = [];
+          return tagsIndex;
+        });
+      return tagsPromise;
+    }
     tagsPromise = fetch(base + 'tags.json' + v)
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -732,7 +787,9 @@
 
   function openSelected() {
     if (selectedIndex >= 0 && selectedIndex < currentResults.length) {
-      window.location.href = currentResults[selectedIndex].u;
+      // Resolve against document.baseURI, not the page URL: an offline page
+      // carries a <base> at the render root and its index URLs are relative.
+      window.location.assign(new URL(currentResults[selectedIndex].u, document.baseURI).href);
     }
   }
 

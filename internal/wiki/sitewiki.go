@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -22,6 +23,11 @@ import (
 	"github.com/yuin/goldmark/util"
 	"gopkg.in/yaml.v3"
 )
+
+// errVendorRuntime marks a deployment-wide diagram runtime problem. A tree
+// render treats it as fatal rather than skipping one wiki, because every wiki
+// with a diagram would fail the same way.
+var errVendorRuntime = errors.New("diagram runtime")
 
 // Section is a top-level content directory.
 type Section struct {
@@ -143,6 +149,12 @@ type SkippedSite struct {
 func New(cfg Config) (*Renderer, error) {
 	if cfg.Content == "" {
 		return nil, fmt.Errorf("content directory is required")
+	}
+	if cfg.Offline && cfg.Repo != "" {
+		return nil, fmt.Errorf("offline mode cannot serve a repository mount; drop --repo")
+	}
+	if cfg.Offline {
+		cfg.InlineGraph = true
 	}
 	if err := cfg.Brand.validate(); err != nil {
 		return nil, err
@@ -273,8 +285,16 @@ func (r *Renderer) renderInto(out, site string) error {
 	// Only a bundle that actually has a diagram needs the runtime. A missing
 	// vendor directory is an error in that case, since the browser would
 	// otherwise fetch mermaid from a public CDN and the render is not offline.
+	// A bundle with a diagram needs the runtime copied, or the browser reaches
+	// for the CDN. An offline render also needs the classic build, because a
+	// module cannot be imported from file://.
 	if r.hasMermaid() {
-		if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor")); err != nil {
+		if r.cfg.Offline {
+			if _, err := os.Stat(filepath.Join(r.cfg.VendorDir, "mermaid-bundle.min.js")); err != nil {
+				return fmt.Errorf("%w: offline diagram pages need vendor/mermaid-bundle.min.js; run make vendor or point --vendor at a directory holding both bundles: %v", errVendorRuntime, err)
+			}
+		}
+		if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor"), r.cfg.Offline); err != nil {
 			return err
 		}
 	}
@@ -286,6 +306,11 @@ func (r *Renderer) renderInto(out, site string) error {
 	if err := os.WriteFile(filepath.Join(site, "search-index.json"), index, 0o644); err != nil {
 		return err
 	}
+	if r.cfg.Offline {
+		if err := writeJSData(site, "search-index.js", "__WIKI_SEARCH_INDEX", index); err != nil {
+			return err
+		}
+	}
 
 	content, err := r.SearchContentJSON()
 	if err != nil {
@@ -293,6 +318,11 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 	if err := os.WriteFile(filepath.Join(site, "search-content.json"), content, 0o644); err != nil {
 		return err
+	}
+	if r.cfg.Offline {
+		if err := writeJSData(site, "search-content.js", "__WIKI_SEARCH_CONTENT", content); err != nil {
+			return err
+		}
 	}
 
 	graph, err := r.GraphJSON()
@@ -323,9 +353,14 @@ func (r *Renderer) renderInto(out, site string) error {
 	if err := os.WriteFile(filepath.Join(site, "tags.json"), tags, 0o644); err != nil {
 		return err
 	}
+	if r.cfg.Offline {
+		if err := writeJSData(site, "tags.js", "__WIKI_TAGS", tags); err != nil {
+			return err
+		}
+	}
 
 	// theme.json in the output records which layer produced the site.
-	manifest, err := r.theme.describe(r.cfg.base())
+	manifest, err := r.theme.describe(r.urlBase())
 	if err != nil {
 		return err
 	}
@@ -352,11 +387,25 @@ func (r *Renderer) writeRootRedirect(out string) error {
 	if r.nested || filepath.Clean(site) == filepath.Clean(out) {
 		return nil
 	}
+	target := base
+	if r.cfg.Offline {
+		// A file:// directory URL is a listing, so point at the index file.
+		target = strings.TrimPrefix(base, "/") + "index.html"
+	}
 	redirect := `<!DOCTYPE html><html lang="` + r.cfg.lang() + `"><head><meta charset="utf-8">` +
-		`<meta http-equiv="refresh" content="0; url=` + base + `"><title>` +
+		`<meta http-equiv="refresh" content="0; url=` + target + `"><title>` +
 		htmlEscape(r.cfg.Brand.Title) + `</title></head>` +
-		`<body><a href="` + base + `">` + htmlEscape(r.cfg.Brand.Title) + `</a></body></html>`
+		`<body><a href="` + target + `">` + htmlEscape(r.cfg.Brand.Title) + `</a></body></html>`
 	return os.WriteFile(filepath.Join(out, "index.html"), []byte(redirect), 0o644)
+}
+
+// writeJSData writes a JSON catalogue as a classic script that assigns it to
+// window.<global>. Offline pages load these with a script tag, because fetch
+// cannot read a sibling file from file://.
+func writeJSData(dir, name, global string, data []byte) error {
+	js := append([]byte("window."+global+" = "), data...)
+	js = append(js, []byte(";\n")...)
+	return os.WriteFile(filepath.Join(dir, name), js, 0o644)
 }
 
 // load builds sections from the directories directly under root, plus a
@@ -661,9 +710,9 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 	if !strings.HasSuffix(clean, ".md") {
 		// Every non-Markdown file in the bundle is copied into the site under
 		// its own path, so an in-bundle asset resolves like a page does.
-		return r.cfg.base() + clean + frag
+		return r.urlBase() + clean + frag
 	}
-	return r.cfg.base() + strings.TrimSuffix(clean, ".md") + ".html" + frag
+	return r.urlBase() + strings.TrimSuffix(clean, ".md") + ".html" + frag
 }
 
 func isHeading(n ast.Node) bool {
@@ -863,19 +912,19 @@ func resolveRoot(root string) (string, error) {
 // runtime falls back to a public CDN in that case and a silent return made an
 // offline render look fine while it was not. A bundle with no diagram does not
 // need the runtime, so the caller only asks for it when there is one.
-func copyVendor(dir, dest string) error {
+func copyVendor(dir, dest string, classic bool) error {
 	if dir == "" {
 		return nil
 	}
 	info, err := os.Stat(dir)
 	if err != nil {
-		return fmt.Errorf("vendor dir %s: no diagram runtime to copy, so the "+
+		return fmt.Errorf("%w: vendor dir %s: no diagram runtime to copy, so the "+
 			"browser would fall back to a public CDN and this render is not "+
-			"offline: %w", dir, err)
+			"offline: %v", errVendorRuntime, dir, err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("vendor dir %s: not a directory, so no diagram runtime "+
-			"is copied and this render is not offline", dir)
+		return fmt.Errorf("%w: vendor dir %s: not a directory, so no diagram runtime "+
+			"is copied and this render is not offline", errVendorRuntime, dir)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -894,6 +943,14 @@ func copyVendor(dir, dest string) error {
 		if !isVendorArtifact(e.Name()) {
 			continue
 		}
+		// An offline page loads the classic build through a script tag; a
+		// served page imports the ESM build. Copy only the one it can use.
+		if classic && strings.HasSuffix(strings.ToLower(e.Name()), ".mjs") {
+			continue
+		}
+		if !classic && strings.EqualFold(e.Name(), "mermaid-bundle.min.js") {
+			continue
+		}
 		if err := copyFile(filepath.Join(dir, e.Name()), filepath.Join(dest, e.Name())); err != nil {
 			return err
 		}
@@ -907,6 +964,9 @@ func isVendorArtifact(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".mjs", ".wasm", ".css", ".map":
 		return true
+	case ".js":
+		// Only the classic mermaid bundle, not its entry source.
+		return strings.HasPrefix(strings.ToLower(name), "mermaid-bundle.")
 	}
 	return false
 }

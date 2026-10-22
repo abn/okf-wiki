@@ -17,8 +17,8 @@ changes, update the relevant page and add an entry to `docs/log.md`.
 ## Environment
 
 - Go 1.25 or newer.
-- Node 22 and npm, only to build the offline mermaid bundle (`make vendor`) or
-  the container image.
+- Node 22 and npm, only to build the offline mermaid bundles (`make vendor`)
+  or the container image.
 
 ## Layout
 
@@ -48,7 +48,8 @@ GitHub Actions drives quality and release. The workflows live in
 `ci.yml` runs on every push to `main` and every pull request:
 
 - **go**: `gofmt`, `go vet`, `go test -race`, and a binary build.
-- **vendor**: builds the offline mermaid bundle with the pinned lockfile.
+- **vendor**: builds the offline mermaid bundles with the pinned lockfile, one
+  ESM build and one classic build for `file://`.
 - **container-build**: builds the image with podman, then runs it and checks
   `/healthz` and the wiki page.
 - **render**: renders `docs/` and checks the pages and search index exist.

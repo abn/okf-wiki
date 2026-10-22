@@ -1,13 +1,14 @@
 /* ============================================================================
    okf-wiki: diagram runtime and lightbox
    ----------------------------------------------------------------------------
-   Two jobs, one module:
+   Two jobs, one script:
      1. Render `pre.mermaid` blocks with mermaid, at natural size so a wide
         topology chart is legible and pans instead of being squashed to an
         illegible sliver. The vendored bundle under BASE vendor/ is tried
         first so a container renders offline; the CDN is a fallback that only
-        runs when the bundle is missing, and a render without --vendor or
-        OKF_WIKI_VENDOR resolves is therefore not offline.
+        runs over HTTP(S) when the bundle is missing, and never from a file://
+        page. A render without --vendor or OKF_WIKI_VENDOR resolves is
+        therefore not offline.
      2. Open a full-screen pan/zoom viewer when a diagram is clicked (scroll =
         zoom, drag = pan, pinch on touch, +/-/0/esc keys, focus trap).
         Dependency-free.
@@ -212,24 +213,35 @@
     if (!diagrams.length) return;
 
     var mermaid, useElk = false;
-    // Prefer the offline vendor bundle (mermaid + ELK in one module). Fall back
-    // to the CDN for local development without a vendor step.
-    try {
-      mermaid = (await import(LOCAL_BUNDLE + V)).default;
+    // A file:// page loads the classic bundle through a script tag, because a
+    // local module cannot be imported there. Prefer that global when present.
+    // On a served page, try the ESM bundle and then the CDN.
+    var localOnly = location.protocol === 'file:';
+    if (window.__WIKI_MERMAID) {
+      mermaid = window.__WIKI_MERMAID;
       useElk = true;
-    } catch (e) {
+    } else {
       try {
-        mermaid = (await import(CDN)).default;
-      } catch (err) {
-        console.warn('Mermaid runtime unavailable; showing diagram source:', err);
-        return;
-      }
-      try {
-        var elk = await import(ELK_CDN);
-        mermaid.registerLayoutLoaders(elk.default);
+        mermaid = (await import(LOCAL_BUNDLE + V)).default;
         useElk = true;
-      } catch (err) {
-        console.warn('ELK layout unavailable; using default mermaid layout:', err);
+      } catch (e) {
+        if (localOnly) {
+          console.warn('Mermaid runtime unavailable from disk; showing diagram source:', e);
+          return;
+        }
+        try {
+          mermaid = (await import(CDN)).default;
+        } catch (err) {
+          console.warn('Mermaid runtime unavailable; showing diagram source:', err);
+          return;
+        }
+        try {
+          var elk = await import(ELK_CDN);
+          mermaid.registerLayoutLoaders(elk.default);
+          useElk = true;
+        } catch (err) {
+          console.warn('ELK layout unavailable; using default mermaid layout:', err);
+        }
       }
     }
 

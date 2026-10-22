@@ -14,11 +14,12 @@ Resolution order is flag, then environment variable, then default.
 | `--content` | `OKF_WIKI_CONTENT` | auto-detect | OKF bundle directory, or a tree of them with `--multi-site` |
 | `--multi-site` | `OKF_WIKI_MULTI_SITE` | `false` | Treat the content directory as a tree of wikis |
 | `--graph-inline` | `OKF_WIKI_GRAPH_INLINE` | `false` | Embed the graph catalogue in the graph page, with no fetch |
+| `--offline` | `OKF_WIKI_OFFLINE` | `false` | Write a portable folder for file://; implies `--graph-inline` |
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--lang` | `OKF_WIKI_LANG` | `en` | Language the pages declare, a tag such as `de` or `pt-BR` |
 | `--repo` | `OKF_WIKI_REPO` | empty | Repository root served at `/repo/` |
-| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid bundle. Required when the bundle has a diagram |
+| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid ESM and classic bundles. Required when the bundle has a diagram |
 | `--theme` | `OKF_WIKI_THEME` | empty | Theme directory layered over the embedded default |
 | `--brand` | `OKF_WIKI_BRAND` | `okf-wiki` | Wordmark |
 | `--brand-sub` | `OKF_WIKI_BRAND_SUB` | `docs` | Subtitle label |
@@ -44,9 +45,20 @@ cost of a larger page. It is the same switch for a single bundle and a tree; a
 tree embeds its aggregate once at the base. See
 [Graph view](../usage/graph.md).
 
+`--offline` writes a portable folder for opening from `file://`. It implies
+`--graph-inline`; it also writes relative URLs behind a per-page `<base>`, names
+`index.html` for home links, rewrites same-page fragments to name their page,
+writes the search and tag data as classic scripts, and copies a classic Mermaid
+bundle for pages with diagrams. A diagram needs `vendor/mermaid-bundle.min.js`
+from `make vendor`; the render fails if it is missing. It refuses `--repo`,
+because a repository mount is a server endpoint. `--base` still names the
+directory inside `--out`; it is not used as an absolute URL prefix. See
+[Offline folder](../usage/offline.md).
+
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server
-unchanged. It must not contain `.` or `..` segments.
+unchanged. In offline mode it is only the directory; the URLs are relative. It
+must not contain `.` or `..` segments.
 
 A base of `/` is the whole site: the pages are written at the top of `--out`
 with no wiki subdirectory, and there is no root redirect, because the wiki's own

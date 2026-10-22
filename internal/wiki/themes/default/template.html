@@ -2,6 +2,7 @@
 <html lang="{{.Lang}}">
 <head>
 <meta charset="UTF-8">
+{{if .DocBase}}<base href="{{.DocBase}}">{{end}}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{.Title}} · {{.BrandTitle}}</title>
 <meta name="description" content="{{.Description}}">
@@ -44,7 +45,7 @@
 </script>
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to content</a>
+<a class="skip-link" href="{{.PageHref}}#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap header-inner">
     <div class="brand-cluster">
@@ -195,13 +196,16 @@
     // stuck on the section before it. Scrolled to the end, the last heading
     // wins outright, which is also what a reader expects there.
     var links = Array.prototype.slice.call(
-      document.querySelectorAll('.toc-aside a[href^="#"], #tocPanel a[href^="#"]'));
+      document.querySelectorAll('.toc-aside a, #tocPanel a'));
     if (!links.length) return;
 
     var byId = {};
     links.forEach(function (a) {
-      var id = a.getAttribute('href').slice(1);
-      (byId[id] = byId[id] || []).push(a);
+      var href = a.getAttribute('href') || '';
+      var mark = href.indexOf('#');
+      if (mark < 0) return;
+      var id = href.slice(mark + 1);
+      if (id) (byId[id] = byId[id] || []).push(a);
     });
     var heads = Array.prototype.slice.call(document.querySelectorAll('article h2[id]'))
       .filter(function (h) { return byId[h.id]; });
@@ -276,10 +280,11 @@
   // on hover and focus. Built client-side so the renderer never rewrites
   // heading content; without JS the headings are simply unlinked.
   (function () {
+    var pageHref = '{{.PageHref}}';
     document.querySelectorAll('article h2[id]').forEach(function (h) {
       var a = document.createElement('a');
       a.className = 'heading-anchor';
-      a.href = '#' + h.id;
+      a.href = pageHref + '#' + h.id;
       a.setAttribute('aria-label', 'Link to this section');
       a.textContent = '#';
       h.appendChild(a);
@@ -362,8 +367,9 @@
     } catch (e) {}
   })();
 </script>
-<script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_SEARCH = '{{.SearchBase}}'; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>
-<script type="module" src="{{.Base}}diagrams.js?v={{.AssetVersion}}"></script>
+<script>window.__WIKI_BASE = '{{.Base}}'; window.__WIKI_SEARCH = '{{.SearchBase}}'; window.__WIKI_OFFLINE = {{if .Offline}}true{{else}}false{{end}}; window.__WIKI_ASSET = '{{.AssetVersion}}'; window.__WIKI_QUICK = {{.QuickJSON}};</script>
+{{if and .Offline .HasMermaid}}<script src="{{.Base}}vendor/mermaid-bundle.min.js?v={{.AssetVersion}}" defer></script>{{end}}
+<script src="{{.Base}}diagrams.js?v={{.AssetVersion}}" defer></script>
 <div class="search-modal-backdrop" id="searchBackdrop" aria-hidden="true">
   <div class="search-modal" role="dialog" aria-modal="true" aria-label="Search documentation">
     <div class="search-modal-header">

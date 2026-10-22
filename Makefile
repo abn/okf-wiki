@@ -28,10 +28,12 @@ export GOCACHE ?= $(CURDIR)/.scratch/gocache
 setup: ## Download Go modules
 	go mod download
 
-vendor: ## Build the offline mermaid+ELK bundle (needs node/npm)
+vendor: ## Build the offline mermaid+ELK bundles (needs node/npm)
 	cd mermaid && npm ci --no-audit --no-fund --legacy-peer-deps
 	cd mermaid && npx esbuild entry.js --bundle --format=esm --minify --outfile=mermaid-bundle.min.mjs
-	@printf '\n  mermaid/mermaid-bundle.min.mjs ready (%s)\n\n' "$$(du -h mermaid/mermaid-bundle.min.mjs | cut -f1)"
+	cd mermaid && npx esbuild entry-iife.js --bundle --format=iife --minify --outfile=mermaid-bundle.min.js
+	@printf '\n  mermaid/mermaid-bundle.min.mjs ready (%s)\n' "$$(du -h mermaid/mermaid-bundle.min.mjs | cut -f1)"
+	@printf '  mermaid/mermaid-bundle.min.js ready (%s)\n\n' "$$(du -h mermaid/mermaid-bundle.min.js | cut -f1)"
 
 ##@ Development
 
@@ -72,7 +74,7 @@ lint: fmt vet ## Format, then vet
 check: lint test ## Full gate: format, vet, tests
 
 clean: ## Remove build output and the vendor bundle
-	rm -rf bin $(OUT) mermaid/node_modules mermaid/mermaid-bundle.min.mjs
+	rm -rf bin $(OUT) mermaid/node_modules mermaid/mermaid-bundle.min.mjs mermaid/mermaid-bundle.min.js
 
 ##@ Container
 

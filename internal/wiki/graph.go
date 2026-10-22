@@ -105,7 +105,7 @@ func (r *Renderer) BuildGraph() GraphIndex {
 			g.Nodes = append(g.Nodes, GraphNode{
 				ID:      id,
 				Title:   pageTitle(p),
-				URL:     r.cfg.base() + p.Slug + ".html",
+				URL:     r.urlBase() + p.Slug + ".html",
 				Kind:    "page",
 				Section: sectionHeading(s),
 				Type:    p.Type,
@@ -149,7 +149,7 @@ func (r *Renderer) BuildGraph() GraphIndex {
 					g.Nodes = append(g.Nodes, GraphNode{
 						ID:    id,
 						Title: "#" + name,
-						URL:   r.cfg.base() + "tags/" + slug + ".html",
+						URL:   r.urlBase() + "tags/" + slug + ".html",
 						Kind:  "tag",
 					})
 				}
@@ -319,7 +319,7 @@ func markdownTarget(href string) bool {
 // this render's base that ends in .html is a page: an external link, a /repo/
 // target and an in-bundle asset each fail the prefix or the suffix.
 func (r *Renderer) graphTarget(dest string) (string, bool) {
-	base := r.cfg.base()
+	base := r.urlBase()
 	if !strings.HasPrefix(dest, base) {
 		return "", false
 	}

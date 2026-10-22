@@ -3,9 +3,10 @@
 # ---- vendor: build the offline mermaid + ELK bundle -------------------------
 FROM docker.io/library/node:26-alpine AS vendor
 WORKDIR /vendor
-COPY mermaid/package.json mermaid/package-lock.json mermaid/entry.js ./
+COPY mermaid/package.json mermaid/package-lock.json mermaid/entry.js mermaid/entry-iife.js ./
 RUN npm ci --no-audit --no-fund --legacy-peer-deps \
- && npx esbuild entry.js --bundle --format=esm --minify --outfile=mermaid-bundle.min.mjs
+ && npx esbuild entry.js --bundle --format=esm --minify --outfile=mermaid-bundle.min.mjs \
+ && npx esbuild entry-iife.js --bundle --format=iife --minify --outfile=mermaid-bundle.min.js
 
 # ---- build: compile the static binary --------------------------------------
 FROM docker.io/library/golang:1.27-alpine AS build
@@ -21,6 +22,7 @@ FROM docker.io/library/alpine:3.24
 RUN adduser -D -u 10001 okf
 COPY --from=build /out/okf-wiki /usr/local/bin/okf-wiki
 COPY --from=vendor /vendor/mermaid-bundle.min.mjs /app/vendor/mermaid-bundle.min.mjs
+COPY --from=vendor /vendor/mermaid-bundle.min.js /app/vendor/mermaid-bundle.min.js
 USER okf
 ENV OKF_WIKI_ADDR=0.0.0.0:8080 \
     OKF_WIKI_OUT=/tmp/okf-wiki \

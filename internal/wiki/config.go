@@ -87,6 +87,12 @@ type Config struct {
 	// sibling file. The page carries the whole catalogue; a served site leaves
 	// this off and fetches graph.json when the view opens.
 	InlineGraph bool
+	// Offline writes relative URLs for a folder opened without a server, such
+	// as file://, and embeds the graph catalogue. Search data is written as
+	// classic scripts, and pages with diagrams load the classic Mermaid runtime
+	// from vendor/. The site root is named by a per-page <base>, so every asset
+	// and page URL is relative to it.
+	Offline bool
 }
 
 // base returns the URL prefix, normalised to a leading and a trailing slash so
