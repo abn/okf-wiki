@@ -49,6 +49,22 @@ frontmatter tags.
 The page carries no page text and no embeddings. It is the structural layer,
 and the search catalogue remains the place for text.
 
+## Local graph and backlinks
+
+Every content page has a **Connections** panel near the foot. It lists the
+pages that link to the current one, with the source page, its section, the
+heading the link sits under, and the text of the link. A page with no incoming links says so, which is useful for
+finding orphans. The panel is static HTML; it works with JavaScript off.
+
+The same panel has a **Local graph** link. It opens the graph focused on the
+current page and its direct neighbours. The URL names the node and depth, for
+example `graph.html?focus=page:usage/graph&depth=1`. The focus node is selected
+and its neighbourhood is lit while the rest of the graph fades. **Show all**
+returns to the whole catalogue.
+
+Backlinks are collected within one wiki. Cross-wiki edges are still on the
+[graph evolution](../design/graph-evolution.md) list.
+
 ## Embedding the catalogue
 
 ```bash
@@ -79,5 +95,6 @@ the tree base.
 
 - [Graph catalogue](../reference/graph.md): the schema, node and edge fields,
   and how the file is built.
+- [Graph evolution](../design/graph-evolution.md): the roadmap and guardrails.
 - [Multi-site trees](multi-site.md#the-graph-catalogue): the aggregate in a
   tree.

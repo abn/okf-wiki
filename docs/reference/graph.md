@@ -113,6 +113,13 @@ The page fetches `graph.json` when it opens, so the catalogue is downloaded on
 demand rather than with every page. `--graph-inline` embeds the same bytes in
 the page and the client reads them instead, which removes the second request.
 An offline render embeds it automatically.
+
+The page also accepts `focus` and `depth` query parameters. A page's Connections
+panel uses them to open the graph around that page, for example
+`graph.html?focus=page:usage/graph&depth=1`. Focus selects the node, fades
+everything outside its neighbourhood, and offers Show all. `depth` is clamped to
+1 through 3. This is a focus link, not the full shareable filter state that is
+still on the evolution list.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

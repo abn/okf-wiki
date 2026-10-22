@@ -25,6 +25,7 @@
   var kind = document.getElementById('graphKind');
   var labels = document.getElementById('graphLabels');
   var fit = document.getElementById('graphFit');
+  var clearFocusLink = document.getElementById('graphClearFocus');
   var download = document.getElementById('graphDownload');
   var details = document.getElementById('graphDetails');
 
@@ -42,6 +43,8 @@
     focus: null,
     focusCount: 0,
     focusHops: 0,
+    pendingFocus: null,
+    focusMissing: false,
     anchor: null,
     overview: false,
     query: '',
@@ -173,6 +176,18 @@
       state.adj[e.from.id].push({ node: e.to, dir: 'out' });
       state.adj[e.to.id].push({ node: e.from, dir: 'in' });
     });
+
+    var params = new URLSearchParams(window.location.search);
+    var focusID = params.get('focus');
+    if (focusID) {
+      if (byId[focusID]) {
+        var hops = parseInt(params.get('depth') || '1', 10);
+        hops = Math.max(1, Math.min(3, isNaN(hops) ? 1 : hops));
+        state.pendingFocus = { node: byId[focusID], hops: hops };
+      } else {
+        state.focusMissing = true;
+      }
+    }
     state.anchor = starterPage();
 
     download.disabled = false;
@@ -543,6 +558,7 @@
       initialView();
       renderPositions();
       applyFilter();
+      applyPendingFocus();
       return;
     }
 
@@ -565,8 +581,16 @@
       initialView();
       renderPositions();
       applyFilter();
+      applyPendingFocus();
     }
     requestAnimationFrame(frame);
+  }
+
+  function applyPendingFocus() {
+    if (!state.pendingFocus) return;
+    var pending = state.pendingFocus;
+    state.pendingFocus = null;
+    select(pending.node, true, pending.hops);
   }
 
   function updateEdgeVisibility() {
@@ -737,6 +761,8 @@
       text += ' Focused on ' + state.selected.title + ': ' + state.focusCount +
         (state.focusCount === 1 ? ' node' : ' nodes') + ' within ' +
         state.focusHops + (state.focusHops === 1 ? ' hop' : ' hops') + '. Press Escape to clear.';
+    } else if (state.focusMissing) {
+      text += ' Focus node not found; showing the default view.';
     } else if (state.overview && total > LOCAL_VIEW_NODES) {
       text += ' Overview zoom. Select a node or zoom in for its neighbourhood.';
     } else {
@@ -997,6 +1023,7 @@
       if (n.el) n.el.classList.toggle('is-focus-far', !!ids && ids[n.id] == null);
     });
     app.classList.toggle('has-focus', !!ids);
+    if (clearFocusLink) clearFocusLink.hidden = !ids;
     updateEdgeVisibility();
     state.edgeElements.forEach(function (item) {
       var e = item.edge;
@@ -1007,8 +1034,9 @@
     scheduleLabels();
   }
 
-  function focusOn(n, fit) {
-    var hops = n.kind === 'tag' ? 1 : 2;
+  function focusOn(n, fit, hopsOverride) {
+    var hops = hopsOverride || (n.kind === 'tag' ? 1 : 2);
+    state.focusMissing = false;
     var found = bfs(n, hops);
     if (found.size > 120 && hops > 1) {
       hops = 1;
@@ -1069,7 +1097,7 @@
     return { list: list, incoming: incoming, outgoing: outgoing };
   }
 
-  function select(n, withView) {
+  function select(n, withView, hops) {
     var keepFocus = details.contains(document.activeElement);
     state.selected = n;
     setTabbable(n);
@@ -1170,7 +1198,7 @@
 
     details.hidden = false;
     if (keepFocus) title.focus();
-    focusOn(n, !!withView);
+    focusOn(n, !!withView, hops);
   }
 
   function clearSelection() {
@@ -1212,7 +1240,7 @@
   filter.addEventListener('input', applyFilter);
   kind.addEventListener('change', applyFilter);
   labels.addEventListener('change', applyLabels);
-  fit.addEventListener('click', fitView);
+  fit.addEventListener('click', function () { fitView(); });
 
   download.addEventListener('click', function () {
     if (!state.raw) return;

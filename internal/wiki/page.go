@@ -94,9 +94,12 @@ type shellData struct {
 	TOCList template.HTML
 	// PrevNext is the previous/next cards for the section, empty when the
 	// page stands alone in it.
-	PrevNext  template.HTML
-	Body      template.HTML
-	QuickJSON template.JS
+	PrevNext template.HTML
+	// Connections is the page's static backlink and local-graph panel, empty on
+	// synthetic pages.
+	Connections template.HTML
+	Body        template.HTML
+	QuickJSON   template.JS
 	// Slots holds the theme's named fragments, reachable as {{.Slot "name"}}.
 	Slots map[string]template.HTML
 }
@@ -446,6 +449,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		TOC:            template.HTML(buildTOC(p)),
 		TOCList:        template.HTML(buildTOCList(p)),
 		PrevNext:       template.HTML(r.prevNextHTML(p)),
+		Connections:    template.HTML(r.connectionsHTML(p)),
 		Body:           template.HTML(stripLeadingH1(p.Body, title)),
 		QuickJSON:      template.JS(r.quickLinksJSON()),
 		Slots:          r.slots(),

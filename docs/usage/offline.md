@@ -30,7 +30,9 @@ environment equivalent is `OKF_WIKI_OFFLINE=true`.
 - Search index, text and tag catalogues are written as classic scripts beside
   their JSON files and loaded lazily. This is what makes search work when
   `fetch` of a sibling file is blocked.
-- The graph catalogue is embedded, so the graph view needs no request.
+- The graph catalogue is embedded, so the graph view needs no request. The
+  page's Connections panel and its Local graph link use the same embedded
+  catalogue and relative URLs.
 - Pages with a diagram load `vendor/mermaid-bundle.min.js`, a classic build of
   Mermaid and ELK. Pages without a diagram do not load it. There is no CDN
   fallback from `file://`; if the runtime is missing, the render fails rather

@@ -662,6 +662,49 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .prevnext-next { text-align: right; }
 .prevnext > :only-child.prevnext-next { grid-column: 2; }
 
+/* --------------------------------------------------------- connections */
+/* The page's own graph context, not part of the prose. The rule separates it
+   from the article without turning it into another card. */
+.connections {
+  margin-top: var(--space-10);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.connections-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+}
+.connections-head h2 { margin: 0; }
+.connections-graph {
+  display: inline-flex; align-items: center;
+  padding: 6px var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-pill);
+  color: var(--color-text-muted); text-decoration: none;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+}
+.connections-graph:hover {
+  color: var(--color-accent-text); border-color: var(--color-accent-ring);
+  background: var(--color-accent-soft);
+}
+.connections-subtitle {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-semibold);
+}
+.connections-list { list-style: none; margin: 0; padding: 0; }
+.connections-list li {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+}
+.connections-list li:first-child { border-top: 0; }
+.connections-list a { font-family: var(--font-ui); font-weight: var(--fw-medium); }
+.connections-section { color: var(--color-text-faint); font-size: var(--text-sm); }
+.connections-heading { color: var(--color-text-faint); font-size: var(--text-sm); }
+.connections-quote { color: var(--color-text-muted); font-size: var(--text-sm); }
+.connections-empty { color: var(--color-text-muted); }
+
 /* ------------------------------------------------------------ site catalog
    A multi-site group index. The wikis of a group lead as cards; the folders
    that hold wikis and other groups follow, compact, under their own heading, so
@@ -1236,11 +1279,13 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 .graph-check input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
 .graph-fit {
+  display: inline-flex; align-items: center; text-decoration: none;
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
   color: var(--color-heading); background: var(--color-surface);
   border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
   padding: 8px var(--space-4); min-height: 36px; cursor: pointer;
 }
+.graph-fit[hidden] { display: none; }
 .graph-fit:hover { border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
 .graph-download {
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);

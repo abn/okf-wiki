@@ -145,6 +145,14 @@ flowchart LR
    reads only the fields the schema documents. It opens a dense catalogue on a
    readable patch rather than on the whole cloud, thins names and edges as the
    view zooms out, and frames a node's neighbourhood when one is selected.
+
+   Every content page also gets a **Connections** panel inside the article. The
+   renderer indexes the recorded page links by target after the bundle is
+   loaded, then writes the source page, its section, the heading and the link
+   text as static HTML. The panel's Local graph link opens the graph at `?focus=<node>&depth=1`;
+   the client selects that node and the existing neighbourhood focus takes over,
+   with Show all as the way back. Backlinks are within one wiki; cross-wiki edges
+   remain on the [graph evolution](graph-evolution.md) list.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,

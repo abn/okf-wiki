@@ -12,6 +12,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
   where they would cover another name or node, and edges are culled off-screen
   and hidden at overview zoom unless a node is selected. `usage/graph.md`
   and `design/rendering.md` say so.
+* **Feature**: Content pages gain a Connections panel with incoming links,
+  their source section, heading and link text, and a Local graph link. The graph view
+  accepts `focus` and `depth`, selects that node and uses the existing
+  neighbourhood focus, and offers Show all. `design/graph-evolution.md` records
+  the roadmap and guardrails; `usage/graph.md`, `reference/graph.md`,
+  `reference/themes.md`, `design/branding.md` and `design/rendering.md` say so.
 * **Feature**: The header gains a graph control. It opens `graph.html` at the
   render root, which draws `graph.json` on demand: pages and tags as nodes,
   links and tags as edges, with filter, kind, label, detail and download

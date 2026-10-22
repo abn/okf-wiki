@@ -8,6 +8,7 @@ The site directory is the one written under the base, for example
 """
 
 import sys
+import time
 from pathlib import Path
 
 try:
@@ -99,6 +100,37 @@ def main():
                 for a in driver.find_elements(By.CSS_SELECTOR, ".search-result-item")
             ),
             "tag search did not reach the tag page",
+        )
+
+        check_page(driver, base + "usage/graph.html", ".connections-graph")
+        driver.find_element(By.CSS_SELECTOR, ".connections-graph").click()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" in d.find_element(By.ID, "graphStatus").text
+        )
+        must(
+            driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.is-focus-far"),
+            "the local graph did not fade nodes outside the neighbourhood",
+        )
+        driver.find_element(By.ID, "graphFit").click()
+        time.sleep(0.3)
+        must(
+            "Focused on" in driver.find_element(By.ID, "graphStatus").text,
+            "Fit view cleared the focus",
+        )
+        driver.find_element(By.ID, "graphClearFocus").click()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" not in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" not in d.find_element(By.ID, "graphStatus").text
+        )
+        must(
+            not driver.find_element(By.ID, "graphClearFocus").is_displayed(),
+            "Show all stayed visible after clearing focus",
+        )
+
+        check_page(driver, base + "graph.html?focus=page%3Amissing", ".graph-node-group")
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focus node not found" in d.find_element(By.ID, "graphStatus").text
         )
 
         check_page(driver, base + "design/rendering.html", ".mermaid-frame svg")
