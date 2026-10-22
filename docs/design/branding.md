@@ -68,6 +68,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.TopNavInternal}}` `{{.TopNavExternal}}` | the same links split by kind, for the drawer |
 | `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
+| `{{.Connections}}` | the page's static backlinks and Local graph panel, empty on synthetic pages |
 | `{{.Base}}` | the URL prefix, with a trailing slash; absolute online, relative to `{{.DocBase}}` offline |
 | `{{.HomeHref}}` | the brand anchor's target: `Base` for a single bundle, the tree base for a wiki or group of a multi-site tree; `index.html` offline |
 | `{{.SearchBase}}` | the URL prefix the search index is fetched from: the same as `Base` for a single bundle, the tree base for a wiki of a multi-site tree |

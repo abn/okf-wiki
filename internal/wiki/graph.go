@@ -20,9 +20,10 @@ const graphVersion = 1
 // reader sees. It is resolved into a graph edge after every page is known, so a
 // target the bundle does not contain can become a stub instead of a dead edge.
 type pageLink struct {
-	To     string
-	Anchor string
-	Text   string
+	To      string
+	Anchor  string
+	Heading string
+	Text    string
 }
 
 // pageTitle is the page's display title, falling back to its slug when neither
@@ -248,6 +249,9 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<option value="tag">Tags</option><option value="stub">Missing pages</option></select></label>`)
 	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
 	b.WriteString(`<button type="button" class="graph-fit" id="graphFit">Fit view</button>`)
+	b.WriteString(`<a class="graph-fit" id="graphClearFocus" href="`)
+	b.WriteString(template.HTMLEscapeString(base + "graph.html"))
+	b.WriteString(`" hidden>Show all</a>`)
 	b.WriteString(`<button type="button" class="graph-download" id="graphDownload">Download JSON</button>`)
 	b.WriteString(`<a class="graph-raw" href="`)
 	b.WriteString(template.HTMLEscapeString(base + "graph.json"))

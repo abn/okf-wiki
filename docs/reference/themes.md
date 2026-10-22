@@ -133,9 +133,13 @@ its `graphApp` subtree, its SVG layers and the `graph.js` tag are present
 without a theme doing anything. A theme that replaces `template.html` should
 keep a control pointing at `{{.GraphHref}}`; without it the view still exists at
 that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`,
-`graphKind`, `graphLabels`, `graphFit`, `graphDownload`, `graphStatus`,
+`graphKind`, `graphLabels`, `graphFit`, `graphClearFocus`, `graphDownload`, `graphStatus`,
 `graphSvg`, `graphEdges`, `graphNodes`, `graphDetails`, and the optional inline
 `graphData`.
+
+The `{{.Connections}}` field is static page HTML. A template that omits it drops
+the backlinks and the Local graph entry point, while the graph page itself
+remains reachable from the header.
 
 `search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
 `role="status"` and `aria-live="polite"`, clipped out of the layout by the

@@ -109,6 +109,10 @@ type Renderer struct {
 	// aggregatedGraph collects the graph of a tree render the same way, with
 	// each wiki's node IDs namespaced by its path.
 	aggregatedGraph GraphIndex
+	// backlinks indexes recorded page links by target slug for the Connections
+	// panel. It is built once, after the pages are loaded.
+	backlinks      map[string][]backlinkRef
+	backlinksReady bool
 	// treeBase, siteRel, siteTitle and siteTrail describe a page's place in a
 	// multi-site tree. treeBase is the tree index's URL prefix, empty for a
 	// single bundle, so the brand and the breadcrumb trail mean "the deployment
@@ -557,6 +561,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	// is skipped like everywhere else, leaving links above the first heading
 	// anchored to the page itself.
 	currentAnchor := ""
+	currentHeading := ""
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -570,9 +575,10 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 					var text strings.Builder
 					collectText(nn, src, &text)
 					p.links = append(p.links, pageLink{
-						To:     to,
-						Anchor: currentAnchor,
-						Text:   strings.TrimSpace(text.String()),
+						To:      to,
+						Anchor:  currentAnchor,
+						Heading: currentHeading,
+						Text:    strings.TrimSpace(text.String()),
 					})
 				}
 			}
@@ -594,6 +600,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 			id := uniqueID(slugify(headingVal), usedIDs)
 			h.SetAttribute([]byte("id"), []byte(id))
 			currentAnchor = id
+			currentHeading = headingVal
 			// The table of contents stops at level two. Deeper headings keep
 			// their ids as link targets but stay out of the navigation, which
 			// is what keeps it short on a deeply nested page.

@@ -58,6 +58,7 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphSvg"`,
 		`id="graphDownload"`,
 		`id="graphFit"`,
+		`id="graphClearFocus"`,
 		`href="/wiki/graph.json"`,
 		`src="/wiki/graph.js?v=`,
 		`content content-graph`,
@@ -85,6 +86,37 @@ func TestGraphPageIsWritten(t *testing.T) {
 	if !strings.Contains(string(home), `href="/wiki/graph.html"`) ||
 		!strings.Contains(string(home), `aria-label="Knowledge graph"`) {
 		t.Error("an ordinary page has no accessible graph control")
+	}
+}
+
+// TestGraphViewLocalFocusContract pins the client hooks used by the page's
+// Local graph link: a focus query, a neighborhood set, and a way back to the
+// whole graph. The Firefox smoke test covers the behavior; this catches a rename in
+// the generated page or the client.
+func TestGraphViewLocalFocusContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"URLSearchParams(window.location.search)",
+		"function focusOn",
+		"function clearFocus",
+		"graphClearFocus",
+		"Focused on",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
 	}
 }
 
