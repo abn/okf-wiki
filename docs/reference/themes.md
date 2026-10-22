@@ -32,6 +32,7 @@ smallest useful theme there is.
     "brand-mark.svg": { "mode": "replace" },
     "favicon.svg": { "mode": "inherit" },
     "search.js": { "mode": "inherit" },
+    "graph.js": { "mode": "inherit" },
     "diagrams.js": { "mode": "drop" }
   }
 }
@@ -93,16 +94,19 @@ These are the keys the default theme publishes, and the ones worth replacing:
 | `fonts/` | the font files themselves. |
 | `brand-mark.svg` `favicon.svg` | the header mark and the browser icon. |
 | `search.js` | the search client. Theme-agnostic; the default's works unchanged. |
+| `graph.js` | the graph view client. The graph page body loads it, not the template; a theme that inherits it keeps the drawing and its controls. |
 | `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. The default declares a light set in `:root` and redeclares the whole set under both dark grounds, since one value cannot serve both; a theme that declares them once gets one palette in both. |
 
 A theme may add keys the default does not have. A key only the default declares
-cannot be removed except by dropping it.
+cannot be removed except by dropping it. A theme that drops `graph.js` leaves
+the view's toolbar inert, because the renderer writes the page body and the
+controls rely on that client.
 
 ## The DOM contract
 
 The default theme's `template.html` is the reference. If a theme keeps it and
 only restyles, this section does not apply. If a theme replaces it, the renderer
-still guarantees some HTML and the two clients still look for specific ids, so
+still guarantees some HTML and the clients still look for specific ids, so
 these are hard requirements rather than style.
 
 A callout is a `note`, not a `region`, so it never joins the landmark
@@ -123,6 +127,15 @@ word would be announced twice. A table header cell is a `th` with
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `readingToggle` | the reading-mode script in the template | the full width reading mode does not toggle |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
+
+The graph page body is rendered by the renderer, not by a theme template, so
+its `graphApp` subtree, its SVG layers and the `graph.js` tag are present
+without a theme doing anything. A theme that replaces `template.html` should
+keep a control pointing at `{{.GraphHref}}`; without it the view still exists at
+that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`,
+`graphKind`, `graphLabels`, `graphFit`, `graphDownload`, `graphStatus`,
+`graphSvg`, `graphEdges`, `graphNodes`, `graphDetails`, and the optional inline
+`graphData`.
 
 `search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
 `role="status"` and `aria-live="polite"`, clipped out of the layout by the
@@ -245,12 +258,12 @@ break behaviour.
 Three sizes, cheapest first. All three are one directory.
 
 **Recolour.** Copy the default's `tokens.css` into `assets/`, change the values
-you care about, and declare one asset. Fonts, template and both clients are
+you care about, and declare one asset. Fonts, template and all three clients are
 inherited. This is the right answer nine times out of ten.
 
 **Reskin.** The same, plus `wiki.css` and a `fonts/` subtree, and optionally
-`brand-mark.svg` and `favicon.svg`. You keep the default's `template.html` and
-`search.js`, so the DOM contract above stays satisfied for free.
+`brand-mark.svg` and `favicon.svg`. You keep the default's `template.html`,
+`search.js` and `graph.js`, so the DOM contract above stays satisfied for free.
 
 **Relayout.** Replace `template.html` as well, or use slots to inject into the
 default's shell without owning it. Read the DOM contract section first; this is
@@ -281,7 +294,7 @@ into `assets/`, change the values you care about, and declare nothing else:
 { "name": "acme", "assets": { "tokens.css": { "mode": "replace" } } }
 ```
 
-Everything else, including the fonts, the template and both clients, is inherited
+Everything else, including the fonts, the template and all three clients, is inherited
 byte for byte. This is the case the manifest's `inherit` mode exists for, and it
 is why an override does not have to be a fork.
 
@@ -306,6 +319,13 @@ multi-site tree, so the mark and the wordmark always mean the deployment home.
 The default template links the brand to it while every asset and preload still
 hangs off `{{.Base}}`. A theme that writes `{{.Base}}` for the brand keeps a
 single bundle unchanged but sends a tree reader to the local wiki's home.
+
+The graph view has its own pair. `{{.GraphHref}}` is the page every header links
+to, and `{{.GraphBase}}` is where that page fetches its catalogue. Both are the
+tree base for a wiki or group of a multi-site tree, where one view and one
+aggregate span every wiki, and `{{.Base}}` for a single bundle.
+`{{.GraphPage}}` is true on the view itself, so a theme can widen the column and
+mark the header control current; the default's template does both.
 
 The breadcrumb keeps the same markup in both cases, and only a tree adds a
 prefix. A single bundle reads `Docs / section / page`. A tree page reads

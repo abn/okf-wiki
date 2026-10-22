@@ -17,6 +17,7 @@ flowchart LR
     D --> E["callouts, code, mermaid"]
     E --> F["search index"]
     E --> H["graph catalogue"]
+    H --> I["graph.html"]
     E --> G["wiki/*.html"]
     F --> G
 ```
@@ -134,14 +135,22 @@ flowchart LR
    its own file, and the tree writes an aggregate at its base with every node ID
    prefixed by the wiki's path, so equal slugs in two wikis stay distinct. See
    [Graph catalogue](../reference/graph.md).
+
+   The same catalogue feeds one browser view, written as `graph.html` at the
+   render root: the bundle base for a single bundle, and the tree base for a
+   tree, where every wiki's header points at it and it draws the aggregate. It
+   fetches `graph.json` when opened, so no other page pays for the catalogue,
+   unless `--graph-inline` embedded the bytes in the page. The drawing has no
+   third-party runtime; the default theme's `graph.js` lays it out in SVG and
+   reads only the fields the schema documents.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
-   fonts, tokens, the search and diagram clients, favicon), the Mermaid vendor
-   bundle when the bundle has a diagram, `search-index.json`,
-   `search-content.json`, `graph.json`, `tags.json`, and a `theme.json` recording
-   which theme produced the output. The output directory is emptied first, so a
-   page removed from the bundle does not linger.
+   fonts, tokens, the search, diagram and graph clients, favicon), the Mermaid
+   vendor bundle when the bundle has a diagram, `search-index.json`,
+   `search-content.json`, `graph.json`, `graph.html`, `tags.json`, and a
+   `theme.json` recording which theme produced the output. The output directory
+   is emptied first, so a page removed from the bundle does not linger.
 
 ## Themes
 
@@ -237,12 +246,12 @@ A synthetic page, such as a tag listing, has no source and no control.
 
 Printing drops to one column and hides what is a control or a jump: the header,
 the sidebar, the table of contents, the previous and next cards, the diagram
-toolbar and the download link. What reads badly split stays together: a heading
-moves to the next page rather than sitting alone at the foot of one, and a
-callout, a code block or a diagram stays whole. A table breaks, but its header
-repeats on each page, so the columns stay named. A dark screen still prints the
-light document, and a printed code block is light with ink text rather than the
-on-screen dark surface.
+toolbar, the graph view, and the download link. What reads badly split stays
+together: a heading moves to the next page rather than sitting alone at the foot
+of one, and a callout, a code block or a diagram stays whole. A table breaks, but
+its header repeats on each page, so the columns stay named. A dark screen still
+prints the light document, and a printed code block is light with ink text rather
+than the on-screen dark surface.
 
 ## Trees of wikis
 
@@ -255,12 +264,13 @@ with no sections of its own, so it keeps the header and the styling but has no
 sidebar and no contents. The output mirrors the tree, which is what lets one
 render and one `serve` publish a whole collection.
 
-Search is the one thing that spans the tree. Every wiki and every group fetches
-the aggregate index at the tree base, and the client groups the hits under a
-heading per wiki and can narrow to the current wiki. A tree of one, whose root
-is itself a wiki, has no aggregate and no per-wiki headings. Tags stay per wiki,
-as does the `#tag` namespace, since a tag page is a page of the wiki that carries
-it.
+Search spans the tree. Every wiki and every group fetches the aggregate index at
+the tree base, and the client groups the hits under a heading per wiki and can
+narrow to the current wiki. A tree of one, whose root is itself a wiki, has no
+aggregate and no per-wiki headings. The graph view spans it too: one page at the
+base draws the aggregate and every wiki's header links to it, while the graph
+files stay per wiki. Tags stay per wiki, as does the `#tag` namespace, since a
+tag page is a page of the wiki that carries it.
 
 ## Caching
 

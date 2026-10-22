@@ -102,6 +102,21 @@ change. A group takes its name and summary from a `.meta.json`
 (`{"title": ..., "description": ...}`) or a `README.md` in that directory, a
 wiki's from its own frontmatter, and a directory with neither from its name.
 
+## The graph view
+
+Every render writes `graph.html` at the base, and the graph control in the
+header opens it. The page fetches `graph.json` when it opens, so a reader who
+never opens it does not download the catalogue. In a multi-site tree the one
+page at the tree base draws the aggregate, and every wiki links to it.
+
+`--graph-inline` embeds the catalogue in the page instead. The page is larger
+and needs no second request, which is useful when a viewer blocks `fetch` of a
+sibling file. `OKF_WIKI_GRAPH_INLINE=true` is the same thing.
+
+The view reserves `graph.html` at the render root. A page `graph.md` or a static
+file of that name there fails the render with the path named, rather than being
+overwritten. See [Graph view](graph.md).
+
 ## Installing it
 
 There are no tagged releases, so there is no release tarball to download and no
@@ -146,10 +161,11 @@ holds in your checkout, which may be ahead of or behind what is published.
 `--out` receives `index.html`, a redirect to the wiki, and the wiki itself at
 the base path: `out/wiki/` by default, and `out/docs/deep/` for
 `--base /docs/deep/`. That directory holds the pages, each page's Markdown
-source beside it for download, the resolved theme's assets,
-`search-index.json` and its text companion `search-content.json`, the
-structural `graph.json`, and a `theme.json` recording which theme produced it.
-The output is a plain static site, so any static file server can host it.
+source beside it for download, the resolved theme's assets (including the
+search, diagram and graph clients), `search-index.json` and its text companion
+`search-content.json`, the structural `graph.json`, the `graph.html` view, and
+a `theme.json` recording which theme produced it. The output is a plain static
+site, so any static file server can host it.
 
 ## Local development
 
