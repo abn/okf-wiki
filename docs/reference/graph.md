@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Graph catalogue
-description: The structural graph.json written beside the search catalogue, its schema, and how links and tags become nodes and edges.
+description: The structural graph.json written beside the search catalogue, the browser view that draws it, and the schema behind both.
 tags: [reference, graph, schema]
 ---
 
@@ -101,10 +101,29 @@ kept deterministic and small. The search catalogue already carries the text, and
 a semantic layer would be a separate artifact with its own provenance rather
 than a second meaning for this one.
 
+## The browser view
+
+Every render writes `graph.html` at the render root: the bundle base for a
+single bundle, and the tree base for a multi-site tree. The header control on
+every page links to it. In a tree every wiki points at the one tree page, which
+draws the aggregate; the per-wiki files remain beside the wikis for an exporter.
+A root that is itself a wiki writes the page from its own render.
+
+The page fetches `graph.json` when it opens, so the catalogue is downloaded on
+demand rather than with every page. `--graph-inline` embeds the same bytes in
+the page and the client reads them instead, which removes the second request.
+See [Graph view](../usage/graph.md) for the controls and the reserved path.
+
+The view is a client of this schema, not a second one. It reads `version`,
+`nodes`, `edges`, `kind`, `stub`, `url`, `title`, `section`, `tags` and `site`;
+a field added here does not change the drawing unless the client is taught to
+use it.
+
 ## Fetching it
 
 The file is served like any other output, so the server's gzip and ETag handling
-applies and a client fetches it only when it needs it:
+applies. The graph page fetches it when opened, and an exporter reads it
+directly:
 
 ```bash
 curl -s http://127.0.0.1:8080/wiki/graph.json | jq '.nodes | length'

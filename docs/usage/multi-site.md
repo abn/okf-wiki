@@ -148,10 +148,18 @@ came from. A wiki that could not be read contributes nothing. A tree whose root
 is itself a wiki keeps that wiki's own catalogue at the base, with no aggregate
 written over it.
 
+The tree also writes one `graph.html` at its base. Every wiki and group links to
+it from the header, and it draws the aggregate, so the view spans the tree the
+way search does. The per-wiki files stay where they are for an exporter.
+`--graph-inline` embeds the aggregate once in that page rather than a copy in
+every wiki. A root that is itself a wiki writes the page from its own render,
+with its own catalogue. See [Graph view](graph.md).
+
 ## What it is not
 
 Links and tags do not cross between wikis. A link inside one wiki resolves
-inside that wiki, and each tag page belongs to its own wiki. Search is the
-exception: one index at the tree base spans every wiki, with results grouped by
-the wiki they came from. A tree is one place to publish many wikis, not one wiki
-with many sections.
+inside that wiki, and each tag page belongs to its own wiki. Search and the
+graph view are the exceptions: one index and one graph at the tree base span
+every wiki, with search results grouped by the wiki they came from and graph
+nodes carrying the wiki they belong to. A tree is one place to publish many
+wikis, not one wiki with many sections.

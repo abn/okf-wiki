@@ -13,6 +13,7 @@ Resolution order is flag, then environment variable, then default.
 | :--- | :--- | :--- | :--- |
 | `--content` | `OKF_WIKI_CONTENT` | auto-detect | OKF bundle directory, or a tree of them with `--multi-site` |
 | `--multi-site` | `OKF_WIKI_MULTI_SITE` | `false` | Treat the content directory as a tree of wikis |
+| `--graph-inline` | `OKF_WIKI_GRAPH_INLINE` | `false` | Embed the graph catalogue in the graph page, with no fetch |
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--lang` | `OKF_WIKI_LANG` | `en` | Language the pages declare, a tag such as `de` or `pt-BR` |
@@ -36,6 +37,12 @@ it sits at under the base; every other directory is a group and is given a
 generated index of the wikis and groups directly inside it. The output mirrors
 the tree, so one render publishes the whole collection and one `serve` serves
 it from one port.
+
+`--graph-inline` embeds the graph catalogue in `graph.html` instead of leaving
+the client to fetch `graph.json`. The view then makes no second request, at the
+cost of a larger page. It is the same switch for a single bundle and a tree; a
+tree embeds its aggregate once at the base. See
+[Graph view](../usage/graph.md).
 
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server
@@ -72,6 +79,8 @@ interval is quieter on a large tree. The default of one second suits authoring.
 ## Endpoints
 
 - `/wiki/` and `/wiki/<slug>.html`: the rendered wiki, under `--base`.
+  `/wiki/graph.html` is the graph view, and it fetches `/wiki/graph.json`
+  unless the catalogue was inlined.
 - `/repo/<path>`: read-only repository mount, when `--repo` is set. Dotfiles are
   refused.
 - `/healthz`: liveness probe.
