@@ -175,7 +175,7 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 	for _, s := range r.sections {
 		secTitle := sectionHeading(s)
 		for _, p := range s.Pages {
-			pageURL := r.cfg.base() + p.Slug + ".html"
+			pageURL := r.urlBase() + p.Slug + ".html"
 			docTitle := pageTitle(p)
 			page := len(index.Pages)
 			index.Pages = append(index.Pages, SearchPage{URL: pageURL, Title: docTitle})

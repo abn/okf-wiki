@@ -153,7 +153,10 @@ it from the header, and it draws the aggregate, so the view spans the tree the
 way search does. The per-wiki files stay where they are for an exporter.
 `--graph-inline` embeds the aggregate once in that page rather than a copy in
 every wiki. A root that is itself a wiki writes the page from its own render,
-with its own catalogue. See [Graph view](graph.md).
+with its own catalogue. See [Graph view](graph.md). An offline render
+(`--offline`) keeps the same tree shape: relative URLs per wiki, search data as
+scripts, one embedded tree graph, and a classic Mermaid bundle where a wiki has
+diagrams.
 
 ## What it is not
 

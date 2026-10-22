@@ -46,7 +46,8 @@ okf-wiki render --content ./docs --out ./public --graph-inline
 client to fetch it. The page is larger, and opening the view makes no second
 request. That helps when a viewer or proxy blocks `fetch` of a sibling file.
 The rest of the site still resolves through `--base`, so a local preview is
-served rather than opened from disk; `okf-wiki serve` is the short path.
+served rather than opened from disk; `okf-wiki serve` is the short path. An
+offline render (`--offline`) inlines the catalogue automatically.
 
 The environment equivalent is `OKF_WIKI_GRAPH_INLINE=true`.
 

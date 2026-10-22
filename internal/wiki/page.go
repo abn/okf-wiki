@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"path"
 	"strings"
 	"unicode/utf8"
 )
@@ -33,13 +34,24 @@ type shellData struct {
 	ThemeName    string
 	ThemeVersion string
 	// Base is the URL prefix every asset and page link hangs off, with a
-	// leading and trailing slash. A theme never hardcodes /wiki/.
+	// trailing slash. It is absolute online. Offline it is relative to the
+	// page's <base>: "./" at the render root and the wiki's path under the tree
+	// for a wiki page.
 	Base string
 	// HomeHref is the brand anchor's target. It is Base for a single bundle and
 	// the tree base for a page of a multi-site tree, so the brand means the
 	// deployment home and works from any depth. It falls back to Base whenever
-	// no tree base is set.
+	// no tree base is set. Offline it names index.html, since a file://
+	// directory URL opens a listing rather than the home page.
 	HomeHref string
+	// DocBase is the relative path from this page to the render root, used as
+	// the document <base> in offline mode. Empty online, where Base is
+	// absolute.
+	DocBase string
+	// PageHref is this page's own path under the render root, used for
+	// fragment links that must resolve to the page rather than to the <base>
+	// root. Empty online.
+	PageHref string
 	// Lang is the language the page declares on the <html> element, for a
 	// screen reader and a read-aloud voice: a subtag such as "de", or a tag
 	// with a region such as "pt-BR". It is DefaultLang when none is
@@ -58,7 +70,14 @@ type shellData struct {
 	GraphHref string
 	// GraphPage marks the graph view itself, so a theme can widen the column
 	// and mark the header control as current.
-	GraphPage  bool
+	GraphPage bool
+	// Offline is true when the page was written for opening without a server.
+	// The search client reads it to load its data from script files instead of
+	// fetching JSON.
+	Offline bool
+	// HasMermaid is true when this page carries a diagram, so an offline page
+	// can load the classic Mermaid bundle it needs.
+	HasMermaid bool
 	Breadcrumb template.HTML
 	Nav        template.HTML
 	// TopNav is the header's links, in the order they were configured.
@@ -91,10 +110,262 @@ func (d shellData) Slot(name string) template.HTML { return d.Slots[name] }
 // render's own base for a single bundle, and the tree base for a wiki or group
 // of a multi-site tree, where one aggregate catalogue spans every wiki.
 func (r *Renderer) graphBase() string {
+	if r.cfg.Offline {
+		return "./"
+	}
 	if r.treeBase != "" {
 		return r.treeBase
 	}
 	return r.cfg.base()
+}
+
+// urlBase returns the prefix asset and page URLs hang off. Online it is the
+// render's absolute base. Offline it is relative to the page's <base>, the
+// render root: "./" at the root and for a group index, and the wiki's path under
+// the tree for a wiki page.
+func (r *Renderer) urlBase() string {
+	if !r.cfg.Offline {
+		return r.cfg.base()
+	}
+	if r.groupIndex || r.siteRel == "" {
+		return "./"
+	}
+	return r.siteRel + "/"
+}
+
+// siteHomeURL names a node's home page. Online that is the node directory,
+// which a static server resolves to index.html. Offline it names index.html
+// directly, because a file:// directory URL opens a listing.
+func (r *Renderer) siteHomeURL(rel string) string {
+	if r.cfg.Offline {
+		if rel == "" {
+			return "./index.html"
+		}
+		return path.Join(rel, "index.html")
+	}
+	root := r.treeBase
+	if root == "" {
+		root = r.cfg.base()
+	}
+	return siteBase(root, rel)
+}
+
+// pagePath is the page's path under the render root, without a leading slash.
+// A group index is written as <dir>/index.html, every other page as its slug
+// plus .html.
+func (r *Renderer) pagePath(p Page) string {
+	if r.groupIndex {
+		return path.Join(r.siteRel, "index.html")
+	}
+	return path.Join(r.siteRel, p.Slug+".html")
+}
+
+// docBase is the relative path from a page to the render root, suitable for a
+// <base> element. It is empty online.
+func (r *Renderer) docBase(p Page) string {
+	if !r.cfg.Offline {
+		return ""
+	}
+	dir := path.Dir(r.pagePath(p))
+	if dir == "." {
+		return "./"
+	}
+	return strings.Repeat("../", strings.Count(dir, "/")+1)
+}
+
+// rewriteFragments rewrites same-page fragment links to name the page
+// explicitly. A <base> element otherwise resolves href="#part" against the base
+// root, not the current page. Script and style content is left alone, as are
+// attributes such as data-href and SVG use references. It is a no-op online.
+func rewriteFragments(markup, pageHref string) string {
+	if pageHref == "" {
+		return markup
+	}
+	escaped := template.HTMLEscapeString(pageHref)
+	var b strings.Builder
+	for pos := 0; pos < len(markup); {
+		script := indexFold(markup[pos:], "<script")
+		style := indexFold(markup[pos:], "<style")
+		next := -1
+		closeTag := ""
+		switch {
+		case script >= 0 && (style < 0 || script < style):
+			next = pos + script
+			closeTag = "</script>"
+		case style >= 0:
+			next = pos + style
+			closeTag = "</style>"
+		}
+		if next < 0 {
+			b.WriteString(rewriteHrefFragments(markup[pos:], escaped))
+			break
+		}
+		b.WriteString(rewriteHrefFragments(markup[pos:next], escaped))
+		end := indexFold(markup[next:], closeTag)
+		if end < 0 {
+			b.WriteString(markup[next:])
+			break
+		}
+		end += next + len(closeTag)
+		b.WriteString(markup[next:end])
+		pos = end
+	}
+	return b.String()
+}
+
+// indexFold finds an HTML tag name without assuming the author's case.
+func indexFold(s, tag string) int {
+	for i := 0; i+len(tag) <= len(s); i++ {
+		if s[i] == '<' && strings.EqualFold(s[i:i+len(tag)], tag) {
+			return i
+		}
+	}
+	return -1
+}
+
+func rewriteHrefFragments(markup, pageHref string) string {
+	var b strings.Builder
+	for len(markup) > 0 {
+		i := anchorIndex(markup)
+		if i < 0 {
+			b.WriteString(markup)
+			break
+		}
+		b.WriteString(markup[:i])
+		end := scanTagEnd(markup[i:])
+		if end < 0 {
+			b.WriteString(markup[i:])
+			break
+		}
+		tag := markup[i : i+end]
+		b.WriteString(rewriteTagHref(tag, pageHref))
+		markup = markup[i+end:]
+	}
+	return b.String()
+}
+
+// anchorIndex finds the next a or area start tag, not an element whose name
+// merely starts with "a" such as abbr.
+func anchorIndex(s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] != '<' {
+			continue
+		}
+		if i+2 <= len(s) && strings.EqualFold(s[i:i+2], "<a") &&
+			(i+2 == len(s) || !isTagNameChar(s[i+2])) {
+			return i
+		}
+		if i+5 <= len(s) && strings.EqualFold(s[i:i+5], "<area") &&
+			(i+5 == len(s) || !isTagNameChar(s[i+5])) {
+			return i
+		}
+	}
+	return -1
+}
+
+func isTagNameChar(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' ||
+		b >= '0' && b <= '9' || b == '-' || b == ':'
+}
+
+func isHTMLSpace(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '\r', '\f':
+		return true
+	}
+	return false
+}
+
+// scanTagEnd returns the index just past a start tag's closing >, ignoring a >
+// inside a quoted attribute value.
+func scanTagEnd(s string) int {
+	quote := byte(0)
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '\'' || c == '"' {
+			quote = c
+			continue
+		}
+		if c == '>' {
+			return i + 1
+		}
+	}
+	return -1
+}
+
+// rewriteTagHref rewrites an href whose value starts with #. The value may be
+// quoted or unquoted, and the attribute name may be any case.
+func rewriteTagHref(tag, pageHref string) string {
+	start, end, ok := hrefValueSpan(tag)
+	if !ok || start >= end || tag[start] != '#' {
+		return tag
+	}
+	return tag[:start] + pageHref + tag[start:end] + tag[end:]
+}
+
+// hrefValueSpan returns the byte span of the href attribute's value, without
+// its quotes. It walks attributes rather than matching a pattern, so a > inside
+// an earlier quoted value and an unquoted value are both handled.
+func hrefValueSpan(tag string) (int, int, bool) {
+	i := 1
+	for i < len(tag) && !isHTMLSpace(tag[i]) && tag[i] != '>' && tag[i] != '/' {
+		i++
+	}
+	for i < len(tag) {
+		for i < len(tag) && isHTMLSpace(tag[i]) {
+			i++
+		}
+		if i >= len(tag) || tag[i] == '>' || tag[i] == '/' {
+			break
+		}
+		nameStart := i
+		for i < len(tag) && !isHTMLSpace(tag[i]) && tag[i] != '=' && tag[i] != '>' && tag[i] != '/' {
+			i++
+		}
+		name := tag[nameStart:i]
+		for i < len(tag) && isHTMLSpace(tag[i]) {
+			i++
+		}
+		if i >= len(tag) || tag[i] != '=' {
+			continue
+		}
+		i++
+		for i < len(tag) && isHTMLSpace(tag[i]) {
+			i++
+		}
+		if i >= len(tag) {
+			break
+		}
+		var start, end int
+		if tag[i] == '"' || tag[i] == '\'' {
+			quote := tag[i]
+			i++
+			start = i
+			for i < len(tag) && tag[i] != quote {
+				i++
+			}
+			end = i
+			if i < len(tag) {
+				i++
+			}
+		} else {
+			start = i
+			for i < len(tag) && !isHTMLSpace(tag[i]) && tag[i] != '>' {
+				i++
+			}
+			end = i
+		}
+		if strings.EqualFold(name, "href") {
+			return start, end, true
+		}
+	}
+	return 0, 0, false
 }
 
 // RenderPage wraps a page body in the themed site shell. A template that parses
@@ -113,21 +384,27 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	}
 
 	name, tail := splitWordmark(r.cfg.Brand.Name)
-	base := r.cfg.base()
+	base := r.urlBase()
 	// A single bundle's index sits at its own base, so that is the default. A
 	// wiki or group of a tree is told the tree base instead, where the one
 	// aggregate index lives.
 	searchBase := r.searchBase
-	if searchBase == "" {
+	if r.cfg.Offline {
+		searchBase = "./"
+	} else if searchBase == "" {
 		searchBase = base
 	}
 	// The brand points at the deployment home: the page's own base for a single
-	// bundle, the tree base for a wiki or group of a tree.
-	homeHref := base
-	if r.treeBase != "" {
-		homeHref = r.treeBase
-	}
+	// bundle, the tree base for a wiki or group of a tree. Offline it names
+	// index.html, since a directory URL is a listing on file://.
+	homeHref := r.siteHomeURL("")
 	graphBase := r.graphBase()
+	pageHref := ""
+	docBase := ""
+	if r.cfg.Offline {
+		pageHref = r.pagePath(p)
+		docBase = r.docBase(p)
+	}
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
@@ -151,11 +428,15 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		ThemeVersion:   r.theme.Version,
 		Base:           base,
 		HomeHref:       homeHref,
+		DocBase:        docBase,
+		PageHref:       pageHref,
 		Lang:           r.cfg.lang(),
 		SearchBase:     searchBase,
 		GraphBase:      graphBase,
 		GraphHref:      graphBase + "graph.html",
 		GraphPage:      r.graphPage,
+		Offline:        r.cfg.Offline,
+		HasMermaid:     strings.Contains(p.Body, `<pre class="mermaid">`),
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		TopNav:         template.HTML(r.topNavHTML()),
@@ -174,7 +455,11 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	if err := r.theme.Template().Execute(&b, data); err != nil {
 		return "", fmt.Errorf("render %s: theme %s: %w", p.Slug, r.theme.Source, err)
 	}
-	return b.String(), nil
+	out := b.String()
+	if pageHref != "" {
+		out = rewriteFragments(out, pageHref)
+	}
+	return out, nil
 }
 
 func (r *Renderer) slots() map[string]template.HTML {
@@ -211,7 +496,7 @@ func (r *Renderer) quickLinksJSON() string {
 		}
 		links = append(links, link{Label: label, Href: href})
 	}
-	base := r.cfg.base()
+	base := r.urlBase()
 	for _, s := range r.sections {
 		if len(s.Pages) == 0 {
 			continue
@@ -284,7 +569,7 @@ func (r *Renderer) pageNeighbors(section, slug string) (prev, next *PageLink) {
 		if title == "" {
 			title = p.Slug
 		}
-		return &PageLink{Title: title, URL: r.cfg.base() + p.Slug + ".html"}
+		return &PageLink{Title: title, URL: r.urlBase() + p.Slug + ".html"}
 	}
 	for _, s := range r.sections {
 		if s.ID != section {
@@ -350,7 +635,7 @@ func (r *Renderer) buildMeta(p Page, markdown string) string {
 			chips = append(chips, fmt.Sprintf(`<span class="tag-link">#%s</span>`, template.HTMLEscapeString(name)))
 			continue
 		}
-		chips = append(chips, tagLink(r.cfg.base(), slug, name))
+		chips = append(chips, tagLink(r.urlBase(), slug, name))
 	}
 	if len(chips) == 0 && markdown == "" {
 		return ""
@@ -388,7 +673,7 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 		return ""
 	}
 	var b strings.Builder
-	base := r.cfg.base()
+	base := r.urlBase()
 	b.WriteString(`<nav class="side" aria-label="Documentation navigation">`)
 	for _, sec := range r.sections {
 		if len(sec.Pages) == 0 {
@@ -702,7 +987,7 @@ func (r *Renderer) topNavMatching(wantExternal bool) string {
 }
 
 func (r *Renderer) breadcrumbHTML(p Page) string {
-	base := r.cfg.base()
+	base := r.urlBase()
 	// Tag pages belong to no section. A single bundle reads Docs / Tags / #tag,
 	// with Tags as unclassed text since there is no tag index page to point it
 	// at and no theme class for a non-current, non-link crumb. The slug prefix
@@ -720,7 +1005,7 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 			// links: the wiki title points at the wiki home and Tags follows it.
 			parts = r.treeTrailParts(false)
 		} else {
-			parts = append(parts, `<a href="`+base+`">Docs</a>`)
+			parts = append(parts, `<a href="`+r.siteHomeURL("")+`">Docs</a>`)
 		}
 		parts = append(parts, `<span>Tags</span>`)
 		title := p.Title
@@ -737,7 +1022,7 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 	if r.treeBase != "" {
 		return r.treeBreadcrumbHTML(p)
 	}
-	parts := []string{`<a href="` + base + `">Docs</a>`}
+	parts := []string{`<a href="` + r.siteHomeURL("") + `">Docs</a>`}
 	if p.Section != "" {
 		for _, s := range r.sections {
 			if s.ID == p.Section {
@@ -762,7 +1047,7 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 // a link on a deeper page and the current crumb on its home, so a wiki home is
 // one click away and never linked to itself.
 func (r *Renderer) treeBreadcrumbHTML(p Page) string {
-	base := r.cfg.base()
+	base := r.urlBase()
 	sep := `<span class="crumb-sep">/</span>`
 	home := r.nodeIsHome(p)
 	parts := r.treeTrailParts(home)
@@ -797,9 +1082,9 @@ func (r *Renderer) treeTrailParts(nodeCurrent bool) []string {
 		if nodeCurrent {
 			return []string{crumbCur(r.cfg.Brand.Title)}
 		}
-		return []string{crumbLink(r.treeBase, r.cfg.Brand.Title)}
+		return []string{crumbLink(r.siteHomeURL(""), r.cfg.Brand.Title)}
 	}
-	parts := []string{crumbLink(r.treeBase, r.cfg.Brand.Title)}
+	parts := []string{crumbLink(r.siteHomeURL(""), r.cfg.Brand.Title)}
 	for _, c := range r.siteTrail {
 		parts = append(parts, crumbLink(c.Href, c.Title))
 	}
@@ -810,7 +1095,7 @@ func (r *Renderer) treeTrailParts(nodeCurrent bool) []string {
 	if nodeCurrent {
 		return append(parts, crumbCur(nodeTitle))
 	}
-	return append(parts, crumbLink(siteBase(r.treeBase, r.siteRel), nodeTitle))
+	return append(parts, crumbLink(r.siteHomeURL(r.siteRel), nodeTitle))
 }
 
 // nodeIsHome reports whether a page is its node's own home: the wiki's

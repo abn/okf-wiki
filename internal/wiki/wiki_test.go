@@ -555,7 +555,7 @@ func TestDefaultThemeSearchLoadsContentInTheBackground(t *testing.T) {
 	}
 	// The light index starts the text load once it resolves, so the open, hover
 	// and focus triggers that load the index also start the texts.
-	indexBody := jsFuncBody(t, js, "fetchIndex")
+	indexBody := jsFuncBody(t, js, "useIndex")
 	if !strings.Contains(indexBody, "fetchContent();") {
 		t.Error("the index load does not start the background text load")
 	}
@@ -2366,6 +2366,10 @@ func TestBundledDocsRenderCarriesTheVendorRuntime(t *testing.T) {
 	}
 	if st.Size() == 0 {
 		t.Error("the copied diagram runtime is empty")
+	}
+	classic := filepath.Join(out, "wiki", "vendor", "mermaid-bundle.min.js")
+	if _, err := os.Stat(classic); err == nil {
+		t.Error("the online render copied the unused classic bundle")
 	}
 }
 

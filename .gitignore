@@ -9,6 +9,7 @@ _site/
 # Node vendor build
 mermaid/node_modules/
 mermaid/mermaid-bundle.min.mjs
+mermaid/mermaid-bundle.min.js
 
 # OS / editor
 .DS_Store

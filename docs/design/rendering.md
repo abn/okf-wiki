@@ -149,8 +149,10 @@ flowchart LR
    fonts, tokens, the search, diagram and graph clients, favicon), the Mermaid
    vendor bundle when the bundle has a diagram, `search-index.json`,
    `search-content.json`, `graph.json`, `graph.html`, `tags.json`, and a
-   `theme.json` recording which theme produced the output. The output directory
-   is emptied first, so a page removed from the bundle does not linger.
+   `theme.json` recording which theme produced the output. An offline render
+   also writes the search index, texts and tags as classic `.js` data scripts.
+   The output directory is emptied first, so a page removed from the bundle does
+   not linger.
 
 ## Themes
 
@@ -271,6 +273,22 @@ aggregate and no per-wiki headings. The graph view spans it too: one page at the
 base draws the aggregate and every wiki's header links to it, while the graph
 files stay per wiki. Tags stay per wiki, as does the `#tag` namespace, since a
 tag page is a page of the wiki that carries it.
+
+## Offline folder
+
+`--offline` changes the URL layer rather than the content. Each page carries a
+`<base>` pointing at the render root, every asset and page URL is relative to
+it, and home links name `index.html` because a directory URL opens a listing on
+`file://`. Fragment-only links are rewritten to name their page, since a
+`<base>` otherwise sends them to the root. The root redirect also names
+`index.html`.
+
+The clients follow the same rule. Search data is written as classic `.js`
+scripts and loaded lazily, because `fetch` of a sibling file is blocked from
+disk. The graph catalogue is embedded. A page with a diagram loads a classic
+Mermaid bundle from `vendor/`; a `file://` page never calls the public CDN. A
+`--repo` mount is refused, because it is a server endpoint with no file to open.
+See [Offline folder](../usage/offline.md).
 
 ## Caching
 

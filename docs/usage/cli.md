@@ -117,6 +117,20 @@ The view reserves `graph.html` at the render root. A page `graph.md` or a static
 file of that name there fails the render with the path named, rather than being
 overwritten. See [Graph view](graph.md).
 
+## Offline folder
+
+`--offline` writes a folder that opens from `file://`: relative URLs, a per-page
+`<base>`, home links that name `index.html`, script-loaded search data, an
+embedded graph, and a classic Mermaid bundle for pages with diagrams. No request
+leaves the folder. `--repo` is refused, since a repository mount needs a server.
+
+```bash
+okf-wiki render --content ./docs --out ./site --offline
+```
+
+Open `site/wiki/index.html` or `site/index.html`. The folder can be moved as a
+unit. See [Offline folder](offline.md).
+
 ## Installing it
 
 There are no tagged releases, so there is no release tarball to download and no
@@ -164,8 +178,11 @@ the base path: `out/wiki/` by default, and `out/docs/deep/` for
 source beside it for download, the resolved theme's assets (including the
 search, diagram and graph clients), `search-index.json` and its text companion
 `search-content.json`, the structural `graph.json`, the `graph.html` view, and
-a `theme.json` recording which theme produced it. The output is a plain static
-site, so any static file server can host it.
+a `theme.json` recording which theme produced it. An offline render also writes
+the search and tag data as `.js` scripts, and copies the Mermaid runtime build
+it needs when the bundle has a diagram. The output is a plain static site, so
+any static file server can host it, and an offline folder can be opened from
+disk.
 
 ## Local development
 

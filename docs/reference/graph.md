@@ -112,6 +112,7 @@ A root that is itself a wiki writes the page from its own render.
 The page fetches `graph.json` when it opens, so the catalogue is downloaded on
 demand rather than with every page. `--graph-inline` embeds the same bytes in
 the page and the client reads them instead, which removes the second request.
+An offline render embeds it automatically.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

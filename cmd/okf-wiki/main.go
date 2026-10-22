@@ -195,7 +195,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Base, "base", env("OKF_WIKI_BASE", wiki.DefaultBase), "URL prefix the wiki is served under")
 	fs.StringVar(&c.Lang, "lang", env("OKF_WIKI_LANG", wiki.DefaultLang), "language the pages declare, e.g. de or pt-BR")
 	fs.StringVar(&c.Repo, "repo", env("OKF_WIKI_REPO", ""), "repository root for /repo/")
-	fs.StringVar(&c.VendorDir, "vendor", env("OKF_WIKI_VENDOR", "mermaid"), "mermaid bundle directory")
+	fs.StringVar(&c.VendorDir, "vendor", env("OKF_WIKI_VENDOR", "mermaid"), "directory holding the mermaid ESM and classic bundles")
 	fs.StringVar(&c.ThemeDir, "theme", env("OKF_WIKI_THEME", ""), "theme directory layered over the embedded default")
 	fs.StringVar(&c.Brand.Name, "brand", env("OKF_WIKI_BRAND", "okf-wiki"), "brand wordmark")
 	fs.StringVar(&c.Brand.Sub, "brand-sub", env("OKF_WIKI_BRAND_SUB", "docs"), "brand subtitle")
@@ -205,6 +205,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Brand.NavLinks, "nav-links", env("OKF_WIKI_NAV_LINKS", ""), "header links as Label=URL pairs")
 	fs.BoolVar(&c.MultiSite, "multi-site", envBool("OKF_WIKI_MULTI_SITE", false), "treat the content directory as a tree of wikis")
 	fs.BoolVar(&c.InlineGraph, "graph-inline", envBool("OKF_WIKI_GRAPH_INLINE", false), "embed the graph catalogue in the graph page")
+	fs.BoolVar(&c.Offline, "offline", envBool("OKF_WIKI_OFFLINE", false), "write a portable folder for opening from file://")
 	return c
 }
 

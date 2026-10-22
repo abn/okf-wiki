@@ -68,9 +68,14 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.TopNavInternal}}` `{{.TopNavExternal}}` | the same links split by kind, for the drawer |
 | `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
-| `{{.Base}}` | the URL prefix, with a leading and trailing slash |
-| `{{.HomeHref}}` | the brand anchor's target: `Base` for a single bundle, the tree base for a wiki or group of a multi-site tree |
+| `{{.Base}}` | the URL prefix, with a trailing slash; absolute online, relative to `{{.DocBase}}` offline |
+| `{{.HomeHref}}` | the brand anchor's target: `Base` for a single bundle, the tree base for a wiki or group of a multi-site tree; `index.html` offline |
 | `{{.SearchBase}}` | the URL prefix the search index is fetched from: the same as `Base` for a single bundle, the tree base for a wiki of a multi-site tree |
+| `{{.DocBase}}` | offline only: the relative path from this page to the render root, for the document `<base>`; empty online |
+| `{{.PageHref}}` | offline only: this page's own path under the render root, for in-document links; empty online |
+| `{{.Offline}}` | true when the page is written for opening without a server |
+| `{{.HasMermaid}}` | true when this page carries a diagram, so an offline page can load the classic runtime |
+| `{{.GraphBase}}` `{{.GraphHref}}` | where the graph catalogue is fetched and where the graph page lives |
 | `{{.AssetVersion}}` | the resolved theme's content hash |
 | `{{.BrandName}}` `{{.BrandTail}}` `{{.BrandSub}}` `{{.BrandTitle}}` | the configured brand |
 | `{{.VersionTag}}` | a freeform version label beside the wordmark, empty when unset |
@@ -89,6 +94,13 @@ base for a page of a tree, so one brand stands for the whole deployment rather
 than for the wiki the reader happens to be in. A theme that keeps the default
 template gets all three for free; one that hardcodes `{{.Base}}` for the brand
 keeps a single bundle's behaviour and gets the local wiki's home in a tree.
+
+In an offline render `{{.Base}}` is relative to `{{.DocBase}}`, which the
+default template writes into a `<base>` element. `{{.HomeHref}}` then names
+`index.html`, because a directory URL opens a listing on `file://`. The renderer
+rewrites fragment-only `<a href="#...">` links in the finished page, so a theme's
+own HTML links are covered. A theme's inline script that builds a fragment link
+at runtime must use `{{.PageHref}}`; the default heading permalink does.
 
 ## Two accessibility fixes, deliberately not reproduced
 
