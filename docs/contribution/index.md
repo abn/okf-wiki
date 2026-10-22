@@ -19,12 +19,22 @@ changes, update the relevant page and add an entry to `docs/log.md`.
 - Go 1.25 or newer.
 - Node 22 and npm, only to build the offline mermaid bundles (`make vendor`)
   or the container image.
+- Python 3 and Selenium, with Firefox, only to run `make firefox` or the CI
+  Firefox smoke test.
+
+## Offline browser check
+
+`make firefox` builds the diagram bundles, renders `docs/` as an offline folder,
+and runs `scripts/check-offline-firefox.py` against it. It needs Firefox and
+Selenium; Selenium Manager fetches a matching geckodriver. CI runs the same
+target.
 
 ## Layout
 
 - `cmd/okf-wiki`: the CLI.
 - `internal/wiki`: renderer, config, detection, server, and embedded assets.
 - `mermaid`: the pinned mermaid and ELK bundle build.
+- `scripts`: browser smoke tests.
 - `Containerfile`: the multi-stage image build.
 
 ## Local hooks
@@ -53,6 +63,8 @@ GitHub Actions drives quality and release. The workflows live in
 - **container-build**: builds the image with podman, then runs it and checks
   `/healthz` and the wiki page.
 - **render**: renders `docs/` and checks the pages and search index exist.
+- **firefox**: renders an offline folder and runs the Firefox `file://` smoke
+  test for search, diagrams, the graph and the root redirect.
 - **pre-commit**: runs every hook over the tree.
 
 `publish.yml` runs on `main`, version tags, and manual dispatch. It builds the

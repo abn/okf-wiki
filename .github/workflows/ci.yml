@@ -125,6 +125,35 @@ jobs:
           test -f .scratch/wiki/wiki/index.html
           echo "render output looks complete"
 
+  firefox:
+    name: Firefox offline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mermaid/package-lock.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: browser-actions/setup-firefox@v1
+
+      - name: Install Selenium
+        run: python3 -m pip install --disable-pip-version-check selenium
+
+      - name: Render offline and run the Firefox smoke test
+        run: make firefox
+
   action:
     name: The action renders a relocated site
     runs-on: ubuntu-latest

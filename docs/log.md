@@ -26,6 +26,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
   `reference/themes.md`, `design/branding.md`, `design/rendering.md`,
   `usage/cli.md`, `usage/graph.md` and `usage/multi-site.md` say so.
 
+* **Verification**: Offline folders are covered by a Firefox `file://` smoke
+  test in CI. It checks the relative base, search and tags, Mermaid, the graph
+  and the root redirect. No renderer change was needed; `usage/offline.md` and
+  `contribution/index.md` say so.
+
 ## 2026-10-21
 
 * **Feature**: Every render writes `graph.json` beside the search catalogue. It
