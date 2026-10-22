@@ -76,6 +76,25 @@ func graphNode(g GraphIndex, id string) (GraphNode, bool) {
 	return GraphNode{}, false
 }
 
+// TestBuildGraphRecordsSectionIDs keeps section identity separate from the
+// display title, so a real directory named tags cannot collide with the view's
+// synthetic tag-hub cell.
+func TestBuildGraphRecordsSectionIDs(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "tags"))
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\ntags: [alpha]\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "tags", "index.md"), "---\ntitle: Tags\n---\n# Tags\n")
+	g := newGraphRenderer(t, dir).BuildGraph()
+	root, ok := graphNode(g, "page:index")
+	if !ok || root.SectionID != "" {
+		t.Errorf("root section ID = %q, want empty", root.SectionID)
+	}
+	tags, ok := graphNode(g, "page:tags/index")
+	if !ok || tags.Section != "Tags" || tags.SectionID != "tags" {
+		t.Errorf("tags section = %+v, want title Tags and ID tags", tags)
+	}
+}
+
 // TestBuildGraphRecordsPageLinks pins the edge set: in-bundle Markdown links
 // become edges, a link repeated under one heading collapses to one edge while
 // the same target under another heading stays a second edge, and a link to a

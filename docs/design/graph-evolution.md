@@ -47,7 +47,7 @@ the semantic layer.
 
 ### Scale and readability
 
-- [ ] Collapse tag hubs and cluster by section.
+- [x] Collapse tag hubs and cluster by section.
 - [ ] Stable or precomputed layout, so a graph looks the same on every visit.
 - [ ] Semantic zoom: labels for hubs first, page names as the reader zooms in.
 - [ ] Path finding between two pages.
@@ -73,6 +73,6 @@ the semantic layer.
 
 ## Current
 
-Local graph and backlinks, shareable view state, and the accessible list view
-are shipped. The next item is search integration: open a search hit in the
-graph and highlight graph matches from the search modal.
+Local graph and backlinks, shareable view state, the accessible list view,
+collapsed tag hubs and section clusters are shipped. The next item is a stable
+or precomputed layout, so the graph looks the same on every visit.

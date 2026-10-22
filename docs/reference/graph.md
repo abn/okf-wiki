@@ -35,6 +35,7 @@ still gets an empty catalogue rather than a missing file.
 | `url` | the rendered page, absent on a stub |
 | `kind` | `page` or `tag` |
 | `section` | the section title, on pages |
+| `sectionId` | the section directory ID, when present |
 | `type`, `status` | frontmatter values, when present |
 | `tags` | the page's frontmatter tags |
 | `stub` | true for a page an in-bundle link names and the bundle does not contain |
@@ -75,6 +76,7 @@ an asset has no page node to point at.
       "url": "/wiki/guide/install.html",
       "kind": "page",
       "section": "Guide",
+      "sectionId": "guide",
       "tags": ["setup"]
     },
     {
@@ -131,11 +133,14 @@ rather than failing. An unknown tag stays in the tag list, marked as missing,
 so a reader can remove it. The client writes these parameters on change and
 restores them on back and forward. Pan and zoom are not stored. The page also
 builds a list of the visible nodes and edges beside the drawing, from the same
-catalogue, for keyboard and screen-reader use.
+catalogue, for keyboard and screen-reader use. The drawing can group pages by
+section and collapse the tag hubs; those two are view settings rather than URL
+parameters.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,
-`nodes`, `edges`, `kind`, `stub`, `url`, `title`, `section`, `tags` and `site`;
+`nodes`, `edges`, `kind`, `stub`, `url`, `title`, `section`, `sectionId`,
+`tags`, `site` and `siteKey`;
 a field added here does not change the drawing unless the client is taught to
 use it.
 

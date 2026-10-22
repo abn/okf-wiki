@@ -23,14 +23,22 @@ frontmatter tags.
 - **Filter** narrows by title, section, tag, or node ID. Matching nodes stay
   lit and the rest fade.
 - **Show** switches between all nodes, pages, tags, and missing pages.
+- **Sections** groups pages by their top-level section in a labelled grid. The
+  section is the directory title, or a title set with `--sections`; there is no
+  `section` frontmatter field. Tag hubs and missing pages get their own cells.
+  The grid is fixed; link edges cross between cells when they are visible at
+  the current zoom. Changing it clears the current focus and relayouts.
+- **Tag hubs** shows or hides tag nodes and tag edges. Hiding them leaves the
+  Tags filter and page tags in place; Show Tags is disabled while the hubs are
+  collapsed. Changing it also clears the focus and relayouts.
 - **Tags** opens a checkbox list of the bundle's tags. A page has to carry every
   selected tag; selected tag hubs stay visible. The count beside each tag is
   the number of pages that carry it. A tag named in the URL but absent from the
   graph still appears in the list, marked as missing, so it can be removed.
-- A dense catalogue opens on a readable patch around a page with a typical
-  number of connections, not on the whole cloud. **Fit view** draws the
-  catalogue as a map, trimming the outermost percentile so one stranded page
-  cannot shrink it.
+- Without Sections, a dense catalogue opens on a readable patch around a page
+  with a typical number of connections. With Sections on, it opens on the
+  section grid. **Fit view** draws the catalogue as a map, trimming the
+  outermost percentile so one stranded page cannot shrink it.
 - **Labels** hides or shows the names. At most 50 names are drawn in one view,
   and one is chosen only where it fits without covering another name or another
   node. Names keep their screen size at every zoom, so zooming in shows more.
@@ -51,15 +59,16 @@ frontmatter tags.
 - **Download JSON** saves the same bytes the view loaded as `graph.json`.
 
 The page carries no page text and no embeddings. It is the structural layer,
-and the search catalogue remains the place for text.
+and the search catalogue remains the place for text. Sections and Tag hubs are
+view settings; they are not part of the shared URL state.
 
 ## List view
 
 At wide widths a **List view** sits beside the drawing. At narrow widths it
 follows the drawing instead. It lists the nodes and edges that match the
-current Filter, Show, Tags and focus, with connection counts on each node, and
-the link text and heading anchor on link edges. The counts in the status line
-stay in step with the drawing.
+current Filter, Show, Tags, Sections and focus, with connection counts on each
+node, and the link text and heading anchor on link edges. The counts in the
+status line stay in step with the drawing.
 
 Select a node in the list to select it in the drawing, open its details and
 focus its neighbourhood. The list marks the current node. Node rows are normal

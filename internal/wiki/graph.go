@@ -50,15 +50,16 @@ func sectionHeading(s Section) string {
 // that an in-bundle link names and the bundle does not contain: it has no URL
 // and exists so the broken link is in the catalogue.
 type GraphNode struct {
-	ID      string   `json:"id"`
-	Title   string   `json:"title"`
-	URL     string   `json:"url,omitempty"`
-	Kind    string   `json:"kind"` // "page" or "tag"
-	Section string   `json:"section,omitempty"`
-	Type    string   `json:"type,omitempty"`
-	Status  string   `json:"status,omitempty"`
-	Tags    []string `json:"tags,omitempty"`
-	Stub    bool     `json:"stub,omitempty"`
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	URL       string   `json:"url,omitempty"`
+	Kind      string   `json:"kind"` // "page" or "tag"
+	Section   string   `json:"section,omitempty"`
+	SectionID string   `json:"sectionId,omitempty"`
+	Type      string   `json:"type,omitempty"`
+	Status    string   `json:"status,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	Stub      bool     `json:"stub,omitempty"`
 	// Site and SiteKey are set only in a tree's aggregate, where they name the
 	// wiki a node came from and its path under the tree root.
 	Site    string `json:"site,omitempty"`
@@ -104,14 +105,15 @@ func (r *Renderer) BuildGraph() GraphIndex {
 			id := pageNodeID(p.Slug)
 			byID[id] = len(g.Nodes)
 			g.Nodes = append(g.Nodes, GraphNode{
-				ID:      id,
-				Title:   pageTitle(p),
-				URL:     r.urlBase() + p.Slug + ".html",
-				Kind:    "page",
-				Section: sectionHeading(s),
-				Type:    p.Type,
-				Status:  p.Status,
-				Tags:    p.Tags,
+				ID:        id,
+				Title:     pageTitle(p),
+				URL:       r.urlBase() + p.Slug + ".html",
+				Kind:      "page",
+				Section:   sectionHeading(s),
+				SectionID: s.ID,
+				Type:      p.Type,
+				Status:    p.Status,
+				Tags:      p.Tags,
 			})
 		}
 	}
@@ -248,6 +250,8 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<select id="graphKind"><option value="all">All nodes</option><option value="page">Pages</option>`)
 	b.WriteString(`<option value="tag">Tags</option><option value="stub">Missing pages</option></select></label>`)
 	b.WriteString(`<details class="graph-tags" id="graphTags"><summary class="graph-tags-summary" id="graphTagsSummary">Tags: any</summary><div class="graph-tags-menu" id="graphTagsMenu" role="group" aria-label="Filter by tag"></div></details>`)
+	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphSections" checked> Sections</label>`)
+	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphTagHubs" checked> Tag hubs</label>`)
 	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
 	b.WriteString(`<button type="button" class="graph-fit" id="graphFit">Fit view</button>`)
 	b.WriteString(`<a class="graph-fit" id="graphClearFocus" href="`)
@@ -262,7 +266,7 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<div class="graph-main">`)
 	b.WriteString(`<div class="graph-canvas"><svg id="graphSvg" viewBox="0 0 1000 700" role="group" aria-labelledby="graphTitle graphDesc" preserveAspectRatio="xMidYMid meet">`)
 	b.WriteString(`<title id="graphTitle">Knowledge graph</title><desc id="graphDesc">Pages and tags as nodes. Drag a node to move it, scroll to zoom, drag the background to pan, and use the arrow keys to move between nodes.</desc>`)
-	b.WriteString(`<g id="graphEdges"></g><g id="graphNodes"></g></svg></div>`)
+	b.WriteString(`<g id="graphEdges"></g><g id="graphNodes"></g><g id="graphSectionLayer" aria-hidden="true"></g></svg></div>`)
 	b.WriteString(`<aside class="graph-list" id="graphList" aria-label="List view">`)
 	b.WriteString(`<div class="graph-list-head"><h2>List view</h2><p class="graph-list-status" id="graphListStatus">Loading the graph...</p></div>`)
 	b.WriteString(`<section class="graph-list-section" aria-labelledby="graphListNodesTitle"><h3 id="graphListNodesTitle">Nodes</h3><ul class="graph-list-nodes" id="graphListNodes" role="list"></ul></section>`)

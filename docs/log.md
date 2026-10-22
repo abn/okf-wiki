@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-22
 
+* **Feature**: The graph can cluster pages by top-level section in a labelled
+  grid, with tag hubs and missing pages in their own cells. Tag hubs can be
+  collapsed without removing tag filtering, and Show Tags is disabled while
+  they are hidden. The controls clear focus and relayout. `usage/graph.md`,
+  `reference/graph.md`, `design/rendering.md`, `reference/themes.md`,
+  `usage/offline.md` and `design/graph-evolution.md` say so.
 * **Feature**: The graph view gains a list beside the drawing, with the visible
   nodes and edges, connection counts, link text and edge anchors. Selecting a
   list node opens the same details and focus as the drawing, and the list

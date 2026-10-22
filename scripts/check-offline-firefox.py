@@ -251,6 +251,109 @@ def main():
 
         check_page(driver, base + "graph.html", ".graph-list-node")
         must(
+            driver.find_element(By.ID, "graphSections").is_selected(),
+            "Sections is not on by default",
+        )
+        must(
+            driver.find_element(By.ID, "graphTagHubs").is_selected(),
+            "Tag hubs is not on by default",
+        )
+        section_labels = driver.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        must(section_labels, "the section grid has no labels")
+        must(
+            driver.find_elements(By.CSS_SELECTOR, ".graph-section-box"),
+            "the section grid has no boxes",
+        )
+        canvas_rect = driver.find_element(By.ID, "graphSvg").rect
+        label_rects = [label.rect for label in section_labels]
+        for rect in label_rects:
+            must(
+                rect["x"] >= canvas_rect["x"] - 1
+                and rect["y"] >= canvas_rect["y"] - 1
+                and rect["x"] + rect["width"] <= canvas_rect["x"] + canvas_rect["width"] + 1
+                and rect["y"] + rect["height"] <= canvas_rect["y"] + canvas_rect["height"] + 1,
+                "a section label was clipped by the canvas",
+            )
+        for i, first_rect in enumerate(label_rects):
+            for second_rect in label_rects[i + 1:]:
+                overlap_x = min(first_rect["x"] + first_rect["width"],
+                                second_rect["x"] + second_rect["width"]) - max(first_rect["x"], second_rect["x"])
+                overlap_y = min(first_rect["y"] + first_rect["height"],
+                                second_rect["y"] + second_rect["height"]) - max(first_rect["y"], second_rect["y"])
+                must(
+                    overlap_x <= 1 or overlap_y <= 1,
+                    "two section labels overlap",
+                )
+        for box in driver.find_elements(By.CSS_SELECTOR, ".graph-section-box"):
+            rect = box.rect
+            must(
+                rect["x"] >= canvas_rect["x"] - 1
+                and rect["y"] >= canvas_rect["y"] - 1
+                and rect["x"] + rect["width"] <= canvas_rect["x"] + canvas_rect["width"] + 1
+                and rect["y"] + rect["height"] <= canvas_rect["y"] + canvas_rect["height"] + 1,
+                "a section box was clipped by the canvas",
+            )
+        node_label_rects = [
+            label.rect for label in driver.find_elements(By.CSS_SELECTOR, ".graph-label")
+            if label.is_displayed()
+        ]
+        for section_rect in label_rects:
+            for node_rect in node_label_rects:
+                overlap_x = min(section_rect["x"] + section_rect["width"],
+                                node_rect["x"] + node_rect["width"]) - max(section_rect["x"], node_rect["x"])
+                overlap_y = min(section_rect["y"] + section_rect["height"],
+                                node_rect["y"] + node_rect["height"]) - max(section_rect["y"], node_rect["y"])
+                must(
+                    overlap_x <= 1 or overlap_y <= 1,
+                    "a section label overlaps a node label",
+                )
+        baseline_nodes = len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
+
+        driver.find_element(By.ID, "graphSections").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
+        driver.find_element(By.ID, "graphSections").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
+
+        driver.find_element(By.ID, "graphTagHubs").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
+            < baseline_nodes
+        )
+        collapsed_nodes = len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
+        must(
+            not driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.tag"),
+            "tag hubs stayed visible after collapsing them",
+        )
+        must(
+            driver.find_element(By.ID, "graphKind")
+            .find_element(By.CSS_SELECTOR, 'option[value="tag"]')
+            .get_attribute("disabled")
+            is not None,
+            "Show Tags stayed enabled with no tag hubs",
+        )
+        must(
+            (str(collapsed_nodes) + " nodes")
+            in driver.find_element(By.ID, "graphListStatus").text,
+            "the list did not follow the collapsed tag hubs",
+        )
+        driver.find_element(By.ID, "graphTagHubs").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
+            == baseline_nodes
+        )
+        must(
+            any(
+                t.text == "Tag hubs"
+                for t in driver.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+            ),
+            "the restored tag hubs have no Tags cluster",
+        )
+
+        must(
             len(driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-node")) > 0,
             "the list has no nodes",
         )
@@ -303,6 +406,21 @@ def main():
             )
             == "page:usage/graph",
             "selecting a list node moved keyboard focus away from it",
+        )
+
+        check_page(driver, base + "graph.html?q=graph", ".graph-list-node")
+        driver.find_element(By.CSS_SELECTOR, "#graphListNodes .graph-list-node").click()
+        driver.find_element(By.ID, "graphSections").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, '#graphSvg circle[tabindex="0"]'))
+            == 1
+        )
+        must(
+            not driver.execute_script(
+                "return document.querySelector('#graphSvg circle[tabindex=\"0\"]')"
+                ".parentElement.classList.contains('is-dim');"
+            ),
+            "the graph tab stop went stale after a relayout",
         )
 
         check_page(driver, base + "graph.html?tag=no-such-tag", ".graph-node-group")

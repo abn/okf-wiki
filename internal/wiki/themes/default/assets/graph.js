@@ -22,11 +22,14 @@
   var FOCUS_SCALE = 0.45;
 
   var svg = document.getElementById('graphSvg');
+  var sectionLayer = document.getElementById('graphSectionLayer');
   var edgeLayer = document.getElementById('graphEdges');
   var nodeLayer = document.getElementById('graphNodes');
   var status = document.getElementById('graphStatus');
   var filter = document.getElementById('graphFilter');
   var kind = document.getElementById('graphKind');
+  var sectionsCheck = document.getElementById('graphSections');
+  var tagHubsCheck = document.getElementById('graphTagHubs');
   var labels = document.getElementById('graphLabels');
   var tagsDetails = document.getElementById('graphTags');
   var tagsSummary = document.getElementById('graphTagsSummary');
@@ -45,6 +48,8 @@
   if (base.charAt(base.length - 1) !== '/') base += '/';
 
   var state = {
+    allNodes: [],
+    allEdges: [],
     nodes: [],
     edges: [],
     edgeElements: [],
@@ -60,6 +65,11 @@
     selectedTags: [],
     tagBySlug: Object.create(null),
     nodeByID: Object.create(null),
+    showTagHubs: true,
+    clusterSections: true,
+    sectionCells: null,
+    clusterLabels: Object.create(null),
+    legacySections: false,
     listAllNodes: false,
     listAllEdges: false,
     anchor: null,
@@ -138,7 +148,7 @@
 
   function initTagFilter() {
     state.tagBySlug = Object.create(null);
-    state.nodes.forEach(function (n) {
+    state.allNodes.forEach(function (n) {
       if (n.kind !== 'tag') return;
       var slug = tagSlugOfNode(n);
       if (!slug) return;
@@ -496,6 +506,7 @@
   // while a popstate can apply it to the finished drawing immediately.
   function readURLState(params) {
     var k = params.get('kind');
+    if (!state.showTagHubs && k === 'tag') k = 'all';
     kind.value = (k === 'page' || k === 'tag' || k === 'stub') ? k : 'all';
     filter.value = params.get('q') || '';
     var wanted = params.getAll('tag').map(function (value) {
@@ -512,7 +523,7 @@
     var id = params.get('focus');
     if (!id) return null;
     var node = state.nodeByID[id];
-    if (!node) return { missing: true };
+    if (!node || state.adj[id] === undefined) return { missing: true };
     var hops = parseInt(params.get('depth') || '1', 10);
     hops = Math.max(1, Math.min(3, isNaN(hops) ? 1 : hops));
     return { node: node, hops: hops };
@@ -607,7 +618,7 @@
     }
 
     state.raw = raw;
-    state.nodes = data.nodes.map(function (n, i) {
+    state.allNodes = data.nodes.map(function (n, i) {
       var nodeTags = Array.isArray(n.tags) ? n.tags.map(String) : [];
       return {
         id: String(n.id || ''),
@@ -615,10 +626,12 @@
         url: n.url ? String(n.url) : '',
         kind: n.kind === 'tag' ? 'tag' : 'page',
         section: n.section ? String(n.section) : '',
+        sectionID: n.sectionId ? String(n.sectionId) : '',
         tags: nodeTags,
         tagSlugs: uniqueTagSlugs(nodeTags),
         stub: !!n.stub,
         site: n.site ? String(n.site) : '',
+        siteKey: n.siteKey ? String(n.siteKey) : '',
         matched: true,
         degree: 0,
         x: 0,
@@ -632,24 +645,29 @@
       };
     });
 
+    state.legacySections = !state.allNodes.some(function (n) {
+      return n.kind === 'page' && n.sectionID;
+    });
     var byId = Object.create(null);
-    state.nodes.forEach(function (n) { byId[n.id] = n; });
+    state.allNodes.forEach(function (n) { byId[n.id] = n; });
     state.nodeByID = byId;
-    state.edges = [];
+    state.allEdges = [];
     data.edges.forEach(function (e) {
       var from = byId[e.from];
       var to = byId[e.to];
       if (!from || !to) return;
-      state.edges.push({
+      state.allEdges.push({
         from: from,
         to: to,
         kind: e.kind === 'tag' ? 'tag' : 'link',
         anchor: e.anchor ? String(e.anchor) : '',
         text: e.text ? String(e.text) : ''
       });
-      from.degree += 1;
-      to.degree += 1;
     });
+
+    state.showTagHubs = tagHubsCheck ? tagHubsCheck.checked : true;
+    state.clusterSections = sectionsCheck ? sectionsCheck.checked : true;
+    buildVisibleGraph();
 
     if (!state.nodes.length) {
       setStatus('The catalogue is empty. Add pages to the bundle and render again.');
@@ -657,14 +675,8 @@
       return;
     }
 
-    state.adj = Object.create(null);
-    state.nodes.forEach(function (n) { state.adj[n.id] = []; });
-    state.edges.forEach(function (e) {
-      state.adj[e.from.id].push({ node: e.to, dir: 'out' });
-      state.adj[e.to.id].push({ node: e.from, dir: 'in' });
-    });
-
     initTagFilter();
+    updateTagKindOption();
     var initial = readURLState(new URLSearchParams(window.location.search));
     if (initial && initial.node) {
       state.pendingFocus = { node: initial.node, hops: initial.hops };
@@ -678,6 +690,64 @@
     layoutInitial();
     draw();
     simulateThenRender();
+  }
+
+  // The drawing and the list share one visible graph. The complete catalogue
+  // stays in allNodes/allEdges so collapsing tag hubs is a view change, not a
+  // loss of the tag filter or of the data.
+  function buildVisibleGraph() {
+    var visible = Object.create(null);
+    state.nodes = state.allNodes.filter(function (n) {
+      return state.showTagHubs || n.kind !== 'tag';
+    });
+    state.nodes.forEach(function (n) {
+      n.degree = 0;
+      visible[n.id] = true;
+    });
+    state.edges = state.allEdges.filter(function (e) {
+      return visible[e.from.id] && visible[e.to.id];
+    });
+    state.edges.forEach(function (e) {
+      e.from.degree += 1;
+      e.to.degree += 1;
+    });
+    state.adj = Object.create(null);
+    state.nodes.forEach(function (n) { state.adj[n.id] = []; });
+    state.edges.forEach(function (e) {
+      state.adj[e.from.id].push({ node: e.to, dir: 'out' });
+      state.adj[e.to.id].push({ node: e.from, dir: 'in' });
+    });
+  }
+
+  function updateTagKindOption() {
+    var option = kind ? kind.querySelector('option[value="tag"]') : null;
+    if (option) option.disabled = !state.showTagHubs;
+    if (!state.showTagHubs && kind && kind.value === 'tag') kind.value = 'all';
+  }
+
+  // A layout toggle changes the visible graph. It clears the selection because
+  // the old focus or tag hub may no longer be on the canvas, then rebuilds and
+  // runs the same render path as the first load.
+  function relayoutGraph(rebuild) {
+    state.selected = null;
+    state.focus = null;
+    state.focusCount = 0;
+    state.focusHops = 0;
+    state.focusMissing = false;
+    state.pendingFocus = null;
+    state.tabbable = null;
+    details.hidden = true;
+    details.textContent = '';
+    if (rebuild) buildVisibleGraph();
+    updateTagKindOption();
+    state.anchor = starterPage();
+    sizeWorld();
+    layoutInitial();
+    draw();
+    applyFocus();
+    simulateThenRender();
+    updateListSelection(null);
+    syncURL('push');
   }
 
   // The view opens on a page with a typical number of connections rather than
@@ -727,6 +797,7 @@
   // asking the simulation for thousands more ticks.
   function normaliseLayout() {
     if (state.nodes.length < 200 || !state.edges.length) return;
+    if (state.clusterSections) return;
     var xr = percentileRange(state.nodes.map(function (n) { return n.x; }));
     var yr = percentileRange(state.nodes.map(function (n) { return n.y; }));
     var minX = xr.min;
@@ -773,7 +844,7 @@
   // Walking the catalogue puts each page beside the page that links to it,
   // which leaves the forces a short distance to refine and keeps a
   // neighbourhood compact when it is selected later.
-  function layoutInitial() {
+  function layoutInitialWalk() {
     var seen = Object.create(null);
     var queue = [];
     var start = state.anchor || state.nodes[0];
@@ -822,6 +893,165 @@
       node.y = H / 2 + Math.sin(a) * r;
       node.vx = 0;
       node.vy = 0;
+    });
+  }
+
+  // In section mode the grid is the layout. Each group occupies one cell and
+  // its members sit in a small grid inside it, so sections never dissolve into
+  // the link cloud. The link edges still show the connections between cells.
+  function layoutInitialClustered() {
+    var groups = clusterGroups();
+    var names = Object.keys(groups).sort();
+    var cells = Object.create(null);
+    state.sectionCells = cells;
+    var cols = names.length <= 1 ? 1 : Math.ceil(Math.sqrt(names.length * (W / H)));
+    cols = Math.max(1, Math.min(names.length, cols));
+    var rows = Math.ceil(names.length / Math.max(1, cols));
+    var cellW = W / Math.max(1, cols);
+    var cellH = H / Math.max(1, rows);
+    names.forEach(function (name, i) {
+      var cell = {
+        x: (i % cols) * cellW,
+        y: Math.floor(i / cols) * cellH,
+        w: cellW,
+        h: cellH
+      };
+      cells[name] = cell;
+      var members = groups[name];
+      var innerCols = Math.max(1, Math.min(members.length,
+        Math.ceil(Math.sqrt(members.length * (cellW / cellH)))));
+      var innerRows = Math.ceil(members.length / innerCols);
+      var gapX = cellW / (innerCols + 1);
+      var gapY = cellH / (innerRows + 1);
+      members.forEach(function (n, j) {
+        n.x = cell.x + gapX * ((j % innerCols) + 1);
+        n.y = cell.y + gapY * (Math.floor(j / innerCols) + 1);
+        n.vx = 0;
+        n.vy = 0;
+      });
+    });
+  }
+
+  function layoutInitial() {
+    if (state.clusterSections) {
+      layoutInitialClustered();
+    } else {
+      layoutInitialWalk();
+    }
+  }
+
+  function pageSectionKey(n) {
+    var site = n.siteKey || n.site;
+    var id = n.sectionID || (state.legacySections ? (n.section || 'Overview') : '\x00root');
+    return (site ? site + '\x00' : '') + id;
+  }
+
+  function clusterGroups() {
+    var groups = Object.create(null);
+    var labels = Object.create(null);
+    state.nodes.forEach(function (n) {
+      if (n.kind === 'page' && !n.stub) {
+        var key = pageSectionKey(n);
+        labels[key] = n.section || 'Overview';
+        (groups[key] || (groups[key] = [])).push(n);
+      }
+    });
+    var tags = state.nodes.filter(function (n) { return n.kind === 'tag'; });
+    if (tags.length) {
+      groups['\x00tag-hubs'] = tags;
+      labels['\x00tag-hubs'] = 'Tag hubs';
+    }
+    var stubs = state.nodes.filter(function (n) { return n.kind === 'page' && n.stub; });
+    if (stubs.length) {
+      groups['\x00missing-pages'] = stubs;
+      labels['\x00missing-pages'] = 'Missing pages';
+    }
+
+    // Distinct sections can share a display title, and synthetic cells can
+    // share one with a real section. Keep the cells separate and say which is
+    // which when the label alone would be ambiguous.
+    var counts = Object.create(null);
+    Object.keys(labels).forEach(function (key) {
+      counts[labels[key]] = (counts[labels[key]] || 0) + 1;
+    });
+    Object.keys(labels).forEach(function (key) {
+      if (counts[labels[key]] < 2) return;
+      if (key.indexOf('\x00root') !== -1) {
+        var root = groups[key][0];
+        var rootSite = root && (root.siteKey || root.site);
+        labels[key] += rootSite ? ' (' + rootSite + ')' : ' (root)';
+      } else if (key.indexOf('\x00tag-hubs') !== -1) {
+        labels[key] += ' (all tags)';
+      } else if (key.indexOf('\x00missing-pages') !== -1) {
+        labels[key] += ' (broken links)';
+      } else {
+        var first = groups[key][0];
+        var suffix = first
+          ? [first.siteKey || first.site, first.sectionID].filter(Boolean).join(' / ')
+          : key;
+        labels[key] += ' (' + (suffix || key) + ')';
+      }
+    });
+    state.clusterLabels = labels;
+    return groups;
+  }
+
+  function clampToSectionCell(n) {
+    if (!state.clusterSections || !state.sectionCells) return;
+    var key = n.kind === 'tag' ? '\x00tag-hubs' : n.stub ? '\x00missing-pages' : pageSectionKey(n);
+    var cell = state.sectionCells[key];
+    if (!cell) return;
+    var pad = Math.min(24, Math.max(10, Math.min(cell.w, cell.h) * 0.08));
+    n.x = Math.max(cell.x + pad, Math.min(cell.x + cell.w - pad, n.x));
+    n.y = Math.max(cell.y + pad, Math.min(cell.y + cell.h - pad, n.y));
+  }
+
+  function renderSections() {
+    if (!sectionLayer) return;
+    sectionLayer.textContent = '';
+    if (!state.clusterSections || !state.sectionCells) return;
+    Object.keys(state.sectionCells).sort().forEach(function (name) {
+      var cell = state.sectionCells[name];
+      var label = document.createElementNS(NS, 'text');
+      label.setAttribute('class', 'graph-section-label');
+      var box = document.createElementNS(NS, 'rect');
+      box.setAttribute('class', 'graph-section-box');
+      box.setAttribute('vector-effect', 'non-scaling-stroke');
+      box.setAttribute('x', (cell.x + 6).toFixed(2));
+      box.setAttribute('y', (cell.y + 6).toFixed(2));
+      box.setAttribute('width', Math.max(0, cell.w - 12).toFixed(2));
+      box.setAttribute('height', Math.max(0, cell.h - 12).toFixed(2));
+      sectionLayer.appendChild(box);
+      label.setAttribute('x', cell.x.toFixed(2));
+      label.setAttribute('y', cell.y.toFixed(2));
+      label.setAttribute('text-anchor', 'start');
+      label.setAttribute('dominant-baseline', 'hanging');
+      label.setAttribute('data-section', name);
+      label.setAttribute('aria-hidden', 'true');
+      label.textContent = state.clusterLabels[name] || name;
+      sectionLayer.appendChild(label);
+    });
+    sizeSectionLabels();
+  }
+
+  function sizeSectionLabels() {
+    if (!sectionLayer) return;
+    var scale = state.scale || 1;
+    var pad = 6 / scale;
+    Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
+      var key = label.getAttribute('data-section');
+      var cell = state.sectionCells && state.sectionCells[key];
+      if (!cell) return;
+      label.style.fontSize = (12 / scale) + 'px';
+      label.setAttribute('x', (cell.x + pad).toFixed(2));
+      label.setAttribute('y', (cell.y + pad).toFixed(2));
+      label.removeAttribute('textLength');
+      label.removeAttribute('lengthAdjust');
+      var available = Math.max(18, cell.w - pad * 2);
+      if (label.getComputedTextLength() > available) {
+        label.setAttribute('textLength', available.toFixed(2));
+        label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+      }
     });
   }
 
@@ -934,10 +1164,12 @@
       if (n.x > W - 20) { n.x = W - 20; n.vx *= -0.4; }
       if (n.y < 20) { n.y = 20; n.vy *= -0.4; }
       if (n.y > H - 20) { n.y = H - 20; n.vy *= -0.4; }
+      clampToSectionCell(n);
     });
   }
 
   function draw() {
+    sectionLayer.textContent = '';
     edgeLayer.textContent = '';
     nodeLayer.textContent = '';
     state.edgeElements = [];
@@ -1030,6 +1262,17 @@
 
   function simulateThenRender() {
     var n = state.nodes.length;
+    if (state.clusterSections) {
+      state.totalTicks = 0;
+      state.step = 0;
+      normaliseLayout();
+      initialView();
+      renderPositions();
+      renderSections();
+      applyFilter();
+      applyPendingFocus();
+      return;
+    }
     // A larger world needs fewer ticks than a cramped one, because the walk
     // already starts near the density the springs ask for.
     state.totalTicks = n > 1200 ? 300 : n > 600 ? 280 : n > 300 ? 260 : 320;
@@ -1040,6 +1283,7 @@
       normaliseLayout();
       initialView();
       renderPositions();
+      renderSections();
       applyFilter();
       applyPendingFocus();
       return;
@@ -1063,6 +1307,7 @@
       normaliseLayout();
       initialView();
       renderPositions();
+      renderSections();
       applyFilter();
       applyPendingFocus();
     }
@@ -1087,6 +1332,7 @@
     var ch = svg.clientHeight || 700;
     state.scale = Math.min(cw / state.view.w, ch / state.view.h) || 1;
     updateEdgeVisibility();
+    sizeSectionLabels();
     scheduleLabels();
   }
 
@@ -1099,6 +1345,7 @@
       return;
     }
     fitView();
+    if (state.clusterSections) return;
     if (!state.anchor) return;
     // A fit that would draw the edges as specks is not a useful first screen,
     // whether the catalogue is large or the canvas is narrow.
@@ -1156,6 +1403,15 @@
       minY -= 20;
       maxX += 20;
       maxY += 20;
+    }
+    if (state.clusterSections && state.sectionCells) {
+      Object.keys(state.sectionCells).forEach(function (name) {
+        var cell = state.sectionCells[name];
+        minX = Math.min(minX, cell.x);
+        minY = Math.min(minY, cell.y);
+        maxX = Math.max(maxX, cell.x + cell.w);
+        maxY = Math.max(maxY, cell.y + cell.h);
+      });
     }
     state.view = {
       x: minX,
@@ -1340,6 +1596,13 @@
 
     var grid = circleGrid();
     var boxes = [];
+    if (sectionLayer) {
+      Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
+        var box = label.getBBox();
+        if (!box.width || !box.height) return;
+        boxes.push({ x: box.x - 2, y: box.y - 2, w: box.width + 4, h: box.height + 4 });
+      });
+    }
     var placed = 0;
     for (var i = 0; i < order.length && placed < LABEL_LIMIT; i++) {
       var n = order[i];
@@ -1759,6 +2022,19 @@
     syncURL('push');
   });
   labels.addEventListener('change', applyLabels);
+  if (sectionsCheck) {
+    sectionsCheck.addEventListener('change', function () {
+      state.clusterSections = sectionsCheck.checked;
+      relayoutGraph(false);
+    });
+  }
+  if (tagHubsCheck) {
+    tagHubsCheck.addEventListener('change', function () {
+      state.showTagHubs = tagHubsCheck.checked;
+      updateTagKindOption();
+      relayoutGraph(true);
+    });
+  }
   fit.addEventListener('click', function () { fitView(); });
   if (clearFocusLink) {
     clearFocusLink.addEventListener('click', function (ev) {
@@ -1900,6 +2176,7 @@
       var pt = toSvg(ev.clientX, ev.clientY);
       state.dragging.x = pt.x;
       state.dragging.y = pt.y;
+      clampToSectionCell(state.dragging);
       renderPositions();
     }
   });
@@ -1923,6 +2200,7 @@
       if (moved) swallowClick = true;
     }
     if (state.nodes.length) placeLabels();
+    if (state.clusterSections) renderSections();
   }
   svg.addEventListener('pointerup', endPointer);
   svg.addEventListener('pointercancel', endPointer);

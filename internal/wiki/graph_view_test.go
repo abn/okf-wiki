@@ -62,6 +62,9 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphTags"`,
 		`id="graphTagsSummary"`,
 		`id="graphTagsMenu"`,
+		`id="graphSections"`,
+		`id="graphTagHubs"`,
+		`id="graphSectionLayer"`,
 		`id="graphList"`,
 		`id="graphListStatus"`,
 		`id="graphListNodes"`,
@@ -156,6 +159,41 @@ func TestGraphViewStateContract(t *testing.T) {
 		"params.set('kind'",
 		"function initTagFilter",
 		"function tagSlug",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
+
+// TestGraphSectionsContract pins the view controls for collapsed tag hubs and
+// the section grid. The drawing itself is exercised in the Firefox smoke test.
+func TestGraphSectionsContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function layoutInitialClustered",
+		"function clusterGroups",
+		"function renderSections",
+		"graph-section-box",
+		"function buildVisibleGraph",
+		"showTagHubs",
+		"clusterSections",
+		"graphTagHubs",
+		"pageSectionKey",
+		"sectionID",
+		"\\x00tag-hubs",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)
