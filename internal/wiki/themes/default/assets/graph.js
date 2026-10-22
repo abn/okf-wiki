@@ -517,6 +517,7 @@
         return;
       }
     }
+    state.tabbable = null;
     state.nodes.forEach(function (n) {
       if (n.circle) n.circle.setAttribute('tabindex', '-1');
     });
