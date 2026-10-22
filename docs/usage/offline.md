@@ -54,6 +54,12 @@ Search and diagrams are local, but the browser still applies its normal
 `file://` restrictions. This mode does not add a service worker, and it does not
 make a page work when a browser profile blocks local scripts.
 
+## Browser support
+
+The folder is tested from `file://` in current desktop Chrome and Firefox. Both
+load the classic scripts and the classic Mermaid bundle from disk; the mode does
+not depend on `fetch` or module imports. Safari has not been tested.
+
 ## See also
 
 - [Command line](cli.md): the flags on the render command.

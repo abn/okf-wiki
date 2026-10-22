@@ -20,7 +20,7 @@ BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE)
 # Keep the Go build cache inside the workspace (sandbox-friendly).
 export GOCACHE ?= $(CURDIR)/.scratch/gocache
 
-.PHONY: setup vendor build test vet fmt lint check run render render-themed \
+.PHONY: setup vendor build test vet fmt lint check run render render-themed firefox \
         container/build container/run container/shell clean help
 
 ##@ Bootstrap
@@ -54,6 +54,11 @@ render: ## Render $(CONTENT) into $(OUT)
 render-themed: ## Render $(CONTENT) with THEME=DIR layered over the embedded theme
 	@test -n "$(THEME)" || { echo 'usage: make render-themed THEME=DIR'; exit 2; }
 	@$(MAKE) --no-print-directory render THEME=$(THEME)
+
+firefox: ## Render $(CONTENT) offline and run the Firefox smoke test (needs Firefox and Selenium)
+	@$(MAKE) --no-print-directory vendor
+	go run ./cmd/okf-wiki render --content $(CONTENT) --out .scratch/offline --offline $(BRANDING)
+	python3 scripts/check-offline-firefox.py .scratch/offline/wiki
 
 ##@ Build & Quality
 
