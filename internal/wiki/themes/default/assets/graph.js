@@ -11,6 +11,10 @@
   var EDGE_MIN_TEXT_PX = 4;
   var LABEL_LIMIT = 50;
   var LOCAL_VIEW_NODES = 250;
+  // A first page keeps the HTML list responsive and its one roving tab stop
+  // useful on a large catalogue. Show all is an explicit choice.
+  var LIST_NODE_LIMIT = 200;
+  var LIST_EDGE_LIMIT = 300;
   // Screen pixels per world unit for the first view and for a focused
   // neighbourhood. Names are drawn at 11 screen pixels, so these set how much
   // of the graph fits on screen at a readable size.
@@ -27,6 +31,11 @@
   var tagsDetails = document.getElementById('graphTags');
   var tagsSummary = document.getElementById('graphTagsSummary');
   var tagsMenu = document.getElementById('graphTagsMenu');
+  var listStatus = document.getElementById('graphListStatus');
+  var listNodes = document.getElementById('graphListNodes');
+  var listEdges = document.getElementById('graphListEdges');
+  var listNodesTitle = document.getElementById('graphListNodesTitle');
+  var listEdgesTitle = document.getElementById('graphListEdgesTitle');
   var fit = document.getElementById('graphFit');
   var clearFocusLink = document.getElementById('graphClearFocus');
   var download = document.getElementById('graphDownload');
@@ -51,6 +60,8 @@
     selectedTags: [],
     tagBySlug: Object.create(null),
     nodeByID: Object.create(null),
+    listAllNodes: false,
+    listAllEdges: false,
     anchor: null,
     overview: false,
     query: '',
@@ -204,6 +215,265 @@
     tagsSummary.title = state.selectedTags.map(tagLabel).join(', ');
   }
 
+  // The list is the non-visual path through the same visible set. It filters
+  // by focus as well as by the controls, rebuilds only when that set changes,
+  // and keeps one roving tab stop among its node buttons.
+  function renderList() {
+    if (!listNodes || !listEdges) return;
+    var active = document.activeElement;
+    var activeInList = !!active && ((listNodes && listNodes.contains(active)) ||
+      (listEdges && listEdges.contains(active)));
+    var activeID = active && active.classList && active.classList.contains('graph-list-node')
+      ? active.getAttribute('data-id') : '';
+
+    var allNodes = state.nodes.filter(listVisible).slice();
+    allNodes.sort(function (a, b) {
+      var byKind = listRank(a) - listRank(b);
+      if (byKind) return byKind;
+      var byTitle = a.title.localeCompare(b.title);
+      return byTitle || a.id.localeCompare(b.id);
+    });
+    var allEdges = state.edges.filter(function (edge) {
+      return listVisible(edge.from) && listVisible(edge.to);
+    }).slice();
+    allEdges.sort(function (a, b) {
+      var byFrom = a.from.title.localeCompare(b.from.title);
+      if (byFrom) return byFrom;
+      var byTo = a.to.title.localeCompare(b.to.title);
+      if (byTo) return byTo;
+      return a.kind.localeCompare(b.kind);
+    });
+
+    var nodes = state.listAllNodes ? allNodes : allNodes.slice(0, LIST_NODE_LIMIT);
+    if (!state.listAllNodes && state.selected &&
+        allNodes.indexOf(state.selected) !== -1 && nodes.indexOf(state.selected) === -1) {
+      nodes = nodes.slice(0, LIST_NODE_LIMIT - 1);
+      nodes.push(state.selected);
+    }
+    var edges = state.listAllEdges ? allEdges : allEdges.slice(0, LIST_EDGE_LIMIT);
+    if (listStatus) {
+      var parts = [];
+      if (nodes.length !== allNodes.length) {
+        parts.push(nodes.length + ' of ' + allNodes.length + ' nodes');
+      } else {
+        parts.push(allNodes.length + (allNodes.length === 1 ? ' node' : ' nodes'));
+      }
+      if (edges.length !== allEdges.length) {
+        parts.push(edges.length + ' of ' + allEdges.length + ' edges');
+      } else {
+        parts.push(allEdges.length + (allEdges.length === 1 ? ' edge' : ' edges'));
+      }
+      var capped = nodes.length !== allNodes.length || edges.length !== allEdges.length;
+      listStatus.textContent = (capped ? 'Showing ' : '') + parts.join(', ') + '.';
+    }
+    if (listNodesTitle) listNodesTitle.textContent = 'Nodes (' + allNodes.length + ')';
+    if (listEdgesTitle) listEdgesTitle.textContent = 'Edges (' + allEdges.length + ')';
+
+    listNodes.textContent = '';
+    if (!allNodes.length) {
+      listNodes.appendChild(listEmpty('nodes'));
+    }
+    nodes.forEach(function (n) {
+      var links = connections(n);
+      var item = document.createElement('li');
+      item.className = 'graph-list-item';
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'graph-list-node';
+      button.setAttribute('data-id', n.id);
+      button.setAttribute('aria-label', 'Select ' + n.title + ', ' + listKind(n));
+      button.textContent = n.title;
+      if (state.selected === n) {
+        item.classList.add('is-selected');
+        button.setAttribute('aria-current', 'true');
+      }
+      button.addEventListener('click', function () { select(n, true); });
+      item.appendChild(button);
+
+      var meta = document.createElement('p');
+      meta.className = 'graph-list-meta';
+      var kind = document.createElement('span');
+      kind.textContent = listKind(n);
+      var counts = document.createElement('span');
+      counts.textContent = links.incoming + ' in / ' + links.outgoing + ' out';
+      meta.appendChild(kind);
+      meta.appendChild(counts);
+      if (n.tags.length) {
+        var tags = document.createElement('span');
+        tags.className = 'graph-list-tags';
+        tags.textContent = n.tags.map(function (tag) { return '#' + tag; }).join(' ');
+        meta.appendChild(tags);
+      }
+      item.appendChild(meta);
+      listNodes.appendChild(item);
+    });
+    if (nodes.length < allNodes.length) {
+      var nodeMore = document.createElement('li');
+      nodeMore.className = 'graph-list-more-row';
+      var nodeButton = document.createElement('button');
+      nodeButton.type = 'button';
+      nodeButton.className = 'graph-list-more';
+      nodeButton.textContent = 'Show all ' + allNodes.length + ' nodes';
+      nodeButton.addEventListener('click', function () {
+        state.listAllNodes = true;
+        renderList();
+        var shown = listNodes.querySelectorAll('.graph-list-node');
+        if (shown[nodes.length]) {
+          Array.prototype.forEach.call(shown, function (button) { button.tabIndex = -1; });
+          shown[nodes.length].tabIndex = 0;
+          shown[nodes.length].focus();
+        }
+      });
+      nodeMore.appendChild(nodeButton);
+      listNodes.appendChild(nodeMore);
+    }
+
+    listEdges.textContent = '';
+    if (!allEdges.length) {
+      listEdges.appendChild(listEmpty('edges'));
+    }
+    edges.forEach(function (edge) {
+      var item = document.createElement('li');
+      item.className = 'graph-list-edge';
+      var from = document.createElement('span');
+      from.className = 'graph-list-edge-node';
+      from.textContent = edge.from.title;
+      var action = document.createElement('span');
+      action.className = 'graph-list-edge-action';
+      action.textContent = edge.kind === 'tag' ? 'tagged' : 'links to';
+      var to = document.createElement('span');
+      to.className = 'graph-list-edge-node';
+      to.textContent = edge.to.title;
+      var type = document.createElement('span');
+      type.className = 'graph-list-edge-kind';
+      type.textContent = edge.kind;
+      item.appendChild(from);
+      item.appendChild(action);
+      item.appendChild(to);
+      item.appendChild(type);
+      if (edge.anchor) {
+        var anchor = document.createElement('span');
+        anchor.className = 'graph-list-edge-anchor';
+        anchor.textContent = '#' + edge.anchor;
+        item.appendChild(anchor);
+      }
+      if (edge.text) {
+        var text = document.createElement('span');
+        text.className = 'graph-list-edge-text';
+        text.textContent = '\u201c' + edge.text + '\u201d';
+        item.appendChild(text);
+      }
+      listEdges.appendChild(item);
+    });
+    if (edges.length < allEdges.length) {
+      var edgeMore = document.createElement('li');
+      edgeMore.className = 'graph-list-more-row';
+      var edgeButton = document.createElement('button');
+      edgeButton.type = 'button';
+      edgeButton.className = 'graph-list-more';
+      edgeButton.textContent = 'Show all ' + allEdges.length + ' edges';
+      edgeButton.addEventListener('click', function () {
+        state.listAllEdges = true;
+        renderList();
+        if (listEdgesTitle) {
+          listEdgesTitle.tabIndex = -1;
+          listEdgesTitle.focus();
+        }
+      });
+      edgeMore.appendChild(edgeButton);
+      listEdges.appendChild(edgeMore);
+    }
+
+    var target = syncListTabbable(activeID);
+    if (activeInList) {
+      if (!target) target = listNodes.querySelector('.graph-list-node');
+      if (!target && listNodesTitle) {
+        listNodesTitle.tabIndex = -1;
+        target = listNodesTitle;
+      }
+      if (target) target.focus();
+    }
+  }
+
+  function listVisible(n) {
+    return !!n.matched && (!state.focus || state.focus[n.id] != null);
+  }
+
+  function listEmpty(what) {
+    var hasFilters = !!state.query || kind.value !== 'all' || state.selectedTags.length > 0;
+    var item = document.createElement('li');
+    item.className = 'graph-list-empty';
+    if (state.focus) {
+      item.textContent = hasFilters
+        ? 'No ' + what + ' in this focus match the filters.'
+        : 'No ' + what + ' are in this focus.';
+    } else if (hasFilters) {
+      item.textContent = 'No ' + what + ' match the current filters.';
+    } else {
+      item.textContent = 'This graph has no ' + what + '.';
+    }
+    return item;
+  }
+
+  function listRank(n) {
+    if (n.kind === 'tag') return 1;
+    return n.stub ? 2 : 0;
+  }
+
+  function listKind(n) {
+    if (n.kind === 'tag') return 'Tag hub';
+    if (n.stub) return 'Missing page';
+    return n.section ? 'Page / ' + n.section : 'Page';
+  }
+
+  function listButtons() {
+    return Array.prototype.slice.call(listNodes.querySelectorAll('.graph-list-node'));
+  }
+
+  function syncListTabbable(preferredID) {
+    if (!listNodes) return null;
+    var buttons = listButtons();
+    if (!buttons.length) return null;
+    var chosen = null;
+    if (preferredID) {
+      chosen = buttons.filter(function (button) {
+        return button.getAttribute('data-id') === preferredID;
+      })[0] || null;
+    }
+    if (!chosen && state.selected) {
+      chosen = buttons.filter(function (button) {
+        return button.getAttribute('data-id') === state.selected.id;
+      })[0] || null;
+    }
+    if (!chosen) chosen = buttons[0];
+    buttons.forEach(function (button) {
+      button.tabIndex = button === chosen ? 0 : -1;
+    });
+    return chosen;
+  }
+
+  function updateListSelection(n) {
+    if (!listNodes) return;
+    Array.prototype.forEach.call(listNodes.querySelectorAll('.graph-list-node'), function (button) {
+      var selected = !!n && button.getAttribute('data-id') === n.id;
+      if (button.parentNode) button.parentNode.classList.toggle('is-selected', selected);
+      if (selected) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
+    });
+    var active = document.activeElement;
+    var preferred = active && active.classList && active.classList.contains('graph-list-node')
+      ? active.getAttribute('data-id') : '';
+    syncListTabbable(preferred);
+  }
+
+  function showListUnavailable(message) {
+    if (listStatus) listStatus.textContent = message;
+    if (listNodes) listNodes.textContent = '';
+    if (listEdges) listEdges.textContent = '';
+    if (listNodesTitle) listNodesTitle.textContent = 'Nodes';
+    if (listEdgesTitle) listEdgesTitle.textContent = 'Edges';
+  }
+
   // Keep the menu inside the viewport. The CSS anchors it left; this shifts it
   // only when its right edge would cross the viewport padding.
   function positionTagsMenu() {
@@ -317,6 +587,7 @@
       .catch(function (err) {
         var detail = err && err.message ? err.message : 'the request failed';
         setStatus('The graph could not be loaded (' + detail + '). The raw file is at ' + base + 'graph.json.', true);
+        showListUnavailable('The list is unavailable because the graph could not be loaded.');
       });
   }
 
@@ -326,10 +597,12 @@
       data = JSON.parse(raw);
     } catch (e) {
       setStatus('The graph catalogue is not valid JSON.', true);
+      showListUnavailable('The list is unavailable because the graph is not valid JSON.');
       return;
     }
     if (!data || data.version !== 1 || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) {
       setStatus('The graph catalogue has a shape this view does not know (expected version 1).', true);
+      showListUnavailable('The list is unavailable because the graph has an unknown shape.');
       return;
     }
 
@@ -370,7 +643,9 @@
       state.edges.push({
         from: from,
         to: to,
-        kind: e.kind === 'tag' ? 'tag' : 'link'
+        kind: e.kind === 'tag' ? 'tag' : 'link',
+        anchor: e.anchor ? String(e.anchor) : '',
+        text: e.text ? String(e.text) : ''
       });
       from.degree += 1;
       to.degree += 1;
@@ -378,6 +653,7 @@
 
     if (!state.nodes.length) {
       setStatus('The catalogue is empty. Add pages to the bundle and render again.');
+      renderList();
       return;
     }
 
@@ -967,6 +1243,7 @@
     scheduleLabels();
     ensureTabbable();
     updateStatus();
+    renderList();
   }
 
   function updateStatus() {
@@ -1255,6 +1532,7 @@
     });
     ensureTabbable();
     scheduleLabels();
+    renderList();
   }
 
   function focusOn(n, fit, hopsOverride) {
@@ -1423,6 +1701,7 @@
     details.hidden = false;
     if (keepFocus) title.focus();
     focusOn(n, !!withView, hops);
+    updateListSelection(n);
     if (!restoring) syncURL('push');
   }
 
@@ -1438,6 +1717,7 @@
     details.hidden = true;
     details.textContent = '';
     updateStatus();
+    updateListSelection(null);
     if (!restoring) syncURL('push');
     if (restoreGraphFocus) {
       if (state.tabbable && state.tabbable.circle) state.tabbable.circle.focus();
@@ -1500,6 +1780,27 @@
       syncURL('push');
     });
   }
+  if (listNodes) {
+    listNodes.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp' &&
+          ev.key !== 'Home' && ev.key !== 'End') return;
+      var buttons = listButtons();
+      if (!buttons.length) return;
+      var at = buttons.indexOf(document.activeElement);
+      if (at < 0) at = 0;
+      var next = at;
+      if (ev.key === 'ArrowDown') next = Math.min(buttons.length - 1, at + 1);
+      else if (ev.key === 'ArrowUp') next = Math.max(0, at - 1);
+      else if (ev.key === 'Home') next = 0;
+      else if (ev.key === 'End') next = buttons.length - 1;
+      buttons.forEach(function (button, index) {
+        button.tabIndex = index === next ? 0 : -1;
+      });
+      buttons[next].focus();
+      ev.preventDefault();
+    });
+  }
+
   if (tagsDetails) {
     tagsDetails.addEventListener('toggle', function () {
       if (tagsDetails.open) {

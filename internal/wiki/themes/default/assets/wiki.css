@@ -1342,6 +1342,97 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   margin: 0 0 var(--space-3);
 }
 .graph-status.is-error { color: var(--status-danger-text); }
+.graph-main {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4); align-items: stretch;
+}
+.graph-list {
+  max-height: 420px; overflow-y: auto; padding: 0 var(--space-3) var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.graph-list-head {
+  position: sticky; top: 0; z-index: 1;
+  padding: var(--space-3) 0 var(--space-2); background: var(--color-surface);
+}
+.graph-list-head h2 { margin: 0; font-size: var(--text-lg); }
+.graph-list-status {
+  margin: 2px 0 0; color: var(--color-text-muted);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+}
+.graph-list-section + .graph-list-section {
+  margin-top: var(--space-3); padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.graph-list-section h3 {
+  margin: 0 0 var(--space-2); color: var(--color-text-muted);
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-semibold);
+}
+.graph-list-section h3:focus-visible {
+  outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.graph-list-nodes, .graph-list-edges { list-style: none; margin: 0; padding: 0; }
+.graph-list-item {
+  padding: var(--space-2); border-top: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+.graph-list-item:first-child { border-top: 0; }
+.graph-list-item.is-selected { background: var(--color-accent-soft); }
+.graph-list-node {
+  display: block; width: 100%; padding: 0; text-align: left;
+  color: var(--color-heading); background: none; border: 0; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.graph-list-node:hover { color: var(--color-accent-text); text-decoration: underline; }
+.graph-list-node:focus-visible {
+  outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.graph-list-meta {
+  display: flex; flex-wrap: wrap; gap: 2px var(--space-2);
+  margin-top: 2px; color: var(--color-text-muted);
+  font-family: var(--font-ui); font-size: var(--text-xs);
+}
+.graph-list-tags { color: var(--color-text-faint); overflow-wrap: anywhere; }
+.graph-list-edge {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2);
+  min-width: 0; padding: var(--space-2) 0; border-top: 1px solid var(--color-line);
+  color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.4;
+}
+.graph-list-edge:first-child { border-top: 0; }
+.graph-list-edge-node {
+  min-width: 0; color: var(--color-heading); font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.graph-list-edge-action { min-width: 0; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.graph-list-edge-anchor {
+  color: var(--color-text-faint); font-family: var(--font-code); font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.graph-list-edge-kind {
+  color: var(--color-text-faint); border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill); padding: 0 var(--space-2);
+  font-family: var(--font-ui); font-size: var(--text-xs);
+}
+.graph-list-edge-text { color: var(--color-text-muted); overflow-wrap: anywhere; }
+.graph-list-empty {
+  margin: 0; padding: var(--space-2) 0; color: var(--color-text-muted);
+  font-family: var(--font-ui); font-size: var(--text-sm);
+}
+.graph-list-more-row { padding: var(--space-2) 0; }
+.graph-list-more {
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+  background: var(--color-surface-sunken); border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill); padding: 4px var(--space-3); cursor: pointer;
+}
+.graph-list-more:hover {
+  color: var(--color-heading); border-color: var(--color-accent-ring);
+  background: var(--color-accent-soft);
+}
+@media (min-width: 1100px) {
+  .graph-main { grid-template-columns: minmax(0, 1fr) 320px; }
+  .graph-list { max-height: none; height: min(70vh, 640px); }
+}
 .graph-canvas {
   position: relative; height: min(70vh, 640px); overflow: hidden;
   border: 1px solid var(--color-line); border-radius: var(--radius-lg);

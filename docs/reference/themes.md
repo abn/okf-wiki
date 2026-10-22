@@ -135,7 +135,9 @@ keep a control pointing at `{{.GraphHref}}`; without it the view still exists at
 that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`, `graphKind`, `graphTags`,
 `graphTagsSummary`, `graphTagsMenu`, `graphLabels`, `graphFit`,
 `graphClearFocus`, `graphDownload`, `graphStatus`, `graphSvg`, `graphEdges`,
-`graphNodes`, `graphDetails`, and the optional inline `graphData`.
+`graphNodes`, `graphList`, `graphListStatus`, `graphListNodes`,
+`graphListEdges`, `graphListNodesTitle`, `graphListEdgesTitle`, `graphDetails`,
+and the optional inline `graphData`.
 
 The `{{.Connections}}` field is static page HTML. A template that omits it drops
 the backlinks and the Local graph entry point, while the graph page itself

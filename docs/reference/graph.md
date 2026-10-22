@@ -129,7 +129,9 @@ Repeated tags combine with AND. A page's Connections panel uses `focus` and
 `graph.html?focus=page:usage/graph&depth=1`. An unknown focus shows a message
 rather than failing. An unknown tag stays in the tag list, marked as missing,
 so a reader can remove it. The client writes these parameters on change and
-restores them on back and forward. Pan and zoom are not stored.
+restores them on back and forward. Pan and zoom are not stored. The page also
+builds a list of the visible nodes and edges beside the drawing, from the same
+catalogue, for keyboard and screen-reader use.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

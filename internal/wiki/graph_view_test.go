@@ -62,6 +62,11 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphTags"`,
 		`id="graphTagsSummary"`,
 		`id="graphTagsMenu"`,
+		`id="graphList"`,
+		`id="graphListStatus"`,
+		`id="graphListNodes"`,
+		`id="graphListEdges"`,
+		`aria-label="List view"`,
 		`href="/wiki/graph.json"`,
 		`src="/wiki/graph.js?v=`,
 		`content content-graph`,
@@ -151,6 +156,38 @@ func TestGraphViewStateContract(t *testing.T) {
 		"params.set('kind'",
 		"function initTagFilter",
 		"function tagSlug",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
+
+// TestGraphListViewContract pins the client hooks for the accessible list. The
+// Firefox smoke test covers selection and filtering.
+func TestGraphListViewContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function renderList",
+		"function updateListSelection",
+		"graphListNodes",
+		"graphListEdges",
+		"aria-current",
+		"function listEmpty",
+		"match the current filters.",
+		"This graph has no ",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)

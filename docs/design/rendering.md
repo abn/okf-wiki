@@ -146,7 +146,9 @@ flowchart LR
    readable patch rather than on the whole cloud, thins names and edges as the
    view zooms out, and frames a node's neighbourhood when one is selected. It
    keeps focus, depth, kind, text and tags in the query string and restores them
-   on back and forward.
+   on back and forward. A list beside the drawing exposes the visible nodes and
+   edges as node buttons and edge text, and follows the same filters. It keeps
+   focus in one roving tab stop and caps its first page on a large catalogue.
 
    Every content page also gets a **Connections** panel inside the article. The
    renderer indexes the recorded page links by target after the bundle is
