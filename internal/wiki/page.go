@@ -50,6 +50,15 @@ type shellData struct {
 	// one index there spans every wiki. The page carries it as
 	// window.__WIKI_SEARCH; the client falls back to Base when it is unset.
 	SearchBase string
+	// GraphBase is the URL prefix the graph catalogue is fetched from. Like
+	// SearchBase it is the tree base in a multi-site tree, where one aggregate
+	// graph spans every wiki, and Base otherwise.
+	GraphBase string
+	// GraphHref is the graph page's URL: GraphBase plus graph.html.
+	GraphHref string
+	// GraphPage marks the graph view itself, so a theme can widen the column
+	// and mark the header control as current.
+	GraphPage  bool
 	Breadcrumb template.HTML
 	Nav        template.HTML
 	// TopNav is the header's links, in the order they were configured.
@@ -77,6 +86,16 @@ type shellData struct {
 // A theme uses this to inject a stylesheet or a script without owning the
 // whole shell.
 func (d shellData) Slot(name string) template.HTML { return d.Slots[name] }
+
+// graphBase returns the URL prefix the graph catalogue is fetched from: the
+// render's own base for a single bundle, and the tree base for a wiki or group
+// of a multi-site tree, where one aggregate catalogue spans every wiki.
+func (r *Renderer) graphBase() string {
+	if r.treeBase != "" {
+		return r.treeBase
+	}
+	return r.cfg.base()
+}
 
 // RenderPage wraps a page body in the themed site shell. A template that parses
 // but then fails against the data, on a field that does not exist or a method
@@ -108,6 +127,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 	if r.treeBase != "" {
 		homeHref = r.treeBase
 	}
+	graphBase := r.graphBase()
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
@@ -133,6 +153,9 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		HomeHref:       homeHref,
 		Lang:           r.cfg.lang(),
 		SearchBase:     searchBase,
+		GraphBase:      graphBase,
+		GraphHref:      graphBase + "graph.html",
+		GraphPage:      r.graphPage,
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		TopNav:         template.HTML(r.topNavHTML()),

@@ -1179,6 +1179,10 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .wrap { padding-left: var(--space-4); padding-right: var(--space-4); }
   .toc-panel { right: var(--space-4); }
   .brand-sub { display: none; }
+  /* The fourth header control can otherwise paint over the brand at 320px.
+     Let the wordmark shrink and trim rather than push the controls into it. */
+  .brand { min-width: 0; overflow: hidden; }
+  .wordmark { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .search-modal-backdrop { padding-top: 6vh; }
   /* Diagram cards run edge to edge on a phone: the reading column's padding
      is dead space around a drawing that wants the width. */
@@ -1192,9 +1196,134 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .prose table, .prose pre.code { max-width: 100%; }
 }
 
+@media (max-width: 360px) {
+  /* At the narrowest phones the brand keeps its name by giving up the reading
+     control, which is a desktop convenience and remains in the DOM. */
+  .reading-toggle { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
   .wiki-lbx-btn { transition: none; }
+}
+
+/* ------------------------------------------------------------------- graph */
+/* The view is a utility page, not a reading page: it takes the full column and
+   its controls are pills from the same set as the header. */
+.content-graph, .prose-graph { max-width: none; }
+.graph-app { margin-top: var(--space-4); }
+.graph-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.graph-field {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.graph-field-label { font-weight: var(--fw-medium); }
+.graph-field input[type="search"], .graph-field select {
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text);
+  background: var(--color-surface); border: 1px solid var(--color-line-control);
+  border-radius: var(--radius-pill); padding: 6px var(--space-3); min-height: 36px;
+}
+.graph-field input[type="search"] { width: min(260px, 50vw); }
+.graph-field input[type="search"]:focus-visible, .graph-field select:focus-visible {
+  outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.graph-check {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.graph-check input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
+.graph-fit {
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+  color: var(--color-heading); background: var(--color-surface);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  padding: 8px var(--space-4); min-height: 36px; cursor: pointer;
+}
+.graph-fit:hover { border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
+.graph-download {
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+  color: var(--color-on-accent); background: var(--color-accent);
+  border: 1px solid var(--color-accent); border-radius: var(--radius-pill);
+  padding: 8px var(--space-4); min-height: 36px; cursor: pointer;
+}
+.graph-download:hover { background: var(--color-heading); }
+.graph-download:disabled { opacity: .5; cursor: progress; }
+.graph-app .graph-raw { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted); }
+.graph-app .graph-raw:hover { color: var(--color-accent-text); }
+.graph-status {
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+  margin: 0 0 var(--space-3);
+}
+.graph-status.is-error { color: var(--status-danger-text); }
+.graph-canvas {
+  position: relative; height: min(70vh, 640px); overflow: hidden;
+  border: 1px solid var(--color-line); border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+.graph-canvas svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.graph-canvas svg.is-panning, .graph-canvas svg.is-dragging { cursor: grabbing; }
+.graph-edge {
+  stroke: var(--color-line-control); stroke-width: 1; stroke-opacity: .45;
+  pointer-events: none; transition: opacity var(--dur) var(--ease);
+}
+.graph-edge.tag { stroke: var(--color-accent-text); stroke-dasharray: 3 3; stroke-opacity: .3; }
+.graph-edge.is-dim { opacity: .08; }
+.graph-node-group { transition: opacity var(--dur) var(--ease); }
+.graph-node-group circle {
+  fill: var(--color-accent-text); stroke: var(--color-surface-sunken);
+  stroke-width: 1.5; cursor: pointer;
+}
+.graph-node-group.tag circle { fill: var(--color-text-faint); }
+.graph-node-group.stub circle {
+  fill: var(--color-surface-sunken); stroke: var(--status-danger-text); stroke-dasharray: 3 2;
+}
+.graph-node-group.is-dim { opacity: .18; }
+.graph-node-group.is-selected circle, .graph-node-group circle:focus-visible {
+  stroke: var(--focus-ring); stroke-width: 3; outline: none;
+}
+.graph-label {
+  font-family: var(--font-ui); font-size: 11px; fill: var(--color-text-muted);
+  paint-order: stroke; stroke: var(--color-surface-sunken); stroke-width: 3px;
+  stroke-linejoin: round; pointer-events: none; user-select: none;
+}
+.graph-app.hide-labels .graph-label { display: none; }
+.graph-label.is-colliding { display: none; }
+.graph-node-group:hover .graph-label.is-colliding,
+.graph-node-group.is-selected .graph-label.is-colliding { display: block; }
+.graph-details {
+  margin-top: var(--space-4); padding: var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.graph-details[hidden] { display: none; }
+.graph-details h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.graph-details-kind {
+  margin: 0 0 var(--space-1); font-family: var(--font-ui); font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+.graph-details-meta { margin: 0 0 var(--space-2); color: var(--color-text-muted); }
+.graph-details-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.graph-tag {
+  font-family: var(--font-ui); font-size: var(--text-xs); color: var(--color-text-muted);
+  background: var(--color-surface-sunken); border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill); padding: 2px var(--space-2);
+}
+.graph-app .graph-open {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--space-4);
+  border-radius: var(--radius-pill); background: var(--color-accent);
+  color: var(--color-on-accent); font-family: var(--font-ui); font-size: var(--text-sm);
+  font-weight: var(--fw-medium); text-decoration: none;
+}
+.graph-app .graph-open:hover { color: var(--color-on-accent); background: var(--color-heading); }
+.graph-noscript { margin-top: var(--space-3); color: var(--color-text-muted); }
+.graph-btn { padding: 0 var(--space-2); text-decoration: none; }
+.graph-btn[aria-current="page"] { color: var(--color-accent-text); background: var(--color-accent-soft); }
+@media (max-width: 720px) {
+  .graph-canvas { height: 60vh; }
+  .graph-field { flex: 1 1 100%; }
+  .graph-field input[type="search"] { width: 100%; }
 }
 
 /* ------------------------------------------------------------------- print */
@@ -1205,7 +1334,8 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 @media print {
   .site-header, .breadcrumb-bar, .sidebar, .search-modal-backdrop,
   .theme-toggle, .skip-link, .toc, .toc-aside, .toc-btn, .toc-panel,
-  .mermaid-actions, .code-copy, .heading-anchor, .prevnext, .page-download, .tag-controls {
+  .mermaid-actions, .code-copy, .heading-anchor, .prevnext, .page-download, .tag-controls,
+  .graph-app {
     display: none !important;
   }
   .layout, .content { display: block; max-width: none; min-height: 0; }
