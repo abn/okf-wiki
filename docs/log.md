@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-22
 
+* **Feature**: The force layout seeds its collision tie-breaks from the visible
+  catalogue, so the same graph and view settings produce the same positions on
+  every visit. The section grid is fixed already. Positions remain browser-side
+  and are not added to `graph.json`. `usage/graph.md`, `reference/graph.md`,
+  `design/rendering.md` and `design/graph-evolution.md` say so.
 * **Feature**: The graph can cluster pages by top-level section in a labelled
   grid, with tag hubs and missing pages in their own cells. Tag hubs can be
   collapsed without removing tag filtering, and Show Tags is disabled while

@@ -135,7 +135,8 @@ restores them on back and forward. Pan and zoom are not stored. The page also
 builds a list of the visible nodes and edges beside the drawing, from the same
 catalogue, for keyboard and screen-reader use. The drawing can group pages by
 section and collapse the tag hubs; those two are view settings rather than URL
-parameters.
+parameters. The force layout is seeded from the visible catalogue, so positions
+repeat on every visit; they are not stored in the file.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

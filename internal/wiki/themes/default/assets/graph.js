@@ -70,6 +70,8 @@
     sectionCells: null,
     clusterLabels: Object.create(null),
     legacySections: false,
+    layoutGeneration: 0,
+    layoutNudges: 0,
     listAllNodes: false,
     listAllEdges: false,
     anchor: null,
@@ -88,6 +90,11 @@
     dragging: null,
     panning: null
   };
+
+  // The force layout's only random choice is the tiny nudge when two nodes
+  // land on the same point. A content seed makes that choice repeatable
+  // without changing the layout's shape.
+  var layoutRandom = seededRandom(1);
 
   // A node press captures the pointer, so the click that follows can land on
   // the svg rather than the node. The background click would then clear the
@@ -839,6 +846,45 @@
     H = Math.max(H, Math.round(realMaxY - realMinY) + 120);
   }
 
+  function layoutSeed() {
+    var hash = 2166136261;
+    function add(text) {
+      for (var i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+    }
+    add(state.clusterSections ? 'sections' : 'force');
+    state.nodes.forEach(function (n) {
+      add('\x00n');
+      add(n.id);
+    });
+    state.edges.forEach(function (e) {
+      add('\x00e');
+      add(e.from.id);
+      add('\x00');
+      add(e.to.id);
+      add('\x00');
+      add(e.kind);
+    });
+    return hash >>> 0;
+  }
+
+  // mulberry32: small, deterministic and enough for the collision nudge.
+  function seededRandom(seed) {
+    var value = seed >>> 0;
+    return function () {
+      value = (value + 0x6D2B79F5) | 0;
+      var t = Math.imul(value ^ (value >>> 15), 1 | value);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function seedLayout() {
+    layoutRandom = seededRandom(layoutSeed());
+  }
+
   // Placing nodes by index leaves every linked pair at a random distance, so a
   // dense graph spends its whole simulation pulling edges across the world.
   // Walking the catalogue puts each page beside the page that links to it,
@@ -933,6 +979,7 @@
   }
 
   function layoutInitial() {
+    seedLayout();
     if (state.clusterSections) {
       layoutInitialClustered();
     } else {
@@ -1071,8 +1118,9 @@
       var dy = a.y - b.y;
       var d2 = dx * dx + dy * dy;
       if (d2 < 1) {
-        dx = Math.random() - 0.5;
-        dy = Math.random() - 0.5;
+        state.layoutNudges += 1;
+        dx = layoutRandom() - 0.5;
+        dy = layoutRandom() - 0.5;
         d2 = dx * dx + dy * dy + 0.01;
       }
       if (d2 > 320 * 320) return;
@@ -1262,6 +1310,16 @@
 
   function simulateThenRender() {
     var n = state.nodes.length;
+    var generation = ++state.layoutGeneration;
+    state.layoutNudges = 0;
+    app.setAttribute('data-layout', 'running');
+
+    function finishLayout() {
+      if (generation !== state.layoutGeneration) return;
+      app.setAttribute('data-layout-nudges', String(state.layoutNudges));
+      app.setAttribute('data-layout', 'ready');
+    }
+
     if (state.clusterSections) {
       state.totalTicks = 0;
       state.step = 0;
@@ -1271,6 +1329,7 @@
       renderSections();
       applyFilter();
       applyPendingFocus();
+      finishLayout();
       return;
     }
     // A larger world needs fewer ticks than a cramped one, because the walk
@@ -1286,12 +1345,14 @@
       renderSections();
       applyFilter();
       applyPendingFocus();
+      finishLayout();
       return;
     }
 
     setStatus('Laying out ' + n + ' nodes...');
     var paint = 0;
     function frame() {
+      if (generation !== state.layoutGeneration) return;
       var end = Math.min(state.step + 4, state.totalTicks);
       for (; state.step < end; state.step++) tick();
       var done = state.step >= state.totalTicks;
@@ -1310,6 +1371,7 @@
       renderSections();
       applyFilter();
       applyPendingFocus();
+      finishLayout();
     }
     requestAnimationFrame(frame);
   }

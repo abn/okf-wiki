@@ -58,6 +58,11 @@ frontmatter tags.
   overview zoom hides edges unless a node is selected.
 - **Download JSON** saves the same bytes the view loaded as `graph.json`.
 
+The force layout seeds its random tie-breaks from the visible catalogue. The
+same catalogue and view settings produce the same node positions on every
+visit in the same client; positions are computed in the browser and are not
+stored in `graph.json`. The section grid is fixed by construction.
+
 The page carries no page text and no embeddings. It is the structural layer,
 and the search catalogue remains the place for text. Sections and Tag hubs are
 view settings; they are not part of the shared URL state.
