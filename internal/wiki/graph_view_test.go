@@ -59,6 +59,9 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphDownload"`,
 		`id="graphFit"`,
 		`id="graphClearFocus"`,
+		`id="graphTags"`,
+		`id="graphTagsSummary"`,
+		`id="graphTagsMenu"`,
 		`href="/wiki/graph.json"`,
 		`src="/wiki/graph.js?v=`,
 		`content content-graph`,
@@ -113,6 +116,41 @@ func TestGraphViewLocalFocusContract(t *testing.T) {
 		"function clearFocus",
 		"graphClearFocus",
 		"Focused on",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
+
+// TestGraphViewStateContract pins the client hooks that keep the shareable
+// dimensions in the URL. The Firefox smoke test covers the interaction.
+func TestGraphViewStateContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function readURLState",
+		"function syncURL",
+		"window.addEventListener('popstate', applyURLState)",
+		"history.pushState",
+		"history.replaceState",
+		"params.getAll('tag')",
+		"params.append('tag'",
+		"params.set('q'",
+		"params.set('kind'",
+		"function initTagFilter",
+		"function tagSlug",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)

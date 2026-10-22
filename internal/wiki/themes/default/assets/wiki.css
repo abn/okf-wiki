@@ -1278,6 +1278,46 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
 }
 .graph-check input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
+.graph-tags { position: relative; }
+.graph-tags-summary {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  list-style: none; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+  color: var(--color-text-muted); background: var(--color-surface);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  padding: 6px var(--space-3); min-height: 36px;
+}
+.graph-tags-summary::-webkit-details-marker { display: none; }
+.graph-tags-summary::marker { content: ""; }
+.graph-tags-summary::after {
+  content: ""; width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.graph-tags[open] .graph-tags-summary::after { transform: rotate(-135deg); }
+.graph-tags-summary:focus-visible {
+  outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.graph-tags-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  min-width: 240px; max-width: calc(100vw - 2 * var(--space-4));
+  max-height: 320px; overflow-y: auto; padding: var(--space-2);
+  background: var(--color-surface); border: 1px solid var(--color-line);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.graph-tag-option {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 6px var(--space-2); border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text);
+}
+.graph-tag-option:hover { background: var(--color-surface-sunken); }
+.graph-tag-option input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
+.graph-tag-option small { margin-left: auto; color: var(--color-text-faint); font-size: var(--text-xs); }
+.graph-tag-option.is-missing span { color: var(--color-text-muted); }
+.graph-tags-empty {
+  margin: 0; padding: var(--space-2);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+}
 .graph-fit {
   display: inline-flex; align-items: center; text-decoration: none;
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);

@@ -5,6 +5,14 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-22
 
+* **Feature**: The graph view keeps focus, depth, Show, Filter and Tags in the
+  query string and restores them on back and forward. Tags are a real filter:
+  repeated `tag` parameters narrow to pages carrying every named tag, and the
+  tag list marks a tag the graph does not contain so it can be removed. Typing
+  in Filter replaces the current history entry; discrete controls add one.
+  `usage/graph.md`, `reference/graph.md`, `reference/themes.md`,
+  `design/rendering.md`, `usage/offline.md` and `design/graph-evolution.md` say
+  so.
 * **Fix**: The graph view opens a dense catalogue on a readable patch around
   a page with a typical number of connections rather than fitting every node.
   Selecting a node fades the rest, frames its neighbourhood when that fits, and

@@ -24,6 +24,9 @@
   var filter = document.getElementById('graphFilter');
   var kind = document.getElementById('graphKind');
   var labels = document.getElementById('graphLabels');
+  var tagsDetails = document.getElementById('graphTags');
+  var tagsSummary = document.getElementById('graphTagsSummary');
+  var tagsMenu = document.getElementById('graphTagsMenu');
   var fit = document.getElementById('graphFit');
   var clearFocusLink = document.getElementById('graphClearFocus');
   var download = document.getElementById('graphDownload');
@@ -45,6 +48,9 @@
     focusHops: 0,
     pendingFocus: null,
     focusMissing: false,
+    selectedTags: [],
+    tagBySlug: Object.create(null),
+    nodeByID: Object.create(null),
     anchor: null,
     overview: false,
     query: '',
@@ -88,6 +94,208 @@
     return n.title + ', ' + what + ', ' + links;
   }
 
+  // The graph builder slugifies tags with the same alphabet as page slugs: a
+  // lower-case word, with spaces, hyphens and underscores folded to hyphens.
+  // The URL carries the slug so a tag with two spellings still has one filter.
+  function tagSlug(value) {
+    return String(value).toLowerCase()
+      .replace(/[ _]/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  function uniqueTagSlugs(values) {
+    var out = [];
+    values.forEach(function (value) {
+      var slug = tagSlug(value);
+      if (slug && out.indexOf(slug) === -1) out.push(slug);
+    });
+    return out;
+  }
+
+  function tagSlugOfNode(n) {
+    if (!n || n.kind !== 'tag') return '';
+    var at = n.id.lastIndexOf('tag:');
+    return at === -1 ? '' : n.id.slice(at + 4);
+  }
+
+  function tagLabel(slug) {
+    var tag = state.tagBySlug[slug];
+    return tag ? tag.title : '#' + slug;
+  }
+
+  function initTagFilter() {
+    state.tagBySlug = Object.create(null);
+    state.nodes.forEach(function (n) {
+      if (n.kind !== 'tag') return;
+      var slug = tagSlugOfNode(n);
+      if (!slug) return;
+      if (!state.tagBySlug[slug]) {
+        state.tagBySlug[slug] = { slug: slug, title: n.title, count: 0 };
+      }
+    });
+    state.nodes.forEach(function (n) {
+      if (n.kind !== 'page' || n.stub) return;
+      n.tagSlugs.forEach(function (slug) {
+        if (state.tagBySlug[slug]) state.tagBySlug[slug].count += 1;
+      });
+    });
+    renderTagMenu();
+    updateTagSummary();
+  }
+
+  function renderTagMenu() {
+    if (!tagsMenu) return;
+    tagsMenu.textContent = '';
+    var slugs = Object.keys(state.tagBySlug).sort(function (a, b) {
+      return tagLabel(a).localeCompare(tagLabel(b));
+    });
+    var missing = state.selectedTags.filter(function (slug) {
+      return !state.tagBySlug[slug];
+    }).sort();
+    if (!slugs.length && !missing.length) {
+      var empty = document.createElement('p');
+      empty.className = 'graph-tags-empty';
+      empty.textContent = 'No tags in this bundle.';
+      tagsMenu.appendChild(empty);
+      return;
+    }
+    var all = slugs.concat(missing);
+    all.sort(function (a, b) {
+      var aSelected = state.selectedTags.indexOf(a) !== -1;
+      var bSelected = state.selectedTags.indexOf(b) !== -1;
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+      return tagLabel(a).localeCompare(tagLabel(b));
+    });
+    all.forEach(function (slug) {
+      var tag = state.tagBySlug[slug];
+      var label = document.createElement('label');
+      label.className = 'graph-tag-option' + (tag ? '' : ' is-missing');
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = slug;
+      box.checked = state.selectedTags.indexOf(slug) !== -1;
+      var text = document.createElement('span');
+      text.textContent = tag ? tag.title : '#' + slug;
+      var count = document.createElement('small');
+      count.textContent = tag ? String(tag.count) : 'not in graph';
+      label.appendChild(box);
+      label.appendChild(text);
+      label.appendChild(count);
+      tagsMenu.appendChild(label);
+    });
+    if (tagsDetails && tagsDetails.open) positionTagsMenu();
+  }
+
+  function updateTagSummary() {
+    if (!tagsSummary) return;
+    var count = state.selectedTags.length;
+    if (!count) {
+      tagsSummary.textContent = 'Tags: any';
+      tagsSummary.removeAttribute('title');
+      return;
+    }
+    if (count === 1) {
+      tagsSummary.textContent = 'Tags: ' + tagLabel(state.selectedTags[0]);
+    } else {
+      tagsSummary.textContent = 'Tags: ' + count + ' selected';
+    }
+    tagsSummary.title = state.selectedTags.map(tagLabel).join(', ');
+  }
+
+  // Keep the menu inside the viewport. The CSS anchors it left; this shifts it
+  // only when its right edge would cross the viewport padding.
+  function positionTagsMenu() {
+    if (!tagsDetails || !tagsMenu || !tagsDetails.open) return;
+    tagsMenu.style.left = '';
+    tagsMenu.style.right = '';
+    var parent = tagsDetails.getBoundingClientRect();
+    var box = tagsMenu.getBoundingClientRect();
+    var margin = 16;
+    var viewport = document.documentElement.clientWidth || window.innerWidth;
+    var left = parent.left;
+    if (left + box.width > viewport - margin) left = viewport - margin - box.width;
+    if (left < margin) left = margin;
+    tagsMenu.style.left = (left - parent.left) + 'px';
+    tagsMenu.style.right = 'auto';
+  }
+
+  // readURLState applies the shareable dimensions to the controls. Focus is
+  // returned for the caller because the first load has to wait for layout,
+  // while a popstate can apply it to the finished drawing immediately.
+  function readURLState(params) {
+    var k = params.get('kind');
+    kind.value = (k === 'page' || k === 'tag' || k === 'stub') ? k : 'all';
+    filter.value = params.get('q') || '';
+    var wanted = params.getAll('tag').map(function (value) {
+      return tagSlug(String(value).trim());
+    }).filter(function (value) { return !!value; });
+    var selected = [];
+    wanted.forEach(function (slug) {
+      if (selected.indexOf(slug) === -1) selected.push(slug);
+    });
+    state.selectedTags = selected;
+    renderTagMenu();
+    updateTagSummary();
+
+    var id = params.get('focus');
+    if (!id) return null;
+    var node = state.nodeByID[id];
+    if (!node) return { missing: true };
+    var hops = parseInt(params.get('depth') || '1', 10);
+    hops = Math.max(1, Math.min(3, isNaN(hops) ? 1 : hops));
+    return { node: node, hops: hops };
+  }
+
+  function syncURL(mode) {
+    var url = new URL(window.location.href);
+    var params = url.searchParams;
+    params.delete('focus');
+    params.delete('depth');
+    params.delete('kind');
+    params.delete('q');
+    params.delete('tag');
+    var focus = null;
+    if (state.selected && state.focus) {
+      focus = { id: state.selected.id, hops: state.focusHops || 1 };
+    } else if (state.pendingFocus) {
+      focus = { id: state.pendingFocus.node.id, hops: state.pendingFocus.hops };
+    }
+    if (focus) {
+      params.set('focus', focus.id);
+      params.set('depth', String(focus.hops));
+    }
+    if (kind.value !== 'all') params.set('kind', kind.value);
+    var q = filter.value.trim();
+    if (q) params.set('q', q);
+    state.selectedTags.slice().sort().forEach(function (slug) {
+      params.append('tag', slug);
+    });
+    var next = url.pathname + url.search + url.hash;
+    var current = window.location.pathname + window.location.search + window.location.hash;
+    if (next === current) return;
+    try {
+      if (mode === 'push') window.history.pushState(null, '', next);
+      else window.history.replaceState(null, '', next);
+    } catch (e) {
+      // file:// history is available in current Firefox and Chrome. A browser
+      // that refuses it still keeps the controls and the drawing usable.
+    }
+  }
+
+  function applyURLState() {
+    state.pendingFocus = null;
+    var next = readURLState(new URLSearchParams(window.location.search));
+    state.focusMissing = !!(next && next.missing);
+    applyFilter();
+    if (next && next.node) {
+      select(next.node, true, next.hops, true);
+    } else {
+      clearSelection(true);
+    }
+  }
+
   function inlineCatalogue() {
     var el = document.getElementById('graphData');
     return el ? (el.textContent || '').trim() : '';
@@ -127,13 +335,15 @@
 
     state.raw = raw;
     state.nodes = data.nodes.map(function (n, i) {
+      var nodeTags = Array.isArray(n.tags) ? n.tags.map(String) : [];
       return {
         id: String(n.id || ''),
         title: String(n.title || n.id || ''),
         url: n.url ? String(n.url) : '',
         kind: n.kind === 'tag' ? 'tag' : 'page',
         section: n.section ? String(n.section) : '',
-        tags: Array.isArray(n.tags) ? n.tags.map(String) : [],
+        tags: nodeTags,
+        tagSlugs: uniqueTagSlugs(nodeTags),
         stub: !!n.stub,
         site: n.site ? String(n.site) : '',
         matched: true,
@@ -151,6 +361,7 @@
 
     var byId = Object.create(null);
     state.nodes.forEach(function (n) { byId[n.id] = n; });
+    state.nodeByID = byId;
     state.edges = [];
     data.edges.forEach(function (e) {
       var from = byId[e.from];
@@ -177,16 +388,12 @@
       state.adj[e.to.id].push({ node: e.from, dir: 'in' });
     });
 
-    var params = new URLSearchParams(window.location.search);
-    var focusID = params.get('focus');
-    if (focusID) {
-      if (byId[focusID]) {
-        var hops = parseInt(params.get('depth') || '1', 10);
-        hops = Math.max(1, Math.min(3, isNaN(hops) ? 1 : hops));
-        state.pendingFocus = { node: byId[focusID], hops: hops };
-      } else {
-        state.focusMissing = true;
-      }
+    initTagFilter();
+    var initial = readURLState(new URLSearchParams(window.location.search));
+    if (initial && initial.node) {
+      state.pendingFocus = { node: initial.node, hops: initial.hops };
+    } else if (initial && initial.missing) {
+      state.focusMissing = true;
     }
     state.anchor = starterPage();
 
@@ -590,7 +797,8 @@
     if (!state.pendingFocus) return;
     var pending = state.pendingFocus;
     state.pendingFocus = null;
-    select(pending.node, true, pending.hops);
+    select(pending.node, true, pending.hops, true);
+    syncURL('replace');
   }
 
   function updateEdgeVisibility() {
@@ -732,6 +940,15 @@
     if (kind.value === 'page' && (n.kind !== 'page' || n.stub)) return false;
     if (kind.value === 'tag' && n.kind !== 'tag') return false;
     if (kind.value === 'stub' && !n.stub) return false;
+    if (state.selectedTags.length) {
+      if (n.kind === 'tag') {
+        if (state.selectedTags.indexOf(tagSlugOfNode(n)) === -1) return false;
+      } else {
+        for (var t = 0; t < state.selectedTags.length; t++) {
+          if (n.tagSlugs.indexOf(state.selectedTags[t]) === -1) return false;
+        }
+      }
+    }
     var q = state.query;
     if (!q) return true;
     var hay = (n.title + ' ' + n.id + ' ' + n.section + ' ' + n.tags.join(' ') + ' ' + n.site).toLowerCase();
@@ -767,6 +984,12 @@
       text += ' Overview zoom. Select a node or zoom in for its neighbourhood.';
     } else {
       text += ' Scroll to zoom, drag the background to pan, or select Fit view.';
+    }
+    var missing = state.selectedTags.filter(function (slug) {
+      return !state.tagBySlug[slug];
+    });
+    if (missing.length) {
+      text += ' Not in this graph: ' + missing.map(tagLabel).join(', ') + '.';
     }
     setStatus(text);
     var desc = document.getElementById('graphDesc');
@@ -1097,7 +1320,8 @@
     return { list: list, incoming: incoming, outgoing: outgoing };
   }
 
-  function select(n, withView, hops) {
+  function select(n, withView, hops, restoring) {
+    if (!restoring) state.pendingFocus = null;
     var keepFocus = details.contains(document.activeElement);
     state.selected = n;
     setTabbable(n);
@@ -1193,15 +1417,19 @@
     clear.type = 'button';
     clear.className = 'graph-clear';
     clear.textContent = 'Clear selection';
-    clear.addEventListener('click', clearSelection);
+    clear.addEventListener('click', function () { clearSelection(); });
     details.appendChild(clear);
 
     details.hidden = false;
     if (keepFocus) title.focus();
     focusOn(n, !!withView, hops);
+    if (!restoring) syncURL('push');
   }
 
-  function clearSelection() {
+  function clearSelection(restoring) {
+    if (!restoring) state.pendingFocus = null;
+    var restoreGraphFocus = (clearFocusLink && document.activeElement === clearFocusLink) ||
+      details.contains(document.activeElement);
     state.selected = null;
     state.nodes.forEach(function (n) {
       if (n.el) n.el.classList.remove('is-selected');
@@ -1210,6 +1438,11 @@
     details.hidden = true;
     details.textContent = '';
     updateStatus();
+    if (!restoring) syncURL('push');
+    if (restoreGraphFocus) {
+      if (state.tabbable && state.tabbable.circle) state.tabbable.circle.focus();
+      else fit.focus();
+    }
   }
 
   function toSvg(clientX, clientY) {
@@ -1237,10 +1470,49 @@
     select(n, false);
   }
 
-  filter.addEventListener('input', applyFilter);
-  kind.addEventListener('change', applyFilter);
+  filter.addEventListener('input', function () {
+    applyFilter();
+    syncURL('replace');
+  });
+  kind.addEventListener('change', function () {
+    applyFilter();
+    syncURL('push');
+  });
   labels.addEventListener('change', applyLabels);
   fit.addEventListener('click', function () { fitView(); });
+  if (clearFocusLink) {
+    clearFocusLink.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      clearSelection();
+      fitView();
+    });
+  }
+  if (tagsMenu) {
+    tagsMenu.addEventListener('change', function (ev) {
+      if (!ev.target || ev.target.type !== 'checkbox') return;
+      var selected = [];
+      Array.prototype.forEach.call(tagsMenu.querySelectorAll('input[type="checkbox"]:checked'), function (box) {
+        selected.push(box.value);
+      });
+      state.selectedTags = selected;
+      updateTagSummary();
+      applyFilter();
+      syncURL('push');
+    });
+  }
+  if (tagsDetails) {
+    tagsDetails.addEventListener('toggle', function () {
+      if (tagsDetails.open) {
+        positionTagsMenu();
+      } else {
+        tagsMenu.style.left = '';
+        tagsMenu.style.right = '';
+      }
+    });
+    document.addEventListener('click', function (ev) {
+      if (tagsDetails.open && !tagsDetails.contains(ev.target)) tagsDetails.open = false;
+    });
+  }
 
   download.addEventListener('click', function () {
     if (!state.raw) return;
@@ -1355,8 +1627,16 @@
   svg.addEventListener('pointercancel', endPointer);
 
   document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && tagsDetails && tagsDetails.open) {
+      ev.preventDefault();
+      tagsDetails.open = false;
+      if (tagsSummary) tagsSummary.focus();
+      return;
+    }
     if (ev.key === 'Escape' && state.selected) clearSelection();
   });
+
+  window.addEventListener('popstate', applyURLState);
 
   // A local face swaps in after first paint; widths measured against the
   // fallback would keep names overlapping for the life of the page.
@@ -1368,6 +1648,7 @@
   }
 
   window.addEventListener('resize', function () {
+    if (tagsDetails && tagsDetails.open) positionTagsMenu();
     applyView();
     if (!state.overview || !state.anchor || 11 * state.scale >= EDGE_MIN_TEXT_PX) return;
     var cw = svg.clientWidth || 1000;

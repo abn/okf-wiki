@@ -127,6 +127,127 @@ def main():
             not driver.find_element(By.ID, "graphClearFocus").is_displayed(),
             "Show all stayed visible after clearing focus",
         )
+        must(
+            driver.execute_script("return document.activeElement.tagName;")
+            .lower()
+            != "body",
+            "hiding Show all dropped keyboard focus to the document",
+        )
+        driver.back()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" in d.find_element(By.ID, "graphStatus").text
+        )
+        driver.forward()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" not in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" not in d.find_element(By.ID, "graphStatus").text
+        )
+
+        check_page(
+            driver,
+            base + "graph.html?kind=page&q=graph&tag=usage&tag=graph",
+            ".graph-node-group",
+        )
+        must(
+            driver.execute_script("return document.getElementById('graphKind').value;")
+            == "page",
+            "the kind did not come from the URL",
+        )
+        must(
+            driver.execute_script("return document.getElementById('graphFilter').value;")
+            == "graph",
+            "the text filter did not come from the URL",
+        )
+        must(
+            "2 selected"
+            in driver.find_element(By.ID, "graphTagsSummary").text,
+            "the tag selection did not come from the URL",
+        )
+        selected_tags = driver.execute_script(
+            "return Array.from(document.querySelectorAll('#graphTagsMenu input:checked'))"
+            ".map((box) => box.value).sort();"
+        )
+        must(selected_tags == ["graph", "usage"], "wrong tags selected from the URL")
+
+        driver.get(base + "graph.html")
+        wait_for(driver, ".graph-node-group")
+        driver.find_element(By.ID, "graphTagsSummary").click()
+        wait_for(driver, "#graphTagsMenu input[value='usage']")
+        driver.find_element(By.CSS_SELECTOR, "#graphTagsMenu input[value='usage']").click()
+        WebDriverWait(driver, 10).until(lambda d: "tag=usage" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "#usage" in d.find_element(By.ID, "graphTagsSummary").text
+        )
+        driver.back()
+        WebDriverWait(driver, 10).until(lambda d: "tag=usage" not in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Tags: any" in d.find_element(By.ID, "graphTagsSummary").text
+        )
+        driver.forward()
+        WebDriverWait(driver, 10).until(lambda d: "tag=usage" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "#usage" in d.find_element(By.ID, "graphTagsSummary").text
+        )
+        driver.execute_script(
+            "var k=document.getElementById('graphKind');"
+            "k.value='page';k.dispatchEvent(new Event('change',{bubbles:true}));"
+        )
+        WebDriverWait(driver, 10).until(lambda d: "kind=page" in d.current_url)
+        driver.back()
+        WebDriverWait(driver, 10).until(lambda d: "kind=page" not in d.current_url)
+        must(
+            driver.execute_script("return document.getElementById('graphKind').value;")
+            == "all",
+            "the kind did not restore on back",
+        )
+        driver.forward()
+        WebDriverWait(driver, 10).until(lambda d: "kind=page" in d.current_url)
+        must(
+            driver.execute_script("return document.getElementById('graphKind').value;")
+            == "page",
+            "the kind did not restore on forward",
+        )
+
+        driver.set_window_size(768, 1000)
+        check_page(driver, base + "graph.html", ".graph-node-group")
+        driver.find_element(By.ID, "graphTagsSummary").click()
+        wait_for(driver, "#graphTagsMenu input")
+        menu_right = driver.execute_script(
+            "return document.querySelector('.graph-tags-menu').getBoundingClientRect().right;"
+        )
+        viewport = driver.execute_script(
+            "return document.documentElement.clientWidth;"
+        )
+        must(menu_right <= viewport + 1, "the tag menu overflowed the tablet viewport")
+        driver.set_window_size(1440, 1000)
+
+        check_page(driver, base + "graph.html?tag=no-such-tag", ".graph-node-group")
+        WebDriverWait(driver, 5).until(
+            lambda d: "Not in this graph" in d.find_element(By.ID, "graphStatus").text
+        )
+
+        check_page(
+            driver,
+            base + "graph.html?focus=page%3Ausage%2Fgraph&depth=1",
+            ".graph-clear",
+        )
+        driver.find_element(By.CSS_SELECTOR, ".graph-clear").click()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" not in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" not in d.find_element(By.ID, "graphStatus").text
+        )
+        must(
+            not driver.find_element(By.ID, "graphClearFocus").is_displayed(),
+            "Clear selection left Show all visible",
+        )
+        driver.back()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" in d.current_url)
+        WebDriverWait(driver, 5).until(
+            lambda d: "Focused on" in d.find_element(By.ID, "graphStatus").text
+        )
+        driver.forward()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" not in d.current_url)
 
         check_page(driver, base + "graph.html?focus=page%3Amissing", ".graph-node-group")
         WebDriverWait(driver, 5).until(
