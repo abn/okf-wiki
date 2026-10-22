@@ -7,6 +7,8 @@ The site directory is the one written under the base, for example
 .scratch/offline/wiki. Requires Firefox and Selenium.
 """
 
+import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -40,6 +42,57 @@ def non_file_requests(driver):
         return performance.getEntriesByType('resource')
           .map((entry) => entry.name)
           .filter((url) => !url.startsWith('file:') && !url.startsWith('data:'));
+        """
+    )
+
+
+def wait_layout(driver):
+    WebDriverWait(driver, 20).until(
+        lambda d: d.find_element(By.ID, "graphApp").get_attribute("data-layout")
+        == "ready"
+    )
+
+
+def write_force_fixture(root):
+    source = (root / "graph.html").read_text()
+    nodes = [
+        {
+            "id": f"page:p{i}",
+            "title": f"Page {i}",
+            "url": f"./p{i}.html",
+            "kind": "page",
+            "section": "Stress",
+            "sectionId": "stress",
+        }
+        for i in range(1200)
+    ]
+    edges = [
+        {"from": f"page:p{i}", "to": f"page:p{i + 1}", "kind": "link"}
+        for i in range(1199)
+    ]
+    data = json.dumps({"version": 1, "nodes": nodes, "edges": edges})
+    pattern = re.compile(
+        r'<script type="application/json" id="graphData">.*?</script>',
+        re.S,
+    )
+    html, count = pattern.subn(
+        lambda _: '<script type="application/json" id="graphData">' + data + '</script>',
+        source,
+        count=1,
+    )
+    must(count == 1, "the graph page has no inline catalogue to replace")
+    path = root / "stable-layout-test.html"
+    path.write_text(html)
+    return path
+
+
+def graph_positions(driver):
+    return driver.execute_script(
+        """
+        return Object.fromEntries(
+          Array.from(document.querySelectorAll('.graph-node-group'))
+            .map((group) => [group.getAttribute('data-id'), group.getAttribute('transform')])
+        );
         """
     )
 
@@ -250,6 +303,7 @@ def main():
         driver.set_window_size(1440, 1000)
 
         check_page(driver, base + "graph.html", ".graph-list-node")
+        wait_layout(driver)
         must(
             driver.find_element(By.ID, "graphSections").is_selected(),
             "Sections is not on by default",
@@ -310,15 +364,45 @@ def main():
         baseline_nodes = len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
 
         driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
+        first_positions = graph_positions(driver)
         driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
+        WebDriverWait(driver, 5).until(
+            lambda d: d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
+        driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
+        WebDriverWait(driver, 5).until(
+            lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
+        must(
+            graph_positions(driver) == first_positions,
+            "the force layout changed when it was run again",
+        )
+        driver.refresh()
+        wait_for(driver, ".graph-section-label")
+        wait_layout(driver)
+        driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
+        WebDriverWait(driver, 5).until(
+            lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
+        must(
+            graph_positions(driver) == first_positions,
+            "the force layout changed after a reload",
+        )
+        driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
 
         driver.find_element(By.ID, "graphTagHubs").click()
+        wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
             < baseline_nodes
@@ -341,6 +425,7 @@ def main():
             "the list did not follow the collapsed tag hubs",
         )
         driver.find_element(By.ID, "graphTagHubs").click()
+        wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
             == baseline_nodes
@@ -409,8 +494,10 @@ def main():
         )
 
         check_page(driver, base + "graph.html?q=graph", ".graph-list-node")
+        wait_layout(driver)
         driver.find_element(By.CSS_SELECTOR, "#graphListNodes .graph-list-node").click()
         driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, '#graphSvg circle[tabindex="0"]'))
             == 1
@@ -472,6 +559,30 @@ def main():
         must(nodes > 0, "graph has no nodes")
         inline = driver.execute_script("return !!document.getElementById('graphData');")
         must(inline, "graph is not inline")
+
+        force_page = write_force_fixture(root)
+        try:
+            driver.get(force_page.as_uri())
+            wait_for(driver, ".graph-node-group")
+            wait_layout(driver)
+            driver.find_element(By.ID, "graphSections").click()
+            wait_layout(driver)
+            force_first = graph_positions(driver)
+            driver.find_element(By.ID, "graphSections").click()
+            wait_layout(driver)
+            driver.find_element(By.ID, "graphSections").click()
+            wait_layout(driver)
+            must(
+                graph_positions(driver) == force_first,
+                "the synthetic force layout changed when it was run again",
+            )
+            nudges = int(
+                driver.find_element(By.ID, "graphApp").get_attribute("data-layout-nudges")
+                or 0
+            )
+            must(nudges > 0, "the synthetic force layout produced no collision nudge")
+        finally:
+            force_page.unlink(missing_ok=True)
 
         redirect = root.parent / "index.html"
         start = redirect.as_uri()

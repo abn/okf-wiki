@@ -151,7 +151,9 @@ flowchart LR
    focus in one roving tab stop and caps its first page on a large catalogue.
    In Sections mode the drawing is a deterministic grid of section cells, with
    tag hubs and missing pages in their own cells; collapsing tag hubs drops
-   their nodes and edges without dropping the tag filter.
+   their nodes and edges without dropping the tag filter. Outside that mode the
+   force layout seeds its random tie-breaks from the visible catalogue, so a
+   reload does not reshuffle the graph.
 
    Every content page also gets a **Connections** panel inside the article. The
    renderer indexes the recorded page links by target after the bundle is

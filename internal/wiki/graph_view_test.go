@@ -233,6 +233,38 @@ func TestGraphListViewContract(t *testing.T) {
 	}
 }
 
+// TestGraphDeterministicLayoutContract pins the seeded layout: the client has
+// no ambient randomness, and a catalogue produces the same positions again.
+func TestGraphDeterministicLayoutContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function layoutSeed",
+		"function seededRandom",
+		"function seedLayout",
+		"layoutRandom()",
+		"function layoutInitial() {\n    seedLayout();",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	if strings.Contains(js, "Math.random") {
+		t.Error("graph.js still uses ambient randomness")
+	}
+}
+
 // TestGraphInlineEmbedsCatalogue covers inline mode: the page carries the same
 // bytes the served site would fetch, so the client never calls fetch.
 func TestGraphInlineEmbedsCatalogue(t *testing.T) {
