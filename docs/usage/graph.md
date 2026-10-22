@@ -23,14 +23,27 @@ frontmatter tags.
 - **Filter** narrows by title, section, tag, or node ID. Matching nodes stay
   lit and the rest fade.
 - **Show** switches between all nodes, pages, tags, and missing pages.
-- **Labels** hides or shows the names. With labels on, a name is drawn when it
-  fits without covering another name; hover a node or select it to reveal the
-  rest.
+- A dense catalogue opens on a readable patch around a page with a typical
+  number of connections, not on the whole cloud. **Fit view** draws the
+  catalogue as a map, trimming the outermost percentile so one stranded page
+  cannot shrink it.
+- **Labels** hides or shows the names. At most 50 names are drawn in one view,
+  and one is chosen only where it fits without covering another name or another
+  node. Names keep their screen size at every zoom, so zooming in shows more.
+  Hover a node or select it to reveal its own name.
 - Select a node for its kind, section, tags, and incoming and outgoing counts.
-  The panel links to the page or tag. With the keyboard, tab to the graph, use
-  the arrow keys to move between nodes, and press Enter for the details.
+  The rest of the drawing fades to that node's neighbourhood: two hops for a
+  page (one when that set is very large), one for a tag. When the neighbourhood
+  fits, the view frames it.
+- The panel lists the node's connections as buttons, forty at a time with the
+  rest behind one more click. Select one to move to that node, or use **Open
+  page**, **Open tag page**, or **Clear selection**. Escape also clears the
+  focus. With the keyboard, tab to the graph, use the arrow keys
+  to move between nodes, and press Enter for the details.
 - Drag a node to move it. Scroll to zoom, drag the background to pan, and
   select **Fit view** or double-click the background to fit the graph again.
+  An edge whose endpoints are both outside the view is not drawn, and an
+  overview zoom hides edges unless a node is selected.
 - **Download JSON** saves the same bytes the view loaded as `graph.json`.
 
 The page carries no page text and no embeddings. It is the structural layer,

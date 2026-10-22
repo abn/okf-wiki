@@ -142,7 +142,9 @@ flowchart LR
    fetches `graph.json` when opened, so no other page pays for the catalogue,
    unless `--graph-inline` embedded the bytes in the page. The drawing has no
    third-party runtime; the default theme's `graph.js` lays it out in SVG and
-   reads only the fields the schema documents.
+   reads only the fields the schema documents. It opens a dense catalogue on a
+   readable patch rather than on the whole cloud, thins names and edges as the
+   view zooms out, and frames a node's neighbourhood when one is selected.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
