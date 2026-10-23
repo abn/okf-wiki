@@ -153,7 +153,7 @@ stdio server:
 }
 ```
 
-The server exposes six read-only tools:
+The server exposes eight read-only tools:
 
 | Tool | Arguments | Returns |
 | :--- | :--- | :--- |
@@ -163,6 +163,8 @@ The server exposes six read-only tools:
 | `context_for` | `query`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
 | `neighbors` | `pageId`, `depth`, `kinds` | The local graph with typed edges. |
 | `path` | `from`, `to`, `maxDepth`, `kinds` | The shortest undirected path and its edges. |
+| `changes` | none | Pages added, changed or removed in the latest render. |
+| `health` | none | Broken links, orphans, tag-only pages, cycles, stale pages and most connected pages. |
 
 `read_page` defaults to 4,000 tokens, `read_section` to 2,000 and `context_for`
 to 3,000. The limit is an estimate of four bytes per token, not a model
@@ -181,12 +183,23 @@ section; they are not stored in `graph.json`. `path` uses the same undirected
 graph, so it can follow links, tags or page order. A path result includes the
 edge that connects each pair.
 
+`changes` reads `changes.json`, which compares the current `pages.json` with the
+previous render in the output directory. It reports `added`, `changed` and
+`removed` pages with the current and previous content hashes. Only the latest
+render is stored; a first render reports every page as `added`. `health` reads
+`health.json`, which reports broken links, orphans, tag-only pages, link cycles,
+stale pages and the ten most connected pages. Index pages are not orphans.
+Stale dates are parsed as RFC 3339, like the tag badge.
+
 `search_wiki` works without `pages.json`, with the Markdown URL derived from the
-HTML URL. Page IDs, `read_page`, `read_section`, the graph tools, the tag filter
-and the site filter need `pages.json`. `read_page` also needs `--base` when the
-render uses absolute URLs, so the server can resolve a Markdown URL back to the
-site directory. Re-render after a content change; the read and search data is
-not rebuilt on every query.
+HTML URL. Page IDs, `read_page`, `read_section`, the tag filter and the site
+filter need `pages.json`. `neighbors` and `path` work from `graph.json`;
+previous and next edges need `pages.json`. `read_page` also needs `--base` when
+the render uses absolute URLs, so the server can resolve a Markdown URL back to
+the site directory. The server reloads the rendered files before each tool call,
+so a re-render is visible without restarting the MCP process. If `changes.json`
+or `health.json` is absent or unreadable, only those two tools fail; search and
+reads still work.
 
 ## Multi-site and offline
 
@@ -195,10 +208,12 @@ In a tree the aggregate `pages.json` has namespaced IDs such as
 the render's URL mode: absolute paths online, and paths relative to the render
 root for an offline folder.
 
-The generated files reserve `llms.txt` and `pages.json` at the render root. A
-bundle that already contains a file with either name fails the render and names
-the collision rather than overwriting the reader's file.
+The generated files reserve `llms.txt`, `pages.json`, `changes.json` and
+`health.json` at the render root. A bundle that already contains one of those
+names fails the render and names the collision rather than overwriting the
+reader's file.
 
-The files are discovery metadata, not a second content store. The search
+`llms.txt` and `pages.json` are discovery metadata. `changes.json` and
+`health.json` are render state, not a second content store. The search
 catalogue remains the place for ranking, and the graph catalogue remains the
 place for links and tags.

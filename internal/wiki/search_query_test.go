@@ -230,3 +230,26 @@ func TestSearchTreeAggregate(t *testing.T) {
 		t.Errorf("tree Markdown URL = %q", resp.Results[0].MarkdownURL)
 	}
 }
+
+func TestSearchCorpusRejectsMixedRender(t *testing.T) {
+	site := searchFixture(t)
+	raw, err := os.ReadFile(filepath.Join(site, "search-index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index SearchIndex
+	if err := json.Unmarshal(raw, &index); err != nil {
+		t.Fatal(err)
+	}
+	index.RenderID = "another-render"
+	broken, err := json.Marshal(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(site, "search-index.json"), broken, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadSearchCorpus(site, "/wiki/"); err == nil {
+		t.Error("a mixed search render was accepted")
+	}
+}

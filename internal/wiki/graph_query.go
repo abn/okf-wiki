@@ -52,11 +52,12 @@ type PathResponse struct {
 // not stored in graph.json, so they are available to agents without changing
 // the browser drawing.
 type GraphCorpus struct {
-	Graph GraphIndex
-	Pages AgentManifest
-	nodes map[string]GraphNode
-	adj   map[string][]adjEdge
-	edges []GraphEdgeInfo
+	Graph    GraphIndex
+	RenderID string
+	Pages    AgentManifest
+	nodes    map[string]GraphNode
+	adj      map[string][]adjEdge
+	edges    []GraphEdgeInfo
 }
 
 type adjEdge struct {
@@ -76,7 +77,7 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 	if err := json.Unmarshal(raw, &g); err != nil {
 		return nil, fmt.Errorf("decode graph.json: %w", err)
 	}
-	c := &GraphCorpus{Graph: g, nodes: make(map[string]GraphNode), adj: make(map[string][]adjEdge)}
+	c := &GraphCorpus{Graph: g, RenderID: g.RenderID, nodes: make(map[string]GraphNode), adj: make(map[string][]adjEdge)}
 	for _, n := range g.Nodes {
 		c.nodes[n.ID] = n
 	}
@@ -96,6 +97,11 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 		if err := json.Unmarshal(manifestRaw, &c.Pages); err != nil {
 			return nil, fmt.Errorf("decode pages.json: %w", err)
 		}
+		manifestID := agentRenderID(c.Pages.Pages)
+		if c.RenderID != "" && c.RenderID != manifestID {
+			return nil, fmt.Errorf("graph.json and pages.json are from different renders")
+		}
+		c.RenderID = manifestID
 		c.addOrderEdges()
 	} else if !os.IsNotExist(err) {
 		return nil, err

@@ -113,12 +113,18 @@ type Renderer struct {
 	// aggregatedPages collects the agent manifest of a tree render, with each
 	// wiki's page IDs namespaced by its path.
 	aggregatedPages []AgentPage
+	// previousPages is the manifest already in the output directory before this
+	// render. It feeds changes.json; a first render has no previous pages.
+	previousPages []AgentPage
 	// treeWikis is the set of wiki paths in a tree render. Cross-wiki links
 	// resolve against it after each wiki has loaded.
 	treeWikis map[string]bool
 	// crossEdges holds namespaced edges from one wiki to another until every
 	// wiki has rendered and their target nodes can be checked.
 	crossEdges []GraphEdge
+	// crossBroken records a cross-wiki link whose target wiki or page was not
+	// rendered, so the health report can name a real dead link.
+	crossBroken []HealthLink
 	// backlinks indexes recorded page links by target slug for the Connections
 	// panel. It is built once, after the pages are loaded.
 	backlinks      map[string][]backlinkRef
@@ -236,6 +242,11 @@ func (r *Renderer) RenderAll(out string) error {
 	if err != nil {
 		return err
 	}
+	previous, err := readAgentPages(site)
+	if err != nil {
+		return err
+	}
+	r.previousPages = previous
 	return swapDir(site, func(tmp string) error {
 		return r.renderInto(out, tmp)
 	})
@@ -359,7 +370,11 @@ func (r *Renderer) renderInto(out, site string) error {
 		if title == "" {
 			title = r.cfg.Brand.Title
 		}
-		if err := writeAgentFiles(site, title, r.siteDescription, r.generatedAt, r.AgentPages()); err != nil {
+		pages := r.AgentPages()
+		if err := writeAgentFiles(site, title, r.siteDescription, r.generatedAt, pages); err != nil {
+			return err
+		}
+		if err := writeAgentState(site, r.previousPages, pages, r.BuildGraph(), r.generatedAt); err != nil {
 			return err
 		}
 	}
@@ -609,12 +624,17 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 						Text:    strings.TrimSpace(text.String()),
 					})
 				} else if cross, ok := r.crossWikiTarget(p.Slug, href); ok {
-					p.links = append(p.links, pageLink{
-						Cross:   cross,
+					link := pageLink{
 						Anchor:  currentAnchor,
 						Heading: currentHeading,
 						Text:    strings.TrimSpace(text.String()),
-					})
+					}
+					if _, _, known := splitTreeTarget(cross, r.treeWikis); known {
+						link.Cross = cross
+					} else if r.cfg.Repo == "" {
+						link.BrokenCross = cross
+					}
+					p.links = append(p.links, link)
 				}
 			}
 		case *ast.Image:
@@ -731,9 +751,6 @@ func (r *Renderer) crossWikiTarget(fromSlug, href string) (string, bool) {
 	if tree == r.siteRel || strings.HasPrefix(tree, r.siteRel+"/") {
 		return "", false
 	}
-	if _, _, ok := splitTreeTarget(tree, r.treeWikis); !ok {
-		return "", false
-	}
 	return tree, true
 }
 
@@ -770,11 +787,13 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 	}
 
 	if tree, ok := r.crossWikiTarget(fromSlug, href); ok {
-		href = tree + ".html" + frag
-		if r.cfg.Offline {
-			return href
+		if _, _, known := splitTreeTarget(tree, r.treeWikis); known {
+			href = tree + ".html" + frag
+			if r.cfg.Offline {
+				return href
+			}
+			return r.treeBase + href
 		}
-		return r.treeBase + href
 	}
 
 	// A target that climbs out of the bundle is not ours to publish. It can

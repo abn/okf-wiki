@@ -136,6 +136,11 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	if err := agentCollision(root.abs); err != nil {
 		return 0, err
 	}
+	previous, err := readAgentPages(r.cfg.sitePath(out))
+	if err != nil {
+		return 0, err
+	}
+	r.previousPages = previous
 	if root.wiki {
 		if err := graphCollision(root.abs); err != nil {
 			return 0, err
@@ -244,6 +249,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		siteTitle:       title,
 		siteDescription: description,
 		siteTrail:       trail,
+		previousPages:   r.previousPages,
 	}
 	if err := sub.load(cfg.Content); err != nil {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
@@ -279,6 +285,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		graph := sub.BuildGraph()
 		mergeGraph(&r.aggregatedGraph, &graph, title, n.rel)
 		r.crossEdges = append(r.crossEdges, sub.CrossWikiEdges(r.treeWikis)...)
+		r.crossBroken = append(r.crossBroken, sub.crossBroken...)
 		pages := sub.AgentPages()
 		for i := range pages {
 			pages[i].ID = n.rel + ":" + pages[i].ID
@@ -341,6 +348,7 @@ func (r *Renderer) writeSiteRoot(root string) error {
 // the output root the tree was written into.
 func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	index := r.aggregated
+	index.RenderID = agentRenderID(r.aggregatedPages)
 	// Marshal empty slices, not nil ones, so the catalogue is an empty table
 	// rather than null: the client parses either, but a group page expecting
 	// pages and entries should find both.
@@ -361,7 +369,9 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	if err := os.WriteFile(filepath.Join(dir, "search-index.json"), b, 0o644); err != nil {
 		return err
 	}
-	content, err := json.Marshal(contentFromIndex(index))
+	contentValue := contentFromIndex(index)
+	contentValue.RenderID = index.RenderID
+	content, err := json.Marshal(contentValue)
 	if err != nil {
 		return err
 	}
@@ -383,6 +393,7 @@ func (r *Renderer) writeAggregateSearchIndex(root string) error {
 // has rendered, and a tree with no readable wiki still gets an empty catalogue
 // rather than a missing file. root is the output root the tree was written into.
 func (r *Renderer) writeAggregateGraph(root string) error {
+	r.aggregatedGraph.RenderID = agentRenderID(r.aggregatedPages)
 	b, err := graphJSON(r.aggregatedGraph)
 	if err != nil {
 		return err

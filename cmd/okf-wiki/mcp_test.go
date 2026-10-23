@@ -24,15 +24,11 @@ func testMCPServer(t *testing.T) *mcpServer {
 	if err := r.RenderAll(out); err != nil {
 		t.Fatal(err)
 	}
-	corpus, err := wiki.LoadSearchCorpus(filepath.Join(out, "wiki"), "/wiki/")
-	if err != nil {
+	s := &mcpServer{siteDir: filepath.Join(out, "wiki"), base: "/wiki/"}
+	if err := s.refresh(); err != nil {
 		t.Fatal(err)
 	}
-	graph, err := wiki.LoadGraphCorpus(filepath.Join(out, "wiki"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &mcpServer{corpus: corpus, graph: graph}
+	return s
 }
 
 func writeTestPage(path, body string) error {
@@ -59,14 +55,14 @@ func TestMCPInitializeAndTools(t *testing.T) {
 	}
 	result = resp.Result.(map[string]any)
 	tools, ok := result["tools"].([]any)
-	if !ok || len(tools) != 6 {
+	if !ok || len(tools) != 8 {
 		t.Fatalf("tools = %+v", result["tools"])
 	}
 	names := map[string]bool{}
 	for _, item := range tools {
 		names[item.(map[string]any)["name"].(string)] = true
 	}
-	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path"} {
+	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path", "changes", "health"} {
 		if !names[want] {
 			t.Errorf("tools are missing %q: %v", want, names)
 		}
@@ -164,6 +160,16 @@ func TestMCPReadAndContext(t *testing.T) {
 			line: `{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"path","arguments":{"from":"page:index","to":"page:index"}}}`,
 			want: "\"found\":true",
 		},
+		{
+			name: "changes",
+			line: `{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"changes","arguments":{}}}`,
+			want: "\"changes\":[",
+		},
+		{
+			name: "health",
+			line: `{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"health","arguments":{}}}`,
+			want: "\"brokenLinks\":[]",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -177,5 +183,48 @@ func TestMCPReadAndContext(t *testing.T) {
 				t.Errorf("%s content = %s", tc.name, content)
 			}
 		})
+	}
+}
+
+// TestMCPOptionalState keeps search and reads working on an output that predates
+// changes.json and health.json, while those tools fail clearly.
+func TestMCPOptionalState(t *testing.T) {
+	s := testMCPServer(t)
+	for _, name := range []string{"changes.json", "health.json"} {
+		if err := os.Remove(filepath.Join(s.siteDir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resp := s.handle([]byte(`{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"search_wiki","arguments":{"query":"install"}}}`))
+	if resp == nil || resp.Error != nil {
+		t.Fatalf("search = %+v", resp)
+	}
+	result := resp.Result.(map[string]any)
+	if result["isError"] != false {
+		t.Errorf("search failed after removing optional state: %+v", result)
+	}
+	resp = s.handle([]byte(`{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"changes","arguments":{}}}`))
+	if resp == nil {
+		t.Fatal("changes produced no response")
+	}
+	if resp.Result.(map[string]any)["isError"] != true {
+		t.Error("changes did not report missing changes.json")
+	}
+}
+
+// TestMCPMalformedOptionalState keeps a corrupt optional file from taking down
+// search and reads.
+func TestMCPMalformedOptionalState(t *testing.T) {
+	s := testMCPServer(t)
+	if err := os.WriteFile(filepath.Join(s.siteDir, "changes.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resp := s.handle([]byte(`{"jsonrpc":"2.0","id":30,"method":"tools/call","params":{"name":"search_wiki","arguments":{"query":"install"}}}`))
+	if resp == nil || resp.Result.(map[string]any)["isError"] != false {
+		t.Fatalf("search after malformed state = %+v", resp)
+	}
+	resp = s.handle([]byte(`{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"changes","arguments":{}}}`))
+	if resp == nil || resp.Result.(map[string]any)["isError"] != true {
+		t.Errorf("changes after malformed state = %+v", resp)
 	}
 }

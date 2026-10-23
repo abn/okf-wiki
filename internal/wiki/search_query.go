@@ -56,6 +56,7 @@ type SearchCorpus struct {
 	Manifest    AgentManifest
 	SiteDir     string
 	Base        string
+	RenderID    string
 	pageByURL   map[string]AgentPage
 	pageByID    map[string]AgentPage
 	hasManifest bool
@@ -94,6 +95,10 @@ func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
 	if c.Content.Count != len(c.Index.Entries) || len(c.Content.Texts) != len(c.Index.Entries) {
 		return nil, fmt.Errorf("search content has %d entries, index has %d", c.Content.Count, len(c.Index.Entries))
 	}
+	if c.Index.RenderID != "" && c.Content.RenderID != "" && c.Index.RenderID != c.Content.RenderID {
+		return nil, fmt.Errorf("search index and content are from different renders")
+	}
+	c.RenderID = c.Index.RenderID
 	c.pageByURL = make(map[string]AgentPage)
 	c.pageByID = make(map[string]AgentPage)
 	if manifestRaw, err := read("pages.json"); err == nil {
@@ -101,6 +106,11 @@ func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
 			return nil, fmt.Errorf("decode pages.json: %w", err)
 		}
 		c.hasManifest = true
+		manifestID := agentRenderID(c.Manifest.Pages)
+		if c.RenderID != "" && c.RenderID != manifestID {
+			return nil, fmt.Errorf("search index and pages.json are from different renders")
+		}
+		c.RenderID = manifestID
 		for _, p := range c.Manifest.Pages {
 			c.pageByURL[p.URL] = p
 			c.pageByID[p.ID] = p
