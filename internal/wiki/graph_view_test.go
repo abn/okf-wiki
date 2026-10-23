@@ -265,6 +265,37 @@ func TestGraphDeterministicLayoutContract(t *testing.T) {
 	}
 }
 
+// TestGraphSemanticZoomContract pins the label tiers: hubs label the map,
+// ordinary pages join at the page-label scale, and a focus or filter asks for
+// page names without waiting for the zoom.
+func TestGraphSemanticZoomContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"var PAGE_LABEL_SCALE",
+		"function pageHubs",
+		"function isLabelHub",
+		"function labelTier",
+		"function pagesMayLabel",
+		"data-tier",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
+
 // TestGraphInlineEmbedsCatalogue covers inline mode: the page carries the same
 // bytes the served site would fetch, so the client never calls fetch.
 func TestGraphInlineEmbedsCatalogue(t *testing.T) {

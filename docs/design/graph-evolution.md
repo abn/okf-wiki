@@ -49,7 +49,7 @@ the semantic layer.
 
 - [x] Collapse tag hubs and cluster by section.
 - [x] Stable or precomputed layout, so a graph looks the same on every visit.
-- [ ] Semantic zoom: labels for hubs first, page names as the reader zooms in.
+- [x] Semantic zoom: labels for hubs first, page names as the reader zooms in.
 - [ ] Path finding between two pages.
 - [ ] Graph health: orphans, broken links, tag-only pages, cycles and the most
   connected pages.
@@ -74,6 +74,5 @@ the semantic layer.
 ## Current
 
 Local graph and backlinks, shareable view state, the accessible list view,
-collapsed tag hubs, section clusters and a deterministic layout are shipped.
-The next item is semantic zoom: labels for hubs first, page names as the reader
-zooms in.
+collapsed tag hubs, section clusters, a deterministic layout and semantic zoom
+are shipped. The next item is path finding between two pages.

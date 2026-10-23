@@ -3,6 +3,14 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-23
+
+* **Feature**: Graph labels are tiered. The overview names tag hubs and the
+  busiest quarter of the connected pages; ordinary page names appear as the
+  reader zooms in, or when a filter or focus asks for them. The status line says
+  so at the map scale. `usage/graph.md`, `reference/graph.md`,
+  `design/rendering.md` and `design/graph-evolution.md` record it.
+
 ## 2026-10-22
 
 * **Feature**: The force layout seeds its collision tie-breaks from the visible
