@@ -54,7 +54,10 @@ type SearchCorpus struct {
 	Index       SearchIndex
 	Content     SearchContent
 	Manifest    AgentManifest
+	SiteDir     string
+	Base        string
 	pageByURL   map[string]AgentPage
+	pageByID    map[string]AgentPage
 	hasManifest bool
 }
 
@@ -62,7 +65,7 @@ type SearchCorpus struct {
 // present, pages.json from a rendered site directory. A content file whose
 // count does not match the index is refused rather than attached by position:
 // a mismatch would put another render's text on the wrong result.
-func LoadSearchCorpus(dir string) (*SearchCorpus, error) {
+func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
 	read := func(name string) ([]byte, error) {
 		b, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
@@ -78,7 +81,10 @@ func LoadSearchCorpus(dir string) (*SearchCorpus, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &SearchCorpus{}
+	c := &SearchCorpus{SiteDir: dir}
+	if len(bases) > 0 {
+		c.Base = normalizeCorpusBase(bases[0])
+	}
 	if err := json.Unmarshal(indexRaw, &c.Index); err != nil {
 		return nil, fmt.Errorf("decode search-index.json: %w", err)
 	}
@@ -89,6 +95,7 @@ func LoadSearchCorpus(dir string) (*SearchCorpus, error) {
 		return nil, fmt.Errorf("search content has %d entries, index has %d", c.Content.Count, len(c.Index.Entries))
 	}
 	c.pageByURL = make(map[string]AgentPage)
+	c.pageByID = make(map[string]AgentPage)
 	if manifestRaw, err := read("pages.json"); err == nil {
 		if err := json.Unmarshal(manifestRaw, &c.Manifest); err != nil {
 			return nil, fmt.Errorf("decode pages.json: %w", err)
@@ -96,11 +103,27 @@ func LoadSearchCorpus(dir string) (*SearchCorpus, error) {
 		c.hasManifest = true
 		for _, p := range c.Manifest.Pages {
 			c.pageByURL[p.URL] = p
+			c.pageByID[p.ID] = p
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// normalizeCorpusBase keeps a URL prefix usable for stripping a rendered page
+// URL back to a path under SiteDir.
+func normalizeCorpusBase(base string) string {
+	if base == "" {
+		return ""
+	}
+	if !strings.HasPrefix(base, "/") {
+		base = "/" + base
+	}
+	if !strings.HasSuffix(base, "/") {
+		base += "/"
+	}
+	return base
 }
 
 // Search scores the corpus with the same field weights and tie breaks as the

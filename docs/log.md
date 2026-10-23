@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-23
 
+* **Feature**: The MCP server adds `read_page`, `read_section` and `context_for`
+  alongside `search_wiki`. Reads carry page IDs, anchors, Markdown URLs and
+  content hashes, and cap their text at an estimated token budget. The agent
+  page documents the four tools and the budget defaults.
+
 * **Feature**: `okf-wiki search` returns ranked, extractive snippets from a
   rendered site as human text or JSON, with page ID, anchor, Markdown URL and
   content hash. `okf-wiki mcp` exposes the same search as the read-only

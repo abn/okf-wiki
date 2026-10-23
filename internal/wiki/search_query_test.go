@@ -28,6 +28,8 @@ tags: [guide]
 ---
 # Install
 
+## Install
+
 Run the installer. Install it again when the version changes.
 `)
 	mustWrite(t, filepath.Join(dir, "linebreak.md"), `---
@@ -39,6 +41,9 @@ The first line
 continues here.
 
 [First](one.md)[Second](two.md)
+
+- First item
+- Second item
 `)
 	mustWrite(t, filepath.Join(dir, "reference.md"), `---
 title: Reference
@@ -128,6 +133,13 @@ func TestSearchQuery(t *testing.T) {
 	}
 	if links.Total != 1 || links.Results[0].PageID != "page:linebreak" {
 		t.Errorf("adjacent link search = %+v, want the line break page", links)
+	}
+	items, err := c.Search("first item second item", SearchOptions{Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items.Total != 1 || items.Results[0].PageID != "page:linebreak" {
+		t.Errorf("list item search = %+v, want the line break page", items)
 	}
 }
 

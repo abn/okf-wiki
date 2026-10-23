@@ -137,9 +137,9 @@ one result order. They use the same field weights and tie breaks as the browser
 search for a flat result list; the browser additionally groups a tree's results
 by wiki and applies its own per-site caps.
 
-## MCP search
+## MCP search and reading
 
-`okf-wiki mcp` serves the same search as a read-only Model Context Protocol
+`okf-wiki mcp` serves search and reading as a read-only Model Context Protocol
 stdio server:
 
 ```json
@@ -153,15 +153,30 @@ stdio server:
 }
 ```
 
-The server exposes one tool, `search_wiki`, with `query`, `limit`, `site`, `tag`
-and `section` arguments. Its text content is the same JSON object the CLI
-writes. It has no write tools and does not load page text into the protocol; an
-agent fetches the returned `markdownUrl` only when it needs the full page.
+The server exposes four read-only tools:
 
-Both the command and the server read `search-index.json` and
-`search-content.json`. When `pages.json` is present they join it for page IDs,
-Markdown URLs and content hashes; the tag and site filters need it. Re-render
-after a content change; the search data is not rebuilt on every query.
+| Tool | Arguments | Returns |
+| :--- | :--- | :--- |
+| `search_wiki` | `query`, `limit`, `site`, `tag`, `section` | Ranked snippets with citations. |
+| `read_page` | `pageId`, `maxTokens` | The page's Markdown source, capped at the budget. |
+| `read_section` | `pageId`, `anchor`, `maxTokens` | One heading-anchored section as plain text. |
+| `context_for` | `query`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
+
+`read_page` defaults to 4,000 tokens, `read_section` to 2,000 and `context_for`
+to 3,000. The limit is an estimate of four bytes per token, not a model
+tokenizer. Each result carries `estimatedTokens` and `truncated` so an agent
+knows when to ask for a smaller section or a larger budget.
+
+`context_for` is the usual first call for a task. It runs the ranked search,
+selects the matching sections rather than whole pages, and stops before the
+budget is crossed. The text is extractive; no summary is generated.
+
+`search_wiki` works without `pages.json`, with the Markdown URL derived from the
+HTML URL. Page IDs, `read_page`, `read_section`, the tag filter and the site
+filter need `pages.json`. `read_page` also needs `--base` when the render uses
+absolute URLs, so the server can resolve a Markdown URL back to the site
+directory. Re-render after a content change; the read and search data is not
+rebuilt on every query.
 
 ## Multi-site and offline
 
