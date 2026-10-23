@@ -14,6 +14,12 @@ okf-wiki render --content ./docs --out ./public
 # render then serve until interrupted
 okf-wiki serve --content ./docs --out .scratch/wiki --addr 127.0.0.1:8080 --open
 
+# search a rendered site
+okf-wiki search "graph" --out .scratch/wiki --base /wiki/ --json
+
+# serve search over MCP stdio
+okf-wiki mcp --out .scratch/wiki --base /wiki/
+
 # print the auto-detected content directory
 okf-wiki detect
 
@@ -171,6 +177,10 @@ action. If you are reading this page locally, you are reading whatever `docs/`
 holds in your checkout, which may be ahead of or behind what is published.
 
 ## Rendered output
+
+`search` and `mcp` read a rendered site rather than the source bundle. See
+[Agent access](../reference/agent-access.md) for the result contract and the
+MCP tool schema.
 
 `--out` receives `index.html`, a redirect to the wiki, and the wiki itself at
 the base path: `out/wiki/` by default, and `out/docs/deep/` for
