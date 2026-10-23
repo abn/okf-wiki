@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,13 +138,17 @@ func agentLLMS(title, description string, pages []AgentPage) string {
 	}
 	b.WriteString("Machine-readable page list: [pages.json](pages.json).\n\n")
 
-	lastSite := "\x00"
+	lastSiteKey := "\x00"
 	lastSection := "\x00"
 	for _, p := range pages {
-		if p.Site != "" && p.Site != lastSite {
+		siteKey := p.SiteKey
+		if siteKey == "" {
+			siteKey = p.Site
+		}
+		if p.Site != "" && siteKey != lastSiteKey {
 			ensureBlankLine(&b)
 			fmt.Fprintf(&b, "## %s\n\n", oneLine(p.Site))
-			lastSite = p.Site
+			lastSiteKey = siteKey
 			lastSection = "\x00"
 		}
 		if p.Section != lastSection {
@@ -155,7 +160,7 @@ func agentLLMS(title, description string, pages []AgentPage) string {
 			fmt.Fprintf(&b, "%s %s\n\n", level, oneLine(p.Section))
 			lastSection = p.Section
 		}
-		line := fmt.Sprintf("- [%s](%s)", escapeLinkText(p.Title), p.MarkdownURL)
+		line := fmt.Sprintf("- [%s](%s)", escapeLinkText(p.Title), escapeLinkDestination(p.MarkdownURL))
 		if desc := oneLine(p.Description); desc != "" {
 			line += ": " + desc
 		}
@@ -209,6 +214,14 @@ func ensureBlankLine(b *strings.Builder) {
 
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+
+func escapeLinkDestination(s string) string {
+	parts := strings.Split(s, "/")
+	for i := range parts {
+		parts[i] = url.PathEscape(parts[i])
+	}
+	return strings.Join(parts, "/")
 }
 
 func escapeLinkText(s string) string {
