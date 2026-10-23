@@ -28,10 +28,11 @@ type SearchPage struct {
 // Anchor meaning the page url alone. Title is the heading and the page's title
 // is on its row, which differ whenever a hit is anchored mid-page.
 type SearchEntry struct {
-	Page    int    `json:"g"` // index into the page table
-	Anchor  string `json:"a"` // heading anchor, empty for the page itself
-	Title   string `json:"t"` // heading title or page title
-	Section string `json:"s"` // section category (e.g. Architecture)
+	Page      int    `json:"g"`                   // index into the page table
+	Anchor    string `json:"a"`                   // heading anchor, empty for the page itself
+	Title     string `json:"t"`                   // heading title or page title
+	Section   string `json:"s"`                   // section category (e.g. Architecture)
+	Truncated bool   `json:"truncated,omitempty"` // the indexed text was capped
 	// Content is the extracted plain text. It is held in memory so the entry is
 	// one object throughout a render, but it is not written into the index: it
 	// is most of the index's bytes, so it travels in the companion
@@ -58,9 +59,10 @@ type SearchContent struct {
 
 // rawSearchChunk is an unresolved text section extracted from a page's AST.
 type rawSearchChunk struct {
-	Heading string
-	Anchor  string
-	Text    string
+	Heading   string
+	Anchor    string
+	Text      string
+	Truncated bool
 }
 
 // maxSearchChunkBytes bounds one chunk's indexed text. Content dominates the
@@ -74,8 +76,13 @@ const maxSearchChunkBytes = 12000
 // at the cut and then backing up to the last space, so a cut lands between
 // words when the prefix has one.
 func boundSearchText(s string) string {
+	text, _ := boundSearchTextInfo(s)
+	return text
+}
+
+func boundSearchTextInfo(s string) (string, bool) {
 	if len(s) <= maxSearchChunkBytes {
-		return s
+		return s, false
 	}
 	cut := s[:maxSearchChunkBytes]
 	// At most the rune straddling the cut can be partial, so step back over its
@@ -91,7 +98,7 @@ func boundSearchText(s string) string {
 	if i := strings.LastIndexByte(cut, ' '); i > 0 {
 		cut = cut[:i]
 	}
-	return cut
+	return cut, true
 }
 
 // extractSearchChunks splits a page into one text chunk per heading, anchored
@@ -108,9 +115,9 @@ func extractSearchChunks(doc ast.Node, src []byte) []rawSearchChunk {
 			if h.Level == 1 {
 				continue
 			}
-			txt := boundSearchText(cleanSearchText(currentText.String()))
+			txt, cut := boundSearchTextInfo(cleanSearchText(currentText.String()))
 			if txt != "" || currentHeading != "" {
-				chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt})
+				chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt, Truncated: cut})
 			}
 			currentText.Reset()
 			currentHeading = headingText(h, src)
@@ -125,9 +132,9 @@ func extractSearchChunks(doc ast.Node, src []byte) []rawSearchChunk {
 		}
 	}
 
-	txt := boundSearchText(cleanSearchText(currentText.String()))
+	txt, cut := boundSearchTextInfo(cleanSearchText(currentText.String()))
 	if txt != "" || currentHeading != "" {
-		chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt})
+		chunks = append(chunks, rawSearchChunk{Heading: currentHeading, Anchor: currentAnchor, Text: txt, Truncated: cut})
 	}
 	return chunks
 }
@@ -210,7 +217,7 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 					itemTitle = docTitle
 				}
 				index.Entries = append(index.Entries, SearchEntry{
-					Page: page, Anchor: chunk.Anchor, Title: itemTitle, Section: secTitle, Content: chunk.Text,
+					Page: page, Anchor: chunk.Anchor, Title: itemTitle, Section: secTitle, Content: chunk.Text, Truncated: chunk.Truncated,
 				})
 			}
 		}

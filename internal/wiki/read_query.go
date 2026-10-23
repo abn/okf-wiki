@@ -140,7 +140,7 @@ func (c *SearchCorpus) ReadSection(pageID, anchor string, maxTokens int) (Sectio
 		ContentHash:     page.ContentHash,
 		Text:            text,
 		EstimatedTokens: estimateTokens(text),
-		Truncated:       truncated,
+		Truncated:       truncated || entry.Truncated,
 	}, nil
 }
 
@@ -188,11 +188,13 @@ func (c *SearchCorpus) ContextFor(query string, opts SearchOptions, maxTokens in
 			ContentHash:     result.ContentHash,
 			Text:            text,
 			EstimatedTokens: estimateTokens(text),
-			Truncated:       cut,
+			Truncated:       cut || c.Index.Entries[index].Truncated,
 		})
 		remaining -= estimateTokens(text)
-		if cut {
+		if cut || c.Index.Entries[index].Truncated {
 			resp.Truncated = true
+		}
+		if cut {
 			break
 		}
 	}
