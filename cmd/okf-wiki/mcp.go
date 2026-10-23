@@ -17,6 +17,7 @@ import (
 // budgeted context packs all return citations, but nothing writes to the wiki.
 type mcpServer struct {
 	corpus *wiki.SearchCorpus
+	graph  *wiki.GraphCorpus
 }
 
 type rpcRequest struct {
@@ -51,7 +52,11 @@ func runMCP(args []string) {
 	if err != nil {
 		fatal(fmt.Errorf("load rendered search data: %w", err))
 	}
-	s := &mcpServer{corpus: corpus}
+	graph, err := wiki.LoadGraphCorpus(siteDir)
+	if err != nil {
+		fatal(fmt.Errorf("load rendered graph data: %w", err))
+	}
+	s := &mcpServer{corpus: corpus, graph: graph}
 	if err := s.serve(os.Stdin, os.Stdout); err != nil {
 		fatal(err)
 	}
@@ -118,6 +123,7 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			ID:      req.ID,
 			Result: map[string]any{"tools": []any{
 				mcpSearchTool(), mcpReadPageTool(), mcpReadSectionTool(), mcpContextTool(),
+				mcpNeighborsTool(), mcpPathTool(),
 			}},
 		}
 	case "tools/call":
@@ -185,6 +191,41 @@ func mcpContextTool() map[string]any {
 	}
 }
 
+func mcpNeighborsTool() map[string]any {
+	return map[string]any{
+		"name":        "neighbors",
+		"description": "Return the local graph around a page up to three hops, with typed edges and node citations.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"pageId": map[string]any{"type": "string", "description": "Page ID from search, pages.json or the graph."},
+				"depth":  map[string]any{"type": "integer", "minimum": 1, "maximum": 3, "default": 1},
+				"kinds":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional edge kinds: link, tag, previous, next."},
+			},
+			"required":             []string{"pageId"},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpPathTool() map[string]any {
+	return map[string]any{
+		"name":        "path",
+		"description": "Find the shortest undirected path between two pages, with the typed edge that connects each pair.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"from":     map[string]any{"type": "string", "description": "Starting page ID."},
+				"to":       map[string]any{"type": "string", "description": "Target page ID."},
+				"maxDepth": map[string]any{"type": "integer", "minimum": 1, "maximum": 10, "default": 6},
+				"kinds":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional edge kinds: link, tag, previous, next."},
+			},
+			"required":             []string{"from", "to"},
+			"additionalProperties": false,
+		},
+	}
+}
+
 func mcpSearchTool() map[string]any {
 	return map[string]any{
 		"name":        "search_wiki",
@@ -231,6 +272,10 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 		return s.readSectionTool(params.Arguments)
 	case "context_for":
 		return s.contextTool(params.Arguments)
+	case "neighbors":
+		return s.neighborsTool(params.Arguments)
+	case "path":
+		return s.pathTool(params.Arguments)
 	default:
 		return mcpToolError("unknown tool " + params.Name)
 	}
@@ -335,6 +380,49 @@ func (s *mcpServer) contextTool(raw json.RawMessage) map[string]any {
 	resp, err := s.corpus.ContextFor(args.Query, wiki.SearchOptions{
 		Limit: args.Limit, Site: args.Site, Tag: args.Tag, Section: args.Section,
 	}, args.MaxTokens)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+type mcpNeighborsArgs struct {
+	PageID string   `json:"pageId"`
+	Depth  int      `json:"depth"`
+	Kinds  []string `json:"kinds"`
+}
+
+func (s *mcpServer) neighborsTool(raw json.RawMessage) map[string]any {
+	var args mcpNeighborsArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid neighbors arguments")
+	}
+	if args.PageID == "" {
+		return mcpToolError("pageId is required")
+	}
+	resp, err := s.graph.Neighbors(args.PageID, args.Depth, args.Kinds)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+type mcpPathArgs struct {
+	From     string   `json:"from"`
+	To       string   `json:"to"`
+	MaxDepth int      `json:"maxDepth"`
+	Kinds    []string `json:"kinds"`
+}
+
+func (s *mcpServer) pathTool(raw json.RawMessage) map[string]any {
+	var args mcpPathArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid path arguments")
+	}
+	if args.From == "" || args.To == "" {
+		return mcpToolError("from and to are required")
+	}
+	resp, err := s.graph.Path(args.From, args.To, args.MaxDepth, args.Kinds)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}

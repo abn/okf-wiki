@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-23
 
+* **Feature**: The MCP server adds `neighbors` and `path`. Neighbours return the
+  local graph with `link`, `tag`, `previous` and `next` edges; previous and next
+  are derived from page order in `pages.json` inside each site and section.
+  Paths are undirected and carry the edge that connects each pair. The agent
+  page documents the filters and depth limits.
+
 * **Feature**: The MCP server adds `read_page`, `read_section` and `context_for`
   alongside `search_wiki`. Reads carry page IDs, anchors, Markdown URLs and
   content hashes, and cap their text at an estimated token budget. The agent

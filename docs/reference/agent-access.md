@@ -153,7 +153,7 @@ stdio server:
 }
 ```
 
-The server exposes four read-only tools:
+The server exposes six read-only tools:
 
 | Tool | Arguments | Returns |
 | :--- | :--- | :--- |
@@ -161,6 +161,8 @@ The server exposes four read-only tools:
 | `read_page` | `pageId`, `maxTokens` | The page's Markdown source, capped at the budget. |
 | `read_section` | `pageId`, `anchor`, `maxTokens` | One heading-anchored section as plain text. |
 | `context_for` | `query`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
+| `neighbors` | `pageId`, `depth`, `kinds` | The local graph with typed edges. |
+| `path` | `from`, `to`, `maxDepth`, `kinds` | The shortest undirected path and its edges. |
 
 `read_page` defaults to 4,000 tokens, `read_section` to 2,000 and `context_for`
 to 3,000. The limit is an estimate of four bytes per token, not a model
@@ -173,12 +175,18 @@ section that would cross the budget. The response sets `truncated` when the
 budget or the 12,000-byte index cap shortened any section. The text is
 extractive; no summary is generated.
 
+`neighbors` accepts `link`, `tag`, `previous` and `next` in `kinds`. Previous
+and next are derived from the page order in `pages.json` inside each site and
+section; they are not stored in `graph.json`. `path` uses the same undirected
+graph, so it can follow links, tags or page order. A path result includes the
+edge that connects each pair.
+
 `search_wiki` works without `pages.json`, with the Markdown URL derived from the
-HTML URL. Page IDs, `read_page`, `read_section`, the tag filter and the site
-filter need `pages.json`. `read_page` also needs `--base` when the render uses
-absolute URLs, so the server can resolve a Markdown URL back to the site
-directory. Re-render after a content change; the read and search data is not
-rebuilt on every query.
+HTML URL. Page IDs, `read_page`, `read_section`, the graph tools, the tag filter
+and the site filter need `pages.json`. `read_page` also needs `--base` when the
+render uses absolute URLs, so the server can resolve a Markdown URL back to the
+site directory. Re-render after a content change; the read and search data is
+not rebuilt on every query.
 
 ## Multi-site and offline
 
