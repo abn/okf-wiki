@@ -55,8 +55,14 @@ type GraphCorpus struct {
 	Graph GraphIndex
 	Pages AgentManifest
 	nodes map[string]GraphNode
-	adj   map[string][]GraphEdgeInfo
+	adj   map[string][]adjEdge
 	edges []GraphEdgeInfo
+}
+
+type adjEdge struct {
+	peer string
+	edge GraphEdgeInfo
+	kind string
 }
 
 // LoadGraphCorpus reads graph.json and, when present, pages.json from a
@@ -70,7 +76,7 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 	if err := json.Unmarshal(raw, &g); err != nil {
 		return nil, fmt.Errorf("decode graph.json: %w", err)
 	}
-	c := &GraphCorpus{Graph: g, nodes: make(map[string]GraphNode), adj: make(map[string][]GraphEdgeInfo)}
+	c := &GraphCorpus{Graph: g, nodes: make(map[string]GraphNode), adj: make(map[string][]adjEdge)}
 	for _, n := range g.Nodes {
 		c.nodes[n.ID] = n
 	}
@@ -83,8 +89,8 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 		}
 		info := GraphEdgeInfo{From: e.From, To: e.To, Kind: e.Kind, Anchor: e.Anchor, Text: e.Text}
 		c.edges = append(c.edges, info)
-		c.adj[e.From] = append(c.adj[e.From], info)
-		c.adj[e.To] = append(c.adj[e.To], GraphEdgeInfo{From: e.To, To: e.From, Kind: e.Kind, Anchor: e.Anchor, Text: e.Text})
+		c.adj[e.From] = append(c.adj[e.From], adjEdge{peer: e.To, edge: info, kind: e.Kind})
+		c.adj[e.To] = append(c.adj[e.To], adjEdge{peer: e.From, edge: info, kind: e.Kind})
 	}
 	if manifestRaw, err := os.ReadFile(filepath.Join(dir, "pages.json")); err == nil {
 		if err := json.Unmarshal(manifestRaw, &c.Pages); err != nil {
@@ -120,13 +126,12 @@ func (c *GraphCorpus) addSynthetic(e GraphEdgeInfo) {
 		return
 	}
 	for _, existing := range c.adj[e.From] {
-		if existing.To == e.To && existing.Kind == e.Kind {
+		if existing.peer == e.To && existing.kind == e.Kind {
 			return
 		}
 	}
 	c.edges = append(c.edges, e)
-	c.adj[e.From] = append(c.adj[e.From], e)
-	c.adj[e.To] = append(c.adj[e.To], GraphEdgeInfo{From: e.To, To: e.From, Kind: e.Kind})
+	c.adj[e.From] = append(c.adj[e.From], adjEdge{peer: e.To, edge: e, kind: e.Kind})
 }
 
 func nodeInfo(n GraphNode) GraphNodeInfo {
@@ -164,22 +169,22 @@ func (c *GraphCorpus) Neighbors(pageID string, depth int, kinds []string) (Neigh
 			continue
 		}
 		for _, e := range c.adj[current.id] {
-			if !allowed(e.Kind) {
+			if !allowed(e.kind) {
 				continue
 			}
-			if !visited[e.To] {
+			if !visited[e.peer] {
 				if len(nodes) >= 200 {
 					truncated = true
 					continue
 				}
-				visited[e.To] = true
-				nodes = append(nodes, nodeInfo(c.nodes[e.To]))
-				queue = append(queue, item{e.To, current.depth + 1})
+				visited[e.peer] = true
+				nodes = append(nodes, nodeInfo(c.nodes[e.peer]))
+				queue = append(queue, item{e.peer, current.depth + 1})
 			}
-			key := e.From + "\x00" + e.To + "\x00" + e.Kind + "\x00" + e.Anchor
+			key := e.edge.From + "\x00" + e.edge.To + "\x00" + e.kind + "\x00" + e.edge.Anchor
 			if !seenEdges[key] {
 				seenEdges[key] = true
-				edges = append(edges, e)
+				edges = append(edges, e.edge)
 			}
 		}
 	}
@@ -210,6 +215,7 @@ func (c *GraphCorpus) Path(fromID, toID string, maxDepth int, kinds []string) (P
 	type step struct {
 		node GraphNodeInfo
 		edge GraphEdgeInfo
+		from string
 	}
 	prev := make(map[string]step)
 	visited := map[string]bool{fromID: true}
@@ -226,16 +232,16 @@ func (c *GraphCorpus) Path(fromID, toID string, maxDepth int, kinds []string) (P
 			continue
 		}
 		for _, e := range c.adj[current.id] {
-			if !allowed(e.Kind) || visited[e.To] {
+			if !allowed(e.kind) || visited[e.peer] {
 				continue
 			}
-			visited[e.To] = true
-			prev[e.To] = step{node: nodeInfo(c.nodes[e.To]), edge: e}
-			if e.To == toID {
+			visited[e.peer] = true
+			prev[e.peer] = step{node: nodeInfo(c.nodes[e.peer]), edge: e.edge, from: current.id}
+			if e.peer == toID {
 				found = true
 				break
 			}
-			queue = append(queue, item{e.To, current.depth + 1})
+			queue = append(queue, item{e.peer, current.depth + 1})
 		}
 	}
 	resp := PathResponse{From: nodeInfo(from), To: nodeInfo(to), Found: found, Nodes: []GraphNodeInfo{}, Edges: []GraphEdgeInfo{}}
@@ -251,7 +257,7 @@ func (c *GraphCorpus) Path(fromID, toID string, maxDepth int, kinds []string) (P
 		}
 		s := prev[id]
 		edges = append(edges, s.edge)
-		id = s.edge.From
+		id = s.from
 	}
 	for i, j := 0, len(nodes)-1; i < j; i, j = i+1, j-1 {
 		nodes[i], nodes[j] = nodes[j], nodes[i]

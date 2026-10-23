@@ -69,6 +69,30 @@ func TestGraphNeighborsAndPath(t *testing.T) {
 	if !hasEdge(all.Edges, "previous") && !hasEdge(all.Edges, "next") {
 		t.Errorf("page order edges are missing: %+v", all.Edges)
 	}
+	prevID, _ := orderNeighbors(c.Pages.Pages, "page:orphan")
+	prev, err := c.Neighbors("page:orphan", 1, []string{"previous"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prevID == "" {
+		if len(prev.Nodes) != 1 {
+			t.Errorf("first previous neighbours = %+v", prev)
+		}
+	} else if !hasNode(prev.Nodes, prevID) {
+		t.Errorf("previous neighbours = %+v, want %s", prev, prevID)
+	}
+	_, nextID := orderNeighbors(c.Pages.Pages, "page:index")
+	next, err := c.Neighbors("page:index", 1, []string{"next"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nextID == "" {
+		if len(next.Nodes) != 1 {
+			t.Errorf("last next neighbours = %+v", next)
+		}
+	} else if !hasNode(next.Nodes, nextID) {
+		t.Errorf("next neighbours = %+v, want %s", next, nextID)
+	}
 
 	path, err := c.Path("page:guide/install", "page:orphan", 6, nil)
 	if err != nil {
@@ -102,4 +126,19 @@ func hasEdge(edges []GraphEdgeInfo, kind string) bool {
 		}
 	}
 	return false
+}
+
+func orderNeighbors(pages []AgentPage, id string) (previous, next string) {
+	for i, p := range pages {
+		if p.ID != id {
+			continue
+		}
+		if i > 0 {
+			previous = pages[i-1].ID
+		}
+		if i+1 < len(pages) {
+			next = pages[i+1].ID
+		}
+	}
+	return previous, next
 }
