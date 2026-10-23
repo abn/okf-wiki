@@ -1409,6 +1409,9 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   color: var(--color-text-faint); font-family: var(--font-code); font-size: var(--text-xs);
   overflow-wrap: anywhere;
 }
+.graph-list-edge.is-cross-site .graph-list-edge-kind {
+  color: var(--color-accent-text); border-color: var(--color-accent-text);
+}
 .graph-list-edge-kind {
   color: var(--color-text-faint); border: 1px solid var(--color-line);
   border-radius: var(--radius-pill); padding: 0 var(--space-2);
@@ -1455,6 +1458,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   pointer-events: none; transition: opacity var(--dur) var(--ease);
 }
 .graph-edge.tag { stroke: var(--color-accent-text); stroke-dasharray: 3 3; stroke-opacity: .14; }
+.graph-edge.cross-site { stroke: var(--color-accent-text); stroke-dasharray: 6 4; stroke-opacity: .24; }
 .graph-edge.is-dim { opacity: .08; }
 .graph-edge.is-focus-far { opacity: .04; }
 .graph-edge.is-culled { display: none; }

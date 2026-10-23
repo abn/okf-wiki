@@ -109,6 +109,12 @@ type Renderer struct {
 	// aggregatedGraph collects the graph of a tree render the same way, with
 	// each wiki's node IDs namespaced by its path.
 	aggregatedGraph GraphIndex
+	// treeWikis is the set of wiki paths in a tree render. Cross-wiki links
+	// resolve against it after each wiki has loaded.
+	treeWikis map[string]bool
+	// crossEdges holds namespaced edges from one wiki to another until every
+	// wiki has rendered and their target nodes can be checked.
+	crossEdges []GraphEdge
 	// backlinks indexes recorded page links by target slug for the Connections
 	// panel. It is built once, after the pages are loaded.
 	backlinks      map[string][]backlinkRef
@@ -571,11 +577,18 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 			href := string(nn.Destination)
 			nn.Destination = []byte(r.linkPath(p.Slug, href))
 			if markdownTarget(href) {
+				var text strings.Builder
+				collectText(nn, src, &text)
 				if to, ok := r.graphTarget(string(nn.Destination)); ok && to != p.Slug {
-					var text strings.Builder
-					collectText(nn, src, &text)
 					p.links = append(p.links, pageLink{
 						To:      to,
+						Anchor:  currentAnchor,
+						Heading: currentHeading,
+						Text:    strings.TrimSpace(text.String()),
+					})
+				} else if cross, ok := r.crossWikiTarget(p.Slug, href); ok {
+					p.links = append(p.links, pageLink{
+						Cross:   cross,
 						Anchor:  currentAnchor,
 						Heading: currentHeading,
 						Text:    strings.TrimSpace(text.String()),
@@ -669,6 +682,39 @@ func splitFrontmatter(data []byte) (frontmatter, []byte) {
 	return fm, rest[best+len(marker):]
 }
 
+// crossWikiTarget resolves a relative Markdown link that climbs out of this
+// wiki to the page's path under the tree root, without the .md suffix. A link
+// that stays inside the wiki, leaves the tree, or uses a root-relative path is
+// not a cross-wiki target. The tree turns these paths into edges after every
+// wiki has rendered.
+func (r *Renderer) crossWikiTarget(fromSlug, href string) (string, bool) {
+	if !r.nested || r.siteRel == "" {
+		return "", false
+	}
+	if strings.Contains(href, "://") || strings.HasPrefix(href, "/") ||
+		strings.HasPrefix(href, "#") || strings.HasPrefix(href, "//") ||
+		strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
+		return "", false
+	}
+	target, _, _ := strings.Cut(href, "#")
+	target, _, _ = strings.Cut(target, "?")
+	if target == "" || !strings.HasSuffix(target, ".md") {
+		return "", false
+	}
+	tree := path.Clean(path.Join(r.siteRel, path.Dir(fromSlug), target))
+	tree = strings.TrimSuffix(tree, ".md")
+	if tree == "" || tree == "." || strings.HasPrefix(tree, "..") {
+		return "", false
+	}
+	if tree == r.siteRel || strings.HasPrefix(tree, r.siteRel+"/") {
+		return "", false
+	}
+	if _, _, ok := splitTreeTarget(tree, r.treeWikis); !ok {
+		return "", false
+	}
+	return tree, true
+}
+
 // linkPath resolves a markdown link from a page slug into a wiki URL. A link
 // that stays inside the bundle and ends in .md maps to a rendered HTML page. An
 // in-bundle link is written either from the bundle root, "/section/page.md",
@@ -699,6 +745,14 @@ func (r *Renderer) linkPath(fromSlug, href string) string {
 		clean = strings.TrimPrefix(path.Clean(target), "/")
 	} else {
 		clean = path.Clean(path.Join(path.Dir(fromSlug), target))
+	}
+
+	if tree, ok := r.crossWikiTarget(fromSlug, href); ok {
+		href = tree + ".html" + frag
+		if r.cfg.Offline {
+			return href
+		}
+		return r.treeBase + href
 	}
 
 	// A target that climbs out of the bundle is not ours to publish. It can

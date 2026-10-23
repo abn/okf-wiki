@@ -16,7 +16,10 @@ other page loads the catalogue, and `--graph-inline` removes even that request.
 The drawing has one node per page and per tag. A page linked from the bundle
 but missing from it appears as a dashed node, so a broken link is visible here
 as well as in the file. Edges are solid for Markdown links and dashed for
-frontmatter tags.
+frontmatter tags. In a tree, a relative Markdown link that climbs out of one
+wiki and lands on a page in another becomes a cross-wiki edge in the
+aggregate; both ends keep their namespaced IDs, and the edge is drawn in the
+accent colour and labelled `cross-wiki` in the list.
 
 ## Reading it
 
@@ -116,8 +119,9 @@ example `graph.html?focus=page:usage/graph&depth=1`. The focus node is selected
 and its neighbourhood is lit while the rest of the graph fades. **Show all**
 clears the focus, fits the graph and keeps the current filters.
 
-Backlinks are collected within one wiki. Cross-wiki edges are still on the
-[graph evolution](../design/graph-evolution.md) list.
+Backlinks are collected within one wiki. Cross-wiki links appear as edges in
+the tree's aggregate graph, not in a wiki's Connections panel. The
+[graph evolution](../design/graph-evolution.md) page records the distinction.
 
 ## Embedding the catalogue
 

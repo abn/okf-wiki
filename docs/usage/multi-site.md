@@ -144,7 +144,9 @@ Each wiki writes its own `graph.json` beside its search catalogue, and after
 every wiki has rendered the tree writes one aggregate at its base. The aggregate
 prefixes every node ID with the wiki's path under the tree root, so two wikis
 can both own an `index` page, and a node's URL already points into the wiki it
-came from. A wiki that could not be read contributes nothing. A tree whose root
+came from. A relative Markdown link that climbs to a sibling wiki becomes an
+edge between the two namespaced IDs; the wiki's own catalogue keeps only its
+own edges. A wiki that could not be read contributes nothing. A tree whose root
 is itself a wiki keeps that wiki's own catalogue at the base, with no aggregate
 written over it.
 
@@ -160,9 +162,12 @@ diagrams.
 
 ## What it is not
 
-Links and tags do not cross between wikis. A link inside one wiki resolves
-inside that wiki, and each tag page belongs to its own wiki. Search and the
-graph view are the exceptions: one index and one graph at the tree base span
-every wiki, with search results grouped by the wiki they came from and graph
-nodes carrying the wiki they belong to. A tree is one place to publish many
-wikis, not one wiki with many sections.
+Tags do not cross between wikis, and each tag page belongs to its own wiki. A
+relative Markdown link can cross: from a wiki at the tree root
+`[Beta](../beta/index.md)` opens the sibling page, and a page one section deep
+uses `../../beta/index.md`. The aggregate graph records that link with
+namespaced IDs at both ends; the wiki's own graph and Connections panel stay
+inside the wiki. A link that leaves the tree is not a page link. Search and the
+graph view span every wiki, with search results grouped by the wiki they came
+from and graph nodes carrying the wiki they belong to. A tree is one place to
+publish many wikis, not one wiki with many sections.

@@ -427,6 +427,180 @@ func TestMultiSiteWritesAggregateGraph(t *testing.T) {
 	}
 }
 
+// TestCrossWikiTarget pins which links leave a wiki: a relative Markdown link
+// that climbs to a sibling is a cross-wiki target, while an in-wiki link, a
+// root-relative link and a path above the tree are not.
+func TestCrossWikiTarget(t *testing.T) {
+	r := &Renderer{nested: true, siteRel: "alpha", treeWikis: map[string]bool{"alpha": true, "beta": true}}
+	cases := []struct {
+		from, href, want string
+		ok               bool
+	}{
+		{"index", "../beta/index.md", "beta/index", true},
+		{"guide/x", "../../beta/page.md", "beta/page", true},
+		{"guide/x", "../../beta/page.md#setup", "beta/page", true},
+		{"guide/x", "../../beta/page.md?view=1", "beta/page", true},
+		{"guide/x", "../index.md", "", false},
+		{"index", "../../outside.md", "", false},
+		{"index", "/beta/page.md", "", false},
+		{"index", "https://example.com/page.md", "", false},
+		{"index", "../beta/image.png", "", false},
+	}
+	for _, tc := range cases {
+		got, ok := r.crossWikiTarget(tc.from, tc.href)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("crossWikiTarget(%q, %q) = %q/%v, want %q/%v",
+				tc.from, tc.href, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+// TestSplitTreeTarget pins the wiki a tree-relative target belongs to. A
+// nested wiki key wins over a group path that merely shares its prefix.
+func TestSplitTreeTarget(t *testing.T) {
+	keys := map[string]bool{
+		"clients/example/ops":      true,
+		"clients/example/strategy": true,
+		"homelab":                  true,
+	}
+	key, slug, ok := splitTreeTarget("clients/example/strategy/page", keys)
+	if !ok || key != "clients/example/strategy" || slug != "page" {
+		t.Errorf("nested split = %q/%q/%v, want clients/example/strategy/page/true",
+			key, slug, ok)
+	}
+	if _, _, ok := splitTreeTarget("clients/example/group/page", keys); ok {
+		t.Error("a group path became a wiki target")
+	}
+	if _, _, ok := splitTreeTarget("homelab", keys); ok {
+		t.Error("a bare wiki key became a page target")
+	}
+}
+
+// TestMultiSiteCrossWikiLinks covers the aggregate-only edge: a sibling link
+// becomes a namespaced edge in the tree graph, stays out of the wiki's own
+// graph, and is rewritten to the sibling page in both online and offline
+// output.
+func TestMultiSiteCrossWikiLinks(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustMkdir(t, filepath.Join(dir, "beta"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntitle: Alpha\n---\n# Alpha\n[Beta](../beta/index.md)\n")
+	mustWrite(t, filepath.Join(dir, "alpha", "topic.md"),
+		"---\ntitle: Alpha topic\n---\n# Alpha topic\n")
+	mustWrite(t, filepath.Join(dir, "beta", "index.md"),
+		"---\ntitle: Beta\n---\n# Beta\n[Alpha](../alpha/index.md)\n")
+	mustWrite(t, filepath.Join(dir, "beta", "topic.md"),
+		"---\ntitle: Beta topic\n---\n# Beta topic\n")
+
+	for _, offline := range []bool{false, true} {
+		name := "online"
+		if offline {
+			name = "offline"
+		}
+		t.Run(name, func(t *testing.T) {
+			out := t.TempDir()
+			r, err := New(Config{
+				Content: dir, Base: "/family/", Brand: Brand{Name: "t"},
+				MultiSite: true, Offline: offline,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := r.RenderSites(out); err != nil {
+				t.Fatal(err)
+			}
+
+			read := func(path string) GraphIndex {
+				t.Helper()
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var g GraphIndex
+				if err := json.Unmarshal(raw, &g); err != nil {
+					t.Fatalf("decode %s: %v", path, err)
+				}
+				return g
+			}
+			agg := read(filepath.Join(out, "family", "graph.json"))
+			if edges := graphEdges(agg, "alpha:page:index", "beta:page:index", "link"); len(edges) != 1 {
+				t.Errorf("cross edge = %+v, want one from alpha to beta", edges)
+			}
+			if edges := graphEdges(agg, "beta:page:index", "alpha:page:index", "link"); len(edges) != 1 {
+				t.Errorf("reverse cross edge = %+v, want one from beta to alpha", edges)
+			}
+			own := read(filepath.Join(out, "family", "alpha", "graph.json"))
+			for _, id := range []string{"page:beta/index", "page:beta/topic"} {
+				if _, ok := graphNode(own, id); ok {
+					t.Errorf("the per-wiki graph contains sibling node %q", id)
+				}
+			}
+			for _, e := range own.Edges {
+				if _, ok := graphNode(own, e.From); !ok {
+					t.Errorf("the per-wiki graph has an edge from absent node %q", e.From)
+				}
+				if _, ok := graphNode(own, e.To); !ok {
+					t.Errorf("the per-wiki graph has an edge to absent node %q", e.To)
+				}
+			}
+
+			page, err := os.ReadFile(filepath.Join(out, "family", "alpha", "index.html"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := `href="/family/beta/index.html"`
+			if offline {
+				want = `href="beta/index.html"`
+			}
+			if !strings.Contains(string(page), want) {
+				t.Errorf("alpha page does not contain %q", want)
+			}
+		})
+	}
+}
+
+// TestMultiSiteCrossWikiDoesNotHijackRepoLinks keeps a relative Markdown link
+// to a non-wiki file inside the tree on the repo path. Only a path under a wiki
+// key is a cross-wiki page.
+func TestMultiSiteCrossWikiDoesNotHijackRepoLinks(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntitle: Alpha\n---\n# Alpha\n[Docs](../repo-docs/page.md)\n")
+	out := t.TempDir()
+	r, err := New(Config{
+		Content: dir, Base: "/family/", Brand: Brand{Name: "t"},
+		MultiSite: true, Repo: "/tmp/repo",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+	page, err := os.ReadFile(filepath.Join(out, "family", "alpha", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(page), `href="/repo/repo-docs/page.md"`) {
+		t.Error("a non-wiki tree link did not stay on the repo path")
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "family", "graph.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var agg GraphIndex
+	if err := json.Unmarshal(raw, &agg); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range agg.Edges {
+		if e.From == "alpha:page:index" {
+			t.Errorf("a non-wiki tree link became a cross-wiki edge: %+v", e)
+		}
+	}
+}
+
 // TestMultiSiteEmptyGraphs covers the two cases with no aggregate to write over
 // a wiki: a tree with no readable wiki still gets empty arrays at its base, and
 // a root that is itself a wiki keeps its own unnamespaced catalogue there.

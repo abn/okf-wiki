@@ -134,6 +134,52 @@ def write_semantic_fixture(root):
     return path
 
 
+def write_cross_fixture(root):
+    source = (root / "graph.html").read_text()
+    data = json.dumps({
+        "version": 1,
+        "nodes": [
+            {
+                "id": "alpha:page:index",
+                "title": "Alpha home",
+                "url": "alpha/index.html",
+                "kind": "page",
+                "site": "Alpha",
+                "siteKey": "alpha",
+            },
+            {
+                "id": "beta:page:index",
+                "title": "Beta home",
+                "url": "beta/index.html",
+                "kind": "page",
+                "site": "Beta",
+                "siteKey": "beta",
+            },
+        ],
+        "edges": [
+            {
+                "from": "alpha:page:index",
+                "to": "beta:page:index",
+                "kind": "link",
+                "text": "Beta home",
+            }
+        ],
+    })
+    pattern = re.compile(
+        r'<script type="application/json" id="graphData">.*?</script>',
+        re.S,
+    )
+    html, count = pattern.subn(
+        lambda _: '<script type="application/json" id="graphData">' + data + '</script>',
+        source,
+        count=1,
+    )
+    must(count == 1, "the graph page has no inline catalogue to replace")
+    path = root / "cross-wiki-test.html"
+    path.write_text(html)
+    return path
+
+
 def label_tier_totals(driver):
     return driver.execute_script(
         """
@@ -741,6 +787,23 @@ def main():
             )
         finally:
             semantic_page.unlink(missing_ok=True)
+
+        cross_page = write_cross_fixture(root)
+        try:
+            driver.get(cross_page.as_uri())
+            wait_for(driver, ".graph-node-group")
+            wait_layout(driver)
+            must(
+                driver.find_elements(By.CSS_SELECTOR, ".graph-edge.cross-site"),
+                "the cross-wiki edge is not styled as crossing wikis",
+            )
+            must(
+                driver.find_element(By.CSS_SELECTOR, ".graph-list-edge-kind").text
+                == "cross-wiki",
+                "the edge list does not name the cross-wiki edge",
+            )
+        finally:
+            cross_page.unlink(missing_ok=True)
 
         redirect = root.parent / "index.html"
         start = redirect.as_uri()

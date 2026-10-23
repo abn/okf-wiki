@@ -163,8 +163,9 @@ flowchart LR
    loaded, then writes the source page, its section, the heading and the link
    text as static HTML. The panel's Local graph link opens the graph at `?focus=<node>&depth=1`;
    the client selects that node and the existing neighbourhood focus takes over,
-   with Show all as the way back. Backlinks are within one wiki; cross-wiki edges
-   remain on the [graph evolution](graph-evolution.md) list.
+   with Show all as the way back. Backlinks are within one wiki. The aggregate
+   graph records a relative link that climbs to a sibling wiki as an edge
+   between namespaced IDs; the per-wiki catalogue stays inside its wiki.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
    has its Markdown source beside it, the resolved theme's assets (stylesheet,

@@ -296,6 +296,32 @@ func TestGraphSemanticZoomContract(t *testing.T) {
 	}
 }
 
+// TestGraphCrossWikiContract pins the client's cross-wiki treatment: an edge
+// whose endpoints name different sites is drawn and listed as cross-wiki.
+func TestGraphCrossWikiContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js, css string
+	for _, f := range th.files {
+		switch f.Path {
+		case "graph.js":
+			js = string(f.Data)
+		case "wiki.css":
+			css = string(f.Data)
+		}
+	}
+	for _, want := range []string{"cross-site", "cross-wiki", "siteKey"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	if !strings.Contains(css, ".graph-edge.cross-site") {
+		t.Error("wiki.css has no cross-wiki edge style")
+	}
+}
+
 // TestGraphInlineEmbedsCatalogue covers inline mode: the page carries the same
 // bytes the served site would fetch, so the client never calls fetch.
 func TestGraphInlineEmbedsCatalogue(t *testing.T) {
