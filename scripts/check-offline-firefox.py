@@ -430,20 +430,33 @@ def main():
             "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
             "the overview does not explain that only hubs are labelled",
         )
+        driver.find_element(By.ID, "graphSections").click()
+        wait_layout(driver)
+        WebDriverWait(driver, 5).until(
+            lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
+        )
         driver.execute_script(
             """
             const svg = document.getElementById('graphSvg');
-            const rect = svg.getBoundingClientRect();
+            const canvas = svg.getBoundingClientRect();
+            const target = Array.from(document.querySelectorAll('.graph-node-group')).find((group) => {
+              const label = group.querySelector('.graph-label');
+              if (!label || label.getAttribute('data-tier') !== '2') return false;
+              const rect = group.getBoundingClientRect();
+              return rect.left >= canvas.left && rect.right <= canvas.right &&
+                rect.top >= canvas.top && rect.bottom <= canvas.bottom;
+            });
+            const rect = target ? target.getBoundingClientRect() : canvas;
             svg.dispatchEvent(new WheelEvent('wheel', {
               deltaY: -600,
-              clientX: rect.x + rect.width / 2,
-              clientY: rect.y + rect.height / 2,
+              clientX: rect.left + rect.width / 2,
+              clientY: rect.top + rect.height / 2,
               bubbles: true,
               cancelable: true,
             }));
             """
         )
-        time.sleep(0.4)
+        time.sleep(0.9)
         tiers = visible_label_tiers(driver)
         must(
             tiers.get("2", 0) > 0,
