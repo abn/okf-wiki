@@ -79,3 +79,42 @@ func TestReadPageOffline(t *testing.T) {
 		t.Errorf("offline page = %+v", page)
 	}
 }
+
+func TestReadSectionReportsIndexCap(t *testing.T) {
+	dir := t.TempDir()
+	long := strings.Repeat("word ", 5000)
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n\n## Long\n\n"+long+"\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadSearchCorpus(filepath.Join(out, "wiki"), "/wiki/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	section, err := c.ReadSection("page:index", "long", 32000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !section.Truncated || len(section.Text) >= len(long) {
+		t.Errorf("long section = %d bytes, truncated %v; want the index cap flagged", len(section.Text), section.Truncated)
+	}
+	context, err := c.ContextFor("word", SearchOptions{Limit: 1}, 32000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !context.Truncated {
+		t.Error("context_for did not propagate the index cap")
+	}
+	page, err := c.ReadPage("page:index", 32000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Truncated || !strings.Contains(page.Content, strings.Repeat("word ", 100)) {
+		t.Errorf("full page = %d bytes, truncated %v", len(page.Content), page.Truncated)
+	}
+}

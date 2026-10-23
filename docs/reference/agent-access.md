@@ -168,8 +168,10 @@ tokenizer. Each result carries `estimatedTokens` and `truncated` so an agent
 knows when to ask for a smaller section or a larger budget.
 
 `context_for` is the usual first call for a task. It runs the ranked search,
-selects the matching sections rather than whole pages, and stops before the
-budget is crossed. The text is extractive; no summary is generated.
+selects the matching sections rather than whole pages, and truncates the last
+section that would cross the budget. The response sets `truncated` when the
+budget or the 12,000-byte index cap shortened any section. The text is
+extractive; no summary is generated.
 
 `search_wiki` works without `pages.json`, with the Markdown URL derived from the
 HTML URL. Page IDs, `read_page`, `read_section`, the tag filter and the site
