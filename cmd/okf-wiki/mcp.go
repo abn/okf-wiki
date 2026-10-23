@@ -12,10 +12,9 @@ import (
 	"github.com/abn/okf-wiki/internal/wiki"
 )
 
-// mcpServer exposes the rendered search corpus over the Model Context Protocol
-// stdio transport. It is deliberately read-only and search-only: the manifest
-// gives an agent the Markdown URL for a result, so the tool does not need to
-// copy page text into the protocol.
+// mcpServer exposes the rendered corpus over the Model Context Protocol stdio
+// transport. It is deliberately read-only: search, page and section reads, and
+// budgeted context packs all return citations, but nothing writes to the wiki.
 type mcpServer struct {
 	corpus *wiki.SearchCorpus
 }
@@ -48,7 +47,7 @@ func runMCP(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	corpus, err := wiki.LoadSearchCorpus(siteDir)
+	corpus, err := wiki.LoadSearchCorpus(siteDir, *base)
 	if err != nil {
 		fatal(fmt.Errorf("load rendered search data: %w", err))
 	}
@@ -117,7 +116,9 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 		return &rpcResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  map[string]any{"tools": []any{mcpSearchTool()}},
+			Result: map[string]any{"tools": []any{
+				mcpSearchTool(), mcpReadPageTool(), mcpReadSectionTool(), mcpContextTool(),
+			}},
 		}
 	case "tools/call":
 		result := s.callTool(req.Params)
@@ -128,6 +129,59 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			ID:      req.ID,
 			Error:   &rpcError{Code: -32601, Message: "method not found"},
 		}
+	}
+}
+
+func mcpReadPageTool() map[string]any {
+	return map[string]any{
+		"name":        "read_page",
+		"description": "Read one page's Markdown source, capped at a token budget. Returns the page ID, HTML URL, Markdown URL and content hash.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"pageId":    map[string]any{"type": "string", "description": "Page ID from search, pages.json or the graph."},
+				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 4000},
+			},
+			"required":             []string{"pageId"},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpReadSectionTool() map[string]any {
+	return map[string]any{
+		"name":        "read_section",
+		"description": "Read one heading-anchored section as plain text, with page ID, anchor, URLs and content hash.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"pageId":    map[string]any{"type": "string", "description": "Page ID from search or pages.json."},
+				"anchor":    map[string]any{"type": "string", "description": "Heading anchor from a search result or pages.json."},
+				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 2000},
+			},
+			"required":             []string{"pageId", "anchor"},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpContextTool() map[string]any {
+	return map[string]any{
+		"name":        "context_for",
+		"description": "Return the best-ranked sections for a query within a token budget, with page IDs, anchors, URLs and content hashes.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"query":     map[string]any{"type": "string", "description": "Words or a phrase to search for."},
+				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 3000},
+				"limit":     map[string]any{"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+				"site":      map[string]any{"type": "string", "description": "Wiki title or site key."},
+				"tag":       map[string]any{"type": "string", "description": "Page tag."},
+				"section":   map[string]any{"type": "string", "description": "Section title."},
+			},
+			"required":             []string{"query"},
+			"additionalProperties": false,
+		},
 	}
 }
 
@@ -168,11 +222,23 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 	if err := json.Unmarshal(raw, &params); err != nil {
 		return mcpToolError("invalid tool call")
 	}
-	if params.Name != "search_wiki" {
+	switch params.Name {
+	case "search_wiki":
+		return s.searchTool(params.Arguments)
+	case "read_page":
+		return s.readPageTool(params.Arguments)
+	case "read_section":
+		return s.readSectionTool(params.Arguments)
+	case "context_for":
+		return s.contextTool(params.Arguments)
+	default:
 		return mcpToolError("unknown tool " + params.Name)
 	}
+}
+
+func (s *mcpServer) searchTool(raw json.RawMessage) map[string]any {
 	var args mcpSearchArgs
-	if err := json.Unmarshal(params.Arguments, &args); err != nil {
+	if err := json.Unmarshal(raw, &args); err != nil {
 		return mcpToolError("invalid search arguments")
 	}
 	if strings.TrimSpace(args.Query) == "" {
@@ -190,7 +256,93 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
-	body, err := json.Marshal(resp)
+	return mcpToolJSON(resp)
+}
+
+type mcpReadPageArgs struct {
+	PageID    string `json:"pageId"`
+	MaxTokens int    `json:"maxTokens"`
+}
+
+func (s *mcpServer) readPageTool(raw json.RawMessage) map[string]any {
+	var args mcpReadPageArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid read_page arguments")
+	}
+	if args.PageID == "" {
+		return mcpToolError("pageId is required")
+	}
+	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
+		return mcpToolError("maxTokens must be between 1 and 32000")
+	}
+	page, err := s.corpus.ReadPage(args.PageID, args.MaxTokens)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(page)
+}
+
+type mcpReadSectionArgs struct {
+	PageID    string `json:"pageId"`
+	Anchor    string `json:"anchor"`
+	MaxTokens int    `json:"maxTokens"`
+}
+
+func (s *mcpServer) readSectionTool(raw json.RawMessage) map[string]any {
+	var args mcpReadSectionArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid read_section arguments")
+	}
+	if args.PageID == "" || args.Anchor == "" {
+		return mcpToolError("pageId and anchor are required")
+	}
+	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
+		return mcpToolError("maxTokens must be between 1 and 32000")
+	}
+	section, err := s.corpus.ReadSection(args.PageID, args.Anchor, args.MaxTokens)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(section)
+}
+
+type mcpContextArgs struct {
+	Query     string `json:"query"`
+	MaxTokens int    `json:"maxTokens"`
+	Limit     int    `json:"limit"`
+	Site      string `json:"site"`
+	Tag       string `json:"tag"`
+	Section   string `json:"section"`
+}
+
+func (s *mcpServer) contextTool(raw json.RawMessage) map[string]any {
+	var args mcpContextArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid context_for arguments")
+	}
+	if strings.TrimSpace(args.Query) == "" {
+		return mcpToolError("query is required")
+	}
+	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
+		return mcpToolError("maxTokens must be between 1 and 32000")
+	}
+	if args.Limit == 0 {
+		args.Limit = 10
+	}
+	if args.Limit < 1 || args.Limit > 20 {
+		return mcpToolError("limit must be between 1 and 20")
+	}
+	resp, err := s.corpus.ContextFor(args.Query, wiki.SearchOptions{
+		Limit: args.Limit, Site: args.Site, Tag: args.Tag, Section: args.Section,
+	}, args.MaxTokens)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+func mcpToolJSON(value any) map[string]any {
+	body, err := json.Marshal(value)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}

@@ -13,7 +13,7 @@ import (
 func testMCPServer(t *testing.T) *mcpServer {
 	t.Helper()
 	dir := t.TempDir()
-	if err := writeTestPage(filepath.Join(dir, "index.md"), "# Home\n\nThe install guide starts here.\n"); err != nil {
+	if err := writeTestPage(filepath.Join(dir, "index.md"), "# Home\n\n## Install\n\nThe install guide starts here.\n"); err != nil {
 		t.Fatal(err)
 	}
 	r, err := wiki.New(wiki.Config{Content: dir, Base: "/wiki/", Brand: wiki.Brand{Name: "t"}})
@@ -24,7 +24,7 @@ func testMCPServer(t *testing.T) *mcpServer {
 	if err := r.RenderAll(out); err != nil {
 		t.Fatal(err)
 	}
-	corpus, err := wiki.LoadSearchCorpus(filepath.Join(out, "wiki"))
+	corpus, err := wiki.LoadSearchCorpus(filepath.Join(out, "wiki"), "/wiki/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,12 +55,17 @@ func TestMCPInitializeAndTools(t *testing.T) {
 	}
 	result = resp.Result.(map[string]any)
 	tools, ok := result["tools"].([]any)
-	if !ok || len(tools) != 1 {
+	if !ok || len(tools) != 4 {
 		t.Fatalf("tools = %+v", result["tools"])
 	}
-	tool := tools[0].(map[string]any)
-	if tool["name"] != "search_wiki" {
-		t.Errorf("tool name = %v", tool["name"])
+	names := map[string]bool{}
+	for _, item := range tools {
+		names[item.(map[string]any)["name"].(string)] = true
+	}
+	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for"} {
+		if !names[want] {
+			t.Errorf("tools are missing %q: %v", want, names)
+		}
 	}
 }
 
@@ -118,5 +123,45 @@ func TestMCPNotificationsAndErrors(t *testing.T) {
 	}
 	if !strings.Contains(string(body), `"id":null`) {
 		t.Errorf("parse error has no null id: %s", body)
+	}
+}
+
+// TestMCPReadAndContext covers the tools that turn a search hit into exact
+// source text and a budgeted context pack.
+func TestMCPReadAndContext(t *testing.T) {
+	s := testMCPServer(t)
+	cases := []struct {
+		name string
+		line string
+		want string
+	}{
+		{
+			name: "read_page",
+			line: `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"read_page","arguments":{"pageId":"page:index","maxTokens":100}}}`,
+			want: "The install guide",
+		},
+		{
+			name: "read_section",
+			line: `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"read_section","arguments":{"pageId":"page:index","anchor":"install","maxTokens":100}}}`,
+			want: "The install guide",
+		},
+		{
+			name: "context_for",
+			line: `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"context_for","arguments":{"query":"install","maxTokens":100}}}`,
+			want: "The install guide",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := s.handle([]byte(tc.line))
+			if resp == nil || resp.Error != nil {
+				t.Fatalf("response = %+v", resp)
+			}
+			result := resp.Result.(map[string]any)
+			content := result["content"].([]any)[0].(map[string]any)["text"].(string)
+			if !strings.Contains(content, tc.want) {
+				t.Errorf("%s content = %s", tc.name, content)
+			}
+		})
 	}
 }

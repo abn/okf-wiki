@@ -149,6 +149,11 @@ func extractRawBlockText(n ast.Node, src []byte, b *strings.Builder) {
 			extractRawBlockText(c, src, b)
 		}
 		b.WriteByte(' ')
+	case *ast.Paragraph, *ast.ListItem, *ast.List, *ast.Blockquote:
+		for c := nn.FirstChild(); c != nil; c = c.NextSibling() {
+			extractRawBlockText(c, src, b)
+		}
+		b.WriteByte(' ')
 	case *ast.Image:
 		for c := nn.FirstChild(); c != nil; c = c.NextSibling() {
 			extractRawBlockText(c, src, b)
