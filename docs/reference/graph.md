@@ -9,8 +9,10 @@ tags: [reference, graph, schema]
 
 Every render writes `graph.json` beside the search catalogue. It is the
 structural graph of the bundle: one node per page and per tag, one edge per
-in-bundle Markdown link and per frontmatter tag. It is derived from the files
-alone, so two renders of an unchanged bundle produce the same bytes.
+in-bundle Markdown link and per frontmatter tag. In a tree, a relative Markdown
+link that climbs to a sibling wiki adds an edge to the aggregate only. It is
+derived from the files alone, so two renders of an unchanged bundle produce the
+same bytes.
 
 ## Where it is written
 
@@ -18,9 +20,11 @@ A single bundle writes `graph.json` under its base, next to
 `search-index.json`. In a multi-site tree every wiki keeps its own file at its
 own path, and the tree writes one aggregate at its base after the wikis have
 rendered. The aggregate prefixes each wiki's node IDs with its path under the
-tree root, so two wikis can both have an `index` page without colliding. A wiki
-that could not be read contributes nothing, and a tree with no readable wiki
-still gets an empty catalogue rather than a missing file.
+tree root, so two wikis can both have an `index` page without colliding. A
+relative Markdown link that climbs out of one wiki becomes an edge between the
+two namespaced IDs in the aggregate; the per-wiki catalogue keeps only its own
+edges. A wiki that could not be read contributes nothing, and a tree with no
+readable wiki still gets an empty catalogue rather than a missing file.
 
 ## Schema
 
@@ -59,7 +63,9 @@ link is visible in the catalogue instead of disappearing from it.
 `anchor` and `text` belong to link edges. A link repeated under one heading
 produces one edge, and a link from a page to itself is left out.
 
-Only an in-bundle Markdown link becomes an edge. A link that leaves the bundle,
+Only an in-bundle Markdown link becomes an edge. In an aggregate, a relative
+link that climbs out of one wiki and lands on a page in another wiki also
+becomes an edge; the two ends carry namespaced IDs. A link that leaves the tree,
 points at an asset, or is external is not one, because the catalogue follows
 what the renderer can serve: an escaping link is a `/repo/` target at most, and
 an asset has no page node to point at.

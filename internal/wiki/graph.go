@@ -15,12 +15,16 @@ import (
 // being guessed at.
 const graphVersion = 1
 
-// pageLink is one in-bundle Markdown link found while parsing a page. To is the
-// target's page slug, Anchor the heading the link sits under, and Text what the
-// reader sees. It is resolved into a graph edge after every page is known, so a
-// target the bundle does not contain can become a stub instead of a dead edge.
+// pageLink is one Markdown link found while parsing a page. To is the target's
+// page slug inside this wiki; Cross is the tree-relative page path when the
+// link climbs to a sibling wiki. Anchor is the heading the link sits under and
+// Text what the reader sees. An in-wiki target is resolved into a graph edge
+// after every page is known, so a target the bundle does not contain can become
+// a stub instead of a dead edge. A cross-wiki target is resolved by the tree
+// after every wiki has rendered.
 type pageLink struct {
 	To      string
+	Cross   string // tree-relative page path when the link leaves this wiki
 	Anchor  string
 	Heading string
 	Text    string
@@ -123,6 +127,9 @@ func (r *Renderer) BuildGraph() GraphIndex {
 			from := pageNodeID(p.Slug)
 			seen := make(map[string]bool)
 			for _, l := range p.links {
+				if l.Cross != "" {
+					continue
+				}
 				key := "link\x00" + l.To + "\x00" + l.Anchor
 				if seen[key] {
 					continue
@@ -377,4 +384,104 @@ func mergeGraph(dst, src *GraphIndex, site, key string) {
 	}
 	dst.Nodes = append(dst.Nodes, src.Nodes...)
 	dst.Edges = append(dst.Edges, src.Edges...)
+}
+
+// CrossWikiEdges returns the link edges from this wiki to pages in sibling
+// wikis, already named with aggregate IDs. The tree keeps these separate from
+// the wiki's own graph, because a per-wiki catalogue must not name a node that
+// it does not contain. Callers add the edges after every wiki has rendered, so
+// a target in a skipped wiki is dropped rather than becoming a dead edge.
+func (r *Renderer) CrossWikiEdges(wikis map[string]bool) []GraphEdge {
+	if !r.nested || r.siteRel == "" {
+		return nil
+	}
+	var edges []GraphEdge
+	seen := make(map[string]bool)
+	for _, s := range r.sections {
+		for _, p := range s.Pages {
+			from := r.siteRel + ":" + pageNodeID(p.Slug)
+			for _, l := range p.links {
+				if l.Cross == "" {
+					continue
+				}
+				key, slug, ok := splitTreeTarget(l.Cross, wikis)
+				if !ok || key == r.siteRel {
+					continue
+				}
+				to := key + ":" + pageNodeID(slug)
+				if to == from {
+					continue
+				}
+				dedupe := from + "\x00" + to + "\x00" + l.Anchor
+				if seen[dedupe] {
+					continue
+				}
+				seen[dedupe] = true
+				edges = append(edges, GraphEdge{
+					From:   from,
+					To:     to,
+					Kind:   "link",
+					Anchor: l.Anchor,
+					Text:   l.Text,
+				})
+			}
+		}
+	}
+	return edges
+}
+
+// splitTreeTarget names the wiki that owns a tree-relative page path and the
+// page slug inside it. A nested wiki key wins over its parent group, so a
+// path under clients/example/strategy belongs to that wiki rather than to a
+// group of the same prefix.
+func splitTreeTarget(target string, wikis map[string]bool) (string, string, bool) {
+	best := ""
+	for key := range wikis {
+		if key == "" {
+			continue
+		}
+		if !strings.HasPrefix(target, key+"/") {
+			continue
+		}
+		if len(key) > len(best) {
+			best = key
+		}
+	}
+	if best == "" {
+		return "", "", false
+	}
+	slug := strings.TrimPrefix(target, best)
+	slug = strings.TrimPrefix(slug, "/")
+	if slug == "" {
+		slug = "index"
+	}
+	return best, slug, true
+}
+
+// appendCrossWikiEdges adds the tree's cross-wiki edges once every wiki has
+// rendered. An edge whose target wiki was skipped is dropped, so the aggregate
+// never names a node that is absent from the output.
+func (r *Renderer) appendCrossWikiEdges() {
+	if len(r.crossEdges) == 0 {
+		return
+	}
+	nodes := make(map[string]bool, len(r.aggregatedGraph.Nodes))
+	for _, n := range r.aggregatedGraph.Nodes {
+		nodes[n.ID] = true
+	}
+	seen := make(map[string]bool, len(r.aggregatedGraph.Edges))
+	for _, e := range r.aggregatedGraph.Edges {
+		seen[e.From+"\x00"+e.To+"\x00"+e.Anchor] = true
+	}
+	for _, e := range r.crossEdges {
+		if !nodes[e.From] || !nodes[e.To] {
+			continue
+		}
+		key := e.From + "\x00" + e.To + "\x00" + e.Anchor
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		r.aggregatedGraph.Edges = append(r.aggregatedGraph.Edges, e)
+	}
 }

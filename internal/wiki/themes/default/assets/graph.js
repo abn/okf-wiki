@@ -356,6 +356,9 @@
     edges.forEach(function (edge) {
       var item = document.createElement('li');
       item.className = 'graph-list-edge';
+      var cross = edge.from.siteKey && edge.to.siteKey &&
+        edge.from.siteKey !== edge.to.siteKey;
+      if (cross) item.classList.add('is-cross-site');
       var from = document.createElement('span');
       from.className = 'graph-list-edge-node';
       from.textContent = edge.from.title;
@@ -367,7 +370,7 @@
       to.textContent = edge.to.title;
       var type = document.createElement('span');
       type.className = 'graph-list-edge-kind';
-      type.textContent = edge.kind;
+      type.textContent = cross ? 'cross-wiki' : edge.kind;
       item.appendChild(from);
       item.appendChild(action);
       item.appendChild(to);
@@ -1247,7 +1250,8 @@
 
     state.edges.forEach(function (e) {
       var line = document.createElementNS(NS, 'line');
-      line.setAttribute('class', 'graph-edge ' + e.kind);
+      var cross = e.from.siteKey && e.to.siteKey && e.from.siteKey !== e.to.siteKey;
+      line.setAttribute('class', 'graph-edge ' + e.kind + (cross ? ' cross-site' : ''));
       line.setAttribute('vector-effect', 'non-scaling-stroke');
       edgeLayer.appendChild(line);
       state.edgeElements.push({ el: line, edge: e });

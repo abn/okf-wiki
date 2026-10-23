@@ -5,6 +5,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-23
 
+* **Feature**: A relative Markdown link that climbs to a sibling wiki becomes a
+  cross-wiki edge in the tree's aggregate graph. Both ends carry namespaced IDs,
+  the per-wiki catalogue and Connections panel stay inside their wiki, and the
+  client draws the edge in the accent colour and labels it `cross-wiki` in the
+  list. `usage/multi-site.md`, `usage/graph.md`, `reference/graph.md`,
+  `design/rendering.md` and `design/graph-evolution.md` record it.
+
 * **Feature**: Graph labels are tiered. The overview names tag hubs and the
   busiest quarter of the connected pages; ordinary page names appear as the
   reader zooms in, or when a filter or focus asks for them. The status line says

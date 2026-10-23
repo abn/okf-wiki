@@ -56,7 +56,7 @@ the semantic layer.
 
 ### Schema and multi-site
 
-- [ ] Cross-wiki edges, using the namespaced aggregate IDs.
+- [x] Cross-wiki edges, using the namespaced aggregate IDs.
 - [ ] Typed structural edges beyond `link` and `tag`, for example section,
   previous and next.
 - [ ] Export formats such as GraphML, DOT, CSV and JSON-LD.
@@ -74,5 +74,5 @@ the semantic layer.
 ## Current
 
 Local graph and backlinks, shareable view state, the accessible list view,
-collapsed tag hubs, section clusters, a deterministic layout and semantic zoom
-are shipped. The next item is path finding between two pages.
+collapsed tag hubs, section clusters, a deterministic layout, semantic zoom and
+cross-wiki edges are shipped. The next item is path finding between two pages.

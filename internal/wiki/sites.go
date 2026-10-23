@@ -88,6 +88,21 @@ func scanSites(dir, rel string, seen map[string]bool) (*siteNode, error) {
 	return n, nil
 }
 
+// collectWikiKeys records every wiki path below a tree root. The root itself
+// is left out: a root wiki has no aggregate, so it cannot carry cross-wiki
+// edges.
+func collectWikiKeys(n *siteNode, keys map[string]bool) {
+	if n.wiki {
+		if n.rel != "" {
+			keys[n.rel] = true
+		}
+		return
+	}
+	for _, c := range n.children {
+		collectWikiKeys(c, keys)
+	}
+}
+
 // siteBase puts a wiki or group's path under the configured base. The base
 // already ends in a slash; the relative path has none.
 func siteBase(base, rel string) string {
@@ -112,6 +127,8 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	r.treeWikis = make(map[string]bool)
+	collectWikiKeys(root, r.treeWikis)
 	// A root that is itself a wiki renders its own graph page at the tree base,
 	// where the view reserves graph.html. A Markdown page or a static file of
 	// that name would be overwritten, so name the collision before any output is
@@ -146,6 +163,7 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 			if err := r.writeAggregateSearchIndex(tmp); err != nil {
 				return err
 			}
+			r.appendCrossWikiEdges()
 			if err := r.writeAggregateGraph(tmp); err != nil {
 				return err
 			}
@@ -212,6 +230,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		// A wiki of a tree searches the tree, not itself: the page carries the
 		// tree base so the client fetches the aggregate index written there.
 		searchBase: r.cfg.base(),
+		treeWikis:  r.treeWikis,
 		// The page belongs to the tree, so its brand and breadcrumb point at the
 		// tree root and name the folders and wiki it sits under.
 		treeBase:  r.cfg.base(),
@@ -252,6 +271,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		mergeSearchIndex(&r.aggregated, &index)
 		graph := sub.BuildGraph()
 		mergeGraph(&r.aggregatedGraph, &graph, title, n.rel)
+		r.crossEdges = append(r.crossEdges, sub.CrossWikiEdges(r.treeWikis)...)
 	}
 	return 1, nil
 }
