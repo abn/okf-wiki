@@ -20,6 +20,9 @@
   // of the graph fits on screen at a readable size.
   var READABLE_SCALE = 0.9;
   var FOCUS_SCALE = 0.45;
+  // Below this screen scale a plain page keeps its name back and only hubs
+  // label the map. Zooming in brings the page names in.
+  var PAGE_LABEL_SCALE = 0.9;
 
   var svg = document.getElementById('graphSvg');
   var sectionLayer = document.getElementById('graphSectionLayer');
@@ -75,6 +78,7 @@
     listAllNodes: false,
     listAllEdges: false,
     anchor: null,
+    hubIDs: Object.create(null),
     overview: false,
     query: '',
     labelScale: 0,
@@ -718,12 +722,31 @@
       e.from.degree += 1;
       e.to.degree += 1;
     });
+    state.hubIDs = pageHubs();
     state.adj = Object.create(null);
     state.nodes.forEach(function (n) { state.adj[n.id] = []; });
     state.edges.forEach(function (e) {
       state.adj[e.from.id].push({ node: e.to, dir: 'out' });
       state.adj[e.to.id].push({ node: e.from, dir: 'in' });
     });
+  }
+
+  // A page is a hub when it sits in the busiest quarter of the connected
+  // pages. Tags are always hubs. Ranking rather than a degree cutoff keeps
+  // ties from turning every leaf page into a hub. The set follows the visible
+  // graph, so hiding tag hubs does not leave page labels pointing at degrees
+  // from a graph that is no longer on screen.
+  function pageHubs() {
+    var pages = state.nodes.filter(function (n) {
+      return n.kind === 'page' && n.degree > 0;
+    }).sort(function (a, b) {
+      return b.degree - a.degree || a.title.localeCompare(b.title) ||
+        a.id.localeCompare(b.id);
+    });
+    var hubs = Object.create(null);
+    var limit = Math.ceil(pages.length * 0.25);
+    for (var i = 0; i < limit; i++) hubs[pages[i].id] = true;
+    return hubs;
   }
 
   function updateTagKindOption() {
@@ -1396,6 +1419,7 @@
     updateEdgeVisibility();
     sizeSectionLabels();
     scheduleLabels();
+    updateStatus();
   }
 
   // A dense graph opens on a readable patch around a typical page, not on the
@@ -1580,6 +1604,9 @@
     } else {
       text += ' Scroll to zoom, drag the background to pan, or select Fit view.';
     }
+    if (labels.checked && !pagesMayLabel() && hasOrdinaryPages()) {
+      text += ' Labels show hubs; zoom in for page names.';
+    }
     var missing = state.selectedTags.filter(function (slug) {
       return !state.tagBySlug[slug];
     });
@@ -1629,6 +1656,29 @@
     });
   }
 
+  function isLabelHub(n) {
+    return n.kind === 'tag' || !!state.hubIDs[n.id];
+  }
+
+  function labelTier(n) {
+    if (n === state.selected) return 0;
+    return isLabelHub(n) ? 1 : 2;
+  }
+
+  // A focus, a filter or a zoomed-in view is a request for page names. The
+  // map itself stays at hubs.
+  function pagesMayLabel() {
+    return state.scale >= PAGE_LABEL_SCALE || !!state.focus || !!state.query ||
+      (kind && kind.value !== 'all') || state.selectedTags.length > 0;
+  }
+
+  function hasOrdinaryPages() {
+    for (var i = 0; i < state.nodes.length; i++) {
+      if (labelTier(state.nodes[i]) === 2) return true;
+    }
+    return false;
+  }
+
   // Labels are placed greedily, the busiest nodes and the selection first. A
   // name is drawn only when it fits without covering another name or another
   // node, and both tests use the drawn text rather than a character count. A
@@ -1641,13 +1691,13 @@
     var relayout = state.labelScale !== scale;
     state.labelScale = scale;
     var order = state.nodes.slice().sort(function (a, b) {
-      if (a === state.selected) return -1;
-      if (b === state.selected) return 1;
-      return b.degree - a.degree || a.title.localeCompare(b.title);
+      return labelTier(a) - labelTier(b) || b.degree - a.degree ||
+        a.title.localeCompare(b.title);
     });
     order.forEach(function (n) {
       var label = n.label;
       if (!label) return;
+      label.setAttribute('data-tier', String(labelTier(n)));
       label.classList.add('is-colliding');
       if (relayout) {
         label.style.fontSize = fontWorld + 'px';
@@ -1669,6 +1719,7 @@
     for (var i = 0; i < order.length && placed < LABEL_LIMIT; i++) {
       var n = order[i];
       if (!n.matched) continue;
+      if (labelTier(n) === 2 && !pagesMayLabel()) continue;
       if (state.focus && state.focus[n.id] == null) continue;
       var view = state.view;
       var margin = 40 / scale;

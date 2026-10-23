@@ -86,6 +86,68 @@ def write_force_fixture(root):
     return path
 
 
+def visible_label_tiers(driver):
+    return driver.execute_script(
+        """
+        const counts = {};
+        for (const label of document.querySelectorAll('.graph-label')) {
+          const tier = label.getAttribute('data-tier');
+          if (!tier) continue;
+          counts[tier] = counts[tier] || 0;
+          if (!label.classList.contains('is-colliding')) counts[tier] += 1;
+        }
+        return counts;
+        """
+    )
+
+
+def write_semantic_fixture(root):
+    source = (root / "graph.html").read_text()
+    nodes = [
+        {
+            "id": f"page:p{i}",
+            "title": f"Page {i}",
+            "url": f"./p{i}.html",
+            "kind": "page",
+            "section": "Overview",
+            "sectionId": "overview",
+        }
+        for i in range(400)
+    ]
+    edges = [
+        {"from": f"page:p{i}", "to": f"page:p{i + 1}", "kind": "link"}
+        for i in range(7)
+    ]
+    data = json.dumps({"version": 1, "nodes": nodes, "edges": edges})
+    pattern = re.compile(
+        r'<script type="application/json" id="graphData">.*?</script>',
+        re.S,
+    )
+    html, count = pattern.subn(
+        lambda _: '<script type="application/json" id="graphData">' + data + '</script>',
+        source,
+        count=1,
+    )
+    must(count == 1, "the graph page has no inline catalogue to replace")
+    path = root / "semantic-zoom-test.html"
+    path.write_text(html)
+    return path
+
+
+def label_tier_totals(driver):
+    return driver.execute_script(
+        """
+        const counts = {};
+        for (const label of document.querySelectorAll('.graph-label')) {
+          const tier = label.getAttribute('data-tier');
+          if (!tier) continue;
+          counts[tier] = (counts[tier] || 0) + 1;
+        }
+        return counts;
+        """
+    )
+
+
 def graph_positions(driver):
     return driver.execute_script(
         """
@@ -312,6 +374,62 @@ def main():
             driver.find_element(By.ID, "graphTagHubs").is_selected(),
             "Tag hubs is not on by default",
         )
+        tiers = visible_label_tiers(driver)
+        must(tiers.get("1", 0) > 0, "no hub label is visible at the overview")
+        must(
+            tiers.get("2", 0) == 0,
+            "ordinary page labels are visible before the reader zooms in",
+        )
+        must(
+            "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
+            "the overview does not explain that only hubs are labelled",
+        )
+        driver.execute_script(
+            """
+            const svg = document.getElementById('graphSvg');
+            const rect = svg.getBoundingClientRect();
+            svg.dispatchEvent(new WheelEvent('wheel', {
+              deltaY: -600,
+              clientX: rect.x + rect.width / 2,
+              clientY: rect.y + rect.height / 2,
+              bubbles: true,
+              cancelable: true,
+            }));
+            """
+        )
+        time.sleep(0.4)
+        tiers = visible_label_tiers(driver)
+        must(
+            tiers.get("2", 0) > 0,
+            "page labels did not appear after zooming in",
+        )
+        driver.execute_script(
+            """
+            const svg = document.getElementById('graphSvg');
+            const rect = svg.getBoundingClientRect();
+            svg.dispatchEvent(new WheelEvent('wheel', {
+              deltaY: 600,
+              clientX: rect.x + rect.width / 2,
+              clientY: rect.y + rect.height / 2,
+              bubbles: true,
+              cancelable: true,
+            }));
+            """
+        )
+        time.sleep(0.4)
+        tiers = visible_label_tiers(driver)
+        must(
+            tiers.get("2", 0) == 0,
+            "page labels stayed visible after zooming out",
+        )
+        must(
+            "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
+            "the overview hint did not return after zooming out",
+        )
+        driver.refresh()
+        wait_for(driver, ".graph-section-label")
+        wait_layout(driver)
+
         section_labels = driver.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         must(section_labels, "the section grid has no labels")
         must(
@@ -583,6 +701,46 @@ def main():
             must(nudges > 0, "the synthetic force layout produced no collision nudge")
         finally:
             force_page.unlink(missing_ok=True)
+
+        semantic_page = write_semantic_fixture(root)
+        try:
+            driver.get(semantic_page.as_uri())
+            wait_for(driver, ".graph-node-group")
+            wait_layout(driver)
+            totals = label_tier_totals(driver)
+            must(
+                totals.get("1", 0) <= 100,
+                "the hub tier is wider than a quarter of the pages",
+            )
+            must(
+                totals.get("2", 0) > 0,
+                "the sparse fixture has no ordinary page tier",
+            )
+            driver.execute_script(
+                """
+                const svg = document.getElementById('graphSvg');
+                const rect = svg.getBoundingClientRect();
+                svg.dispatchEvent(new WheelEvent('wheel', {
+                  deltaY: 600,
+                  clientX: rect.x + rect.width / 2,
+                  clientY: rect.y + rect.height / 2,
+                  bubbles: true,
+                  cancelable: true,
+                }));
+                """
+            )
+            time.sleep(0.4)
+            tiers = visible_label_tiers(driver)
+            must(
+                tiers.get("2", 0) == 0,
+                "ordinary page labels are visible at the sparse overview",
+            )
+            must(
+                "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
+                "the sparse overview does not explain the hub tier",
+            )
+        finally:
+            semantic_page.unlink(missing_ok=True)
 
         redirect = root.parent / "index.html"
         start = redirect.as_uri()

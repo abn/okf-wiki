@@ -41,8 +41,11 @@ frontmatter tags.
   outermost percentile so one stranded page cannot shrink it.
 - **Labels** hides or shows the names. At most 50 names are drawn in one view,
   and one is chosen only where it fits without covering another name or another
-  node. Names keep their screen size at every zoom, so zooming in shows more.
-  Hover a node or select it to reveal its own name.
+  node. When the view is zoomed out, only hubs are named: tag hubs and the
+  busiest quarter of the connected pages. Ordinary page names join as you zoom
+  in, or as soon as a filter or focus asks for them. A small graph that already
+  fits at a readable scale can show page names immediately. Names keep their
+  screen size at every zoom. Hover a node or select it to reveal its own name.
 - Select a node for its kind, section, tags, and incoming and outgoing counts.
   The rest of the drawing fades to that node's neighbourhood: two hops for a
   page (one when that set is very large), one for a tag. When the neighbourhood
