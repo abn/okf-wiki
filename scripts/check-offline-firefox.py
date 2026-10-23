@@ -435,7 +435,7 @@ def main():
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
-        driver.execute_script(
+        found = driver.execute_script(
             """
             const svg = document.getElementById('graphSvg');
             const canvas = svg.getBoundingClientRect();
@@ -446,7 +446,8 @@ def main():
               return rect.left >= canvas.left && rect.right <= canvas.right &&
                 rect.top >= canvas.top && rect.bottom <= canvas.bottom;
             });
-            const rect = target ? target.getBoundingClientRect() : canvas;
+            if (!target) return false;
+            const rect = target.getBoundingClientRect();
             svg.dispatchEvent(new WheelEvent('wheel', {
               deltaY: -600,
               clientX: rect.left + rect.width / 2,
@@ -454,13 +455,12 @@ def main():
               bubbles: true,
               cancelable: true,
             }));
+            return true;
             """
         )
-        time.sleep(0.9)
-        tiers = visible_label_tiers(driver)
-        must(
-            tiers.get("2", 0) > 0,
-            "page labels did not appear after zooming in",
+        must(found, "the zoom test found no ordinary page to zoom at")
+        WebDriverWait(driver, 5).until(
+            lambda d: visible_label_tiers(d).get("2", 0) > 0
         )
         driver.execute_script(
             """
@@ -475,15 +475,9 @@ def main():
             }));
             """
         )
-        time.sleep(0.4)
-        tiers = visible_label_tiers(driver)
-        must(
-            tiers.get("2", 0) == 0,
-            "page labels stayed visible after zooming out",
-        )
-        must(
-            "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
-            "the overview hint did not return after zooming out",
+        WebDriverWait(driver, 5).until(
+            lambda d: visible_label_tiers(d).get("2", 0) == 0
+            and "Labels show hubs" in d.find_element(By.ID, "graphStatus").text
         )
         driver.refresh()
         wait_for(driver, ".graph-section-label")
