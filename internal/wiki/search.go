@@ -44,8 +44,9 @@ type SearchEntry struct {
 // SearchIndex is the on-disk catalogue: a page table, and the entries that
 // refer to it. Entry text is not part of it; SearchContent holds that.
 type SearchIndex struct {
-	Pages   []SearchPage  `json:"pages"`
-	Entries []SearchEntry `json:"entries"`
+	RenderID string        `json:"renderId,omitempty"`
+	Pages    []SearchPage  `json:"pages"`
+	Entries  []SearchEntry `json:"entries"`
 }
 
 // SearchContent is the companion file to SearchIndex: every entry's text, in
@@ -53,8 +54,9 @@ type SearchIndex struct {
 // catalogue and a reader can search titles, documents and sections before it
 // arrives.
 type SearchContent struct {
-	Count int      `json:"n"` // number of entries the texts align with
-	Texts []string `json:"c"` // text of entry 0, entry 1, ...
+	RenderID string   `json:"renderId,omitempty"`
+	Count    int      `json:"n"` // number of entries the texts align with
+	Texts    []string `json:"c"` // text of entry 0, entry 1, ...
 }
 
 // rawSearchChunk is an unresolved text section extracted from a page's AST.
@@ -228,13 +230,17 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 // SearchIndexJSON returns the JSON representation of the search index, without
 // entry text.
 func (r *Renderer) SearchIndexJSON() ([]byte, error) {
-	return json.Marshal(r.BuildSearchIndex())
+	index := r.BuildSearchIndex()
+	index.RenderID = agentRenderID(r.AgentPages())
+	return json.Marshal(index)
 }
 
 // SearchContentJSON returns the JSON representation of the entry texts, in the
 // same order as the index's entries.
 func (r *Renderer) SearchContentJSON() ([]byte, error) {
-	return json.Marshal(contentFromIndex(r.BuildSearchIndex()))
+	content := contentFromIndex(r.BuildSearchIndex())
+	content.RenderID = agentRenderID(r.AgentPages())
+	return json.Marshal(content)
 }
 
 // contentFromIndex collects an index's entry texts into the companion file

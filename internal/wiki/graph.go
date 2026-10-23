@@ -23,11 +23,12 @@ const graphVersion = 1
 // a stub instead of a dead edge. A cross-wiki target is resolved by the tree
 // after every wiki has rendered.
 type pageLink struct {
-	To      string
-	Cross   string // tree-relative page path when the link leaves this wiki
-	Anchor  string
-	Heading string
-	Text    string
+	To          string
+	Cross       string // tree-relative page path when the link leaves this wiki
+	BrokenCross string // tree-relative path whose wiki was not rendered
+	Anchor      string
+	Heading     string
+	Text        string
 }
 
 // pageTitle is the page's display title, falling back to its slug when neither
@@ -84,9 +85,10 @@ type GraphEdge struct {
 // GraphIndex is graph.json: the structural graph of a bundle, or of a tree with
 // each wiki's IDs namespaced.
 type GraphIndex struct {
-	Version int         `json:"version"`
-	Nodes   []GraphNode `json:"nodes"`
-	Edges   []GraphEdge `json:"edges"`
+	Version  int         `json:"version"`
+	RenderID string      `json:"renderId,omitempty"`
+	Nodes    []GraphNode `json:"nodes"`
+	Edges    []GraphEdge `json:"edges"`
 }
 
 // pageNodeID is the catalogue ID of a page. Pages and tags share one ID space,
@@ -127,7 +129,7 @@ func (r *Renderer) BuildGraph() GraphIndex {
 			from := pageNodeID(p.Slug)
 			seen := make(map[string]bool)
 			for _, l := range p.links {
-				if l.Cross != "" {
+				if l.Cross != "" || l.BrokenCross != "" || l.To == "" {
 					continue
 				}
 				key := "link\x00" + l.To + "\x00" + l.Anchor
@@ -195,7 +197,9 @@ func addStubNode(g *GraphIndex, byID map[string]int, slug string) int {
 
 // GraphJSON returns the JSON representation of the structural graph.
 func (r *Renderer) GraphJSON() ([]byte, error) {
-	return graphJSON(r.BuildGraph())
+	g := r.BuildGraph()
+	g.RenderID = agentRenderID(r.AgentPages())
+	return graphJSON(g)
 }
 
 // graphJSON marshals a catalogue with its empty arrays present, so a consumer
@@ -401,6 +405,11 @@ func (r *Renderer) CrossWikiEdges(wikis map[string]bool) []GraphEdge {
 		for _, p := range s.Pages {
 			from := r.siteRel + ":" + pageNodeID(p.Slug)
 			for _, l := range p.links {
+				if l.BrokenCross != "" {
+					from := r.siteRel + ":" + pageNodeID(p.Slug)
+					r.crossBroken = append(r.crossBroken, HealthLink{From: from, To: l.BrokenCross, Text: l.Text})
+					continue
+				}
 				if l.Cross == "" {
 					continue
 				}
@@ -474,7 +483,11 @@ func (r *Renderer) appendCrossWikiEdges() {
 		seen[e.From+"\x00"+e.To+"\x00"+e.Anchor] = true
 	}
 	for _, e := range r.crossEdges {
-		if !nodes[e.From] || !nodes[e.To] {
+		if !nodes[e.From] {
+			continue
+		}
+		if !nodes[e.To] {
+			r.crossBroken = append(r.crossBroken, HealthLink{From: e.From, To: e.To, Text: e.Text})
 			continue
 		}
 		key := e.From + "\x00" + e.To + "\x00" + e.Anchor

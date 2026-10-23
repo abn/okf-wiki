@@ -156,7 +156,7 @@ func TestAgentManifestMultiSite(t *testing.T) {
 // TestAgentCollision covers the reserved paths. A reader's file is never
 // overwritten by the generated surface.
 func TestAgentCollision(t *testing.T) {
-	for _, name := range []string{"llms.txt", "pages.json"} {
+	for _, name := range []string{"llms.txt", "pages.json", "changes.json", "health.json"} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n")

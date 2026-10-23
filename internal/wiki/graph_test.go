@@ -485,7 +485,7 @@ func TestMultiSiteCrossWikiLinks(t *testing.T) {
 	mustMkdir(t, filepath.Join(dir, "alpha"))
 	mustMkdir(t, filepath.Join(dir, "beta"))
 	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
-		"---\ntitle: Alpha\n---\n# Alpha\n[Beta](../beta/index.md)\n")
+		"---\ntitle: Alpha\n---\n# Alpha\n[Beta](../beta/index.md)\n[Missing](../beta/missing.md)\n[Nowhere](../nowhere/page.md)\n")
 	mustWrite(t, filepath.Join(dir, "alpha", "topic.md"),
 		"---\ntitle: Alpha topic\n---\n# Alpha topic\n")
 	mustWrite(t, filepath.Join(dir, "beta", "index.md"),
@@ -529,6 +529,16 @@ func TestMultiSiteCrossWikiLinks(t *testing.T) {
 			}
 			if edges := graphEdges(agg, "beta:page:index", "alpha:page:index", "link"); len(edges) != 1 {
 				t.Errorf("reverse cross edge = %+v, want one from beta to alpha", edges)
+			}
+			health, err := LoadGraphHealth(filepath.Join(out, "family"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(health.BrokenLinks) != 2 {
+				t.Errorf("cross-wiki broken links = %+v", health.BrokenLinks)
+			}
+			if !hasBroken(health.BrokenLinks, "beta:page:missing") || !hasBroken(health.BrokenLinks, "nowhere/page") {
+				t.Errorf("cross-wiki broken links = %+v", health.BrokenLinks)
 			}
 			own := read(filepath.Join(out, "family", "alpha", "graph.json"))
 			for _, id := range []string{"page:beta/index", "page:beta/topic"} {
@@ -659,4 +669,13 @@ func TestMultiSiteEmptyGraphs(t *testing.T) {
 			t.Errorf("root wiki node gained a wiki label: %+v", node)
 		}
 	})
+}
+
+func hasBroken(links []HealthLink, to string) bool {
+	for _, link := range links {
+		if link.To == to {
+			return true
+		}
+	}
+	return false
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/abn/okf-wiki/internal/wiki"
 )
@@ -16,8 +17,16 @@ import (
 // transport. It is deliberately read-only: search, page and section reads, and
 // budgeted context packs all return citations, but nothing writes to the wiki.
 type mcpServer struct {
-	corpus *wiki.SearchCorpus
-	graph  *wiki.GraphCorpus
+	siteDir   string
+	base      string
+	corpus    *wiki.SearchCorpus
+	graph     *wiki.GraphCorpus
+	changes   wiki.AgentChanges
+	health    wiki.GraphHealth
+	hasChange bool
+	hasHealth bool
+	changeErr string
+	healthErr string
 }
 
 type rpcRequest struct {
@@ -48,18 +57,73 @@ func runMCP(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	corpus, err := wiki.LoadSearchCorpus(siteDir, *base)
-	if err != nil {
-		fatal(fmt.Errorf("load rendered search data: %w", err))
+	s := &mcpServer{siteDir: siteDir, base: *base}
+	if err := s.refresh(); err != nil {
+		fatal(err)
 	}
-	graph, err := wiki.LoadGraphCorpus(siteDir)
-	if err != nil {
-		fatal(fmt.Errorf("load rendered graph data: %w", err))
-	}
-	s := &mcpServer{corpus: corpus, graph: graph}
 	if err := s.serve(os.Stdin, os.Stdout); err != nil {
 		fatal(err)
 	}
+}
+
+// refresh reloads the rendered files before each tool call. A long-running
+// agent therefore sees a re-render without restarting the MCP process. The
+// search and graph files are required; changes and health are optional so a
+// site rendered before those files existed still answers search and reads.
+func (s *mcpServer) refresh() error {
+	var last error
+	for attempt := 0; attempt < 3; attempt++ {
+		if err := s.refreshOnce(); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+		if attempt < 2 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	return last
+}
+
+func (s *mcpServer) refreshOnce() error {
+	corpus, err := wiki.LoadSearchCorpus(s.siteDir, s.base)
+	if err != nil {
+		return fmt.Errorf("load rendered search data: %w", err)
+	}
+	graph, err := wiki.LoadGraphCorpus(s.siteDir)
+	if err != nil {
+		return fmt.Errorf("load rendered graph data: %w", err)
+	}
+	if corpus.RenderID != "" && graph.RenderID != "" && corpus.RenderID != graph.RenderID {
+		return fmt.Errorf("search and graph files are from different renders")
+	}
+	s.corpus = corpus
+	s.graph = graph
+	s.hasChange = false
+	s.hasHealth = false
+	s.changeErr = ""
+	s.healthErr = ""
+	if changes, err := wiki.LoadAgentChanges(s.siteDir); err == nil {
+		s.changes = changes
+		s.hasChange = true
+	} else {
+		s.changeErr = err.Error()
+	}
+	if health, err := wiki.LoadGraphHealth(s.siteDir); err == nil {
+		s.health = health
+		s.hasHealth = true
+	} else {
+		s.healthErr = err.Error()
+	}
+	if s.hasChange && s.changes.RenderID != "" && corpus.RenderID != "" && s.changes.RenderID != corpus.RenderID {
+		s.hasChange = false
+		s.changeErr = "changes.json is from another render; render the site again"
+	}
+	if s.hasHealth && s.health.RenderID != "" && corpus.RenderID != "" && s.health.RenderID != corpus.RenderID {
+		s.hasHealth = false
+		s.healthErr = "health.json is from another render; render the site again"
+	}
+	return nil
 }
 
 // serve reads one JSON-RPC message per line, as the MCP stdio transport does,
@@ -123,7 +187,7 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			ID:      req.ID,
 			Result: map[string]any{"tools": []any{
 				mcpSearchTool(), mcpReadPageTool(), mcpReadSectionTool(), mcpContextTool(),
-				mcpNeighborsTool(), mcpPathTool(),
+				mcpNeighborsTool(), mcpPathTool(), mcpChangesTool(), mcpHealthTool(),
 			}},
 		}
 	case "tools/call":
@@ -186,6 +250,30 @@ func mcpContextTool() map[string]any {
 				"section":   map[string]any{"type": "string", "description": "Section title."},
 			},
 			"required":             []string{"query"},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpChangesTool() map[string]any {
+	return map[string]any{
+		"name":        "changes",
+		"description": "Return the pages added, changed or removed in the latest render, with page IDs and source hashes.",
+		"inputSchema": map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpHealthTool() map[string]any {
+	return map[string]any{
+		"name":        "health",
+		"description": "Return broken links, orphans, tag-only pages, link cycles, stale pages and the most connected pages.",
+		"inputSchema": map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{},
 			"additionalProperties": false,
 		},
 	}
@@ -259,6 +347,9 @@ type mcpSearchArgs struct {
 }
 
 func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
+	if err := s.refresh(); err != nil {
+		return mcpToolError(err.Error())
+	}
 	var params mcpCallParams
 	if err := json.Unmarshal(raw, &params); err != nil {
 		return mcpToolError("invalid tool call")
@@ -276,6 +367,16 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 		return s.neighborsTool(params.Arguments)
 	case "path":
 		return s.pathTool(params.Arguments)
+	case "changes":
+		if !s.hasChange {
+			return mcpToolError("changes unavailable: " + s.changeErr + "; render the site again")
+		}
+		return mcpToolJSON(s.changes)
+	case "health":
+		if !s.hasHealth {
+			return mcpToolError("health unavailable: " + s.healthErr + "; render the site again")
+		}
+		return mcpToolJSON(s.health)
 	default:
 		return mcpToolError("unknown tool " + params.Name)
 	}

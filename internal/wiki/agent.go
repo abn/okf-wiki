@@ -191,14 +191,17 @@ func (r *Renderer) writeTreeAgentFiles(out string, root *siteNode) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeAgentFiles(dir, title, description, r.generatedAt, r.aggregatedPages)
+	if err := writeAgentFiles(dir, title, description, r.generatedAt, r.aggregatedPages); err != nil {
+		return err
+	}
+	return writeAgentState(dir, r.previousPages, r.aggregatedPages, r.aggregatedGraph, r.generatedAt, r.crossBroken...)
 }
 
 // agentCollision reports a file in a bundle root that owns a path the agent
 // surface needs. Overwriting a reader's llms.txt or pages.json silently would
 // be worse than failing the render and naming the file.
 func agentCollision(dir string) error {
-	for _, name := range []string{"llms.txt", "pages.json"} {
+	for _, name := range []string{"llms.txt", "pages.json", "changes.json", "health.json"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 			return fmt.Errorf("the agent surface needs %s, which is already occupied; rename that file", name)
 		}

@@ -3844,8 +3844,9 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 		Section string `json:"s"`
 	}
 	type bareIndex struct {
-		Pages   []barePage  `json:"pages"`
-		Entries []bareEntry `json:"entries"`
+		RenderID string      `json:"renderId"`
+		Pages    []barePage  `json:"pages"`
+		Entries  []bareEntry `json:"entries"`
 	}
 	var bare bareIndex
 	if err := json.Unmarshal(raw, &bare); err != nil {

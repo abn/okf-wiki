@@ -5,6 +5,14 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-23
 
+* **Feature**: Every render writes `changes.json` and `health.json`. Changes
+  compare the current page manifest with the previous render by content hash.
+  Health reports broken links, orphans, tag-only pages, link cycles, stale pages
+  and the most connected pages. The MCP server exposes both as `changes` and
+  `health`. It reloads the rendered files before each tool call, treats missing
+  or malformed change and health files as unavailable rather than fatal, and
+  marks index-capped sections as truncated.
+
 * **Feature**: The MCP server adds `neighbors` and `path`. Neighbours return the
   local graph with `link`, `tag`, `previous` and `next` edges; previous and next
   are derived from page order in `pages.json` inside each site and section.
@@ -14,7 +22,7 @@ deprecated, or restructured. It is deliberately separate from software releases.
 * **Feature**: The MCP server adds `read_page`, `read_section` and `context_for`
   alongside `search_wiki`. Reads carry page IDs, anchors, Markdown URLs and
   content hashes, and cap their text at an estimated token budget. The agent
-  page documents the four tools and the budget defaults.
+  page documents the read tools and the budget defaults.
 
 * **Feature**: `okf-wiki search` returns ranked, extractive snippets from a
   rendered site as human text or JSON, with page ID, anchor, Markdown URL and
