@@ -28,7 +28,11 @@ func testMCPServer(t *testing.T) *mcpServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &mcpServer{corpus: corpus}
+	graph, err := wiki.LoadGraphCorpus(filepath.Join(out, "wiki"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &mcpServer{corpus: corpus, graph: graph}
 }
 
 func writeTestPage(path, body string) error {
@@ -55,14 +59,14 @@ func TestMCPInitializeAndTools(t *testing.T) {
 	}
 	result = resp.Result.(map[string]any)
 	tools, ok := result["tools"].([]any)
-	if !ok || len(tools) != 4 {
+	if !ok || len(tools) != 6 {
 		t.Fatalf("tools = %+v", result["tools"])
 	}
 	names := map[string]bool{}
 	for _, item := range tools {
 		names[item.(map[string]any)["name"].(string)] = true
 	}
-	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for"} {
+	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path"} {
 		if !names[want] {
 			t.Errorf("tools are missing %q: %v", want, names)
 		}
@@ -149,6 +153,16 @@ func TestMCPReadAndContext(t *testing.T) {
 			name: "context_for",
 			line: `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"context_for","arguments":{"query":"install","maxTokens":100}}}`,
 			want: "The install guide",
+		},
+		{
+			name: "neighbors",
+			line: `{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"neighbors","arguments":{"pageId":"page:index","depth":1}}}`,
+			want: "page:index",
+		},
+		{
+			name: "path",
+			line: `{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"path","arguments":{"from":"page:index","to":"page:index"}}}`,
+			want: "\"found\":true",
 		},
 	}
 	for _, tc := range cases {
