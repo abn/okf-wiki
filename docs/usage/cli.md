@@ -177,8 +177,9 @@ the base path: `out/wiki/` by default, and `out/docs/deep/` for
 `--base /docs/deep/`. That directory holds the pages, each page's Markdown
 source beside it for download, the resolved theme's assets (including the
 search, diagram and graph clients), `search-index.json` and its text companion
-`search-content.json`, the structural `graph.json`, the `graph.html` view, and
-a `theme.json` recording which theme produced it. An offline render also writes
+`search-content.json`, the structural `graph.json`, the `graph.html` view,
+`llms.txt` and `pages.json` for agent discovery, and a `theme.json` recording
+which theme produced it. An offline render also writes
 the search and tag data as `.js` scripts, and copies the Mermaid runtime build
 it needs when the bundle has a diagram. The output is a plain static site, so
 any static file server can host it, and an offline folder can be opened from

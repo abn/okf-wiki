@@ -171,7 +171,8 @@ flowchart LR
    has its Markdown source beside it, the resolved theme's assets (stylesheet,
    fonts, tokens, the search, diagram and graph clients, favicon), the Mermaid
    vendor bundle when the bundle has a diagram, `search-index.json`,
-   `search-content.json`, `graph.json`, `graph.html`, `tags.json`, and a
+   `search-content.json`, `graph.json`, `graph.html`, `tags.json`, `llms.txt`,
+   `pages.json`, and a
    `theme.json` recording which theme produced the output. An offline render
    also writes the search index, texts and tags as classic `.js` data scripts.
    The output directory is emptied first, so a page removed from the bundle does

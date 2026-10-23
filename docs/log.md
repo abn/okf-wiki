@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-23
 
+* **Feature**: Every render writes `llms.txt` and `pages.json` for agent
+  discovery. They list page titles, descriptions, Markdown URLs, stable IDs,
+  headings, tags and source hashes without carrying page text. A tree writes one
+  aggregate pair at its base. `reference/agent-access.md`, `usage/cli.md` and
+  `design/rendering.md` record the files.
+
 * **Feature**: A relative Markdown link that climbs to a sibling wiki becomes a
   cross-wiki edge in the tree's aggregate graph. Both ends carry namespaced IDs,
   the per-wiki catalogue and Connections panel stay inside their wiki, and the
