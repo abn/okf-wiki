@@ -133,6 +133,9 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 	// where the view reserves graph.html. A Markdown page or a static file of
 	// that name would be overwritten, so name the collision before any output is
 	// built. A wiki below the root keeps its graph.md: the view is not there.
+	if err := agentCollision(root.abs); err != nil {
+		return 0, err
+	}
 	if root.wiki {
 		if err := graphCollision(root.abs); err != nil {
 			return 0, err
@@ -168,6 +171,9 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 				return err
 			}
 			if err := r.writeTreeGraphPage(tmp, root); err != nil {
+				return err
+			}
+			if err := r.writeTreeAgentFiles(tmp, root); err != nil {
 				return err
 			}
 		}
@@ -219,7 +225,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 	cfg := r.cfg
 	cfg.Content = n.abs
 	cfg.Base = siteBase(r.cfg.base(), n.rel)
-	title, _ := r.siteMeta(n)
+	title, description := r.siteMeta(n)
 	sub := &Renderer{
 		md:           r.md,
 		cfg:          cfg,
@@ -233,10 +239,11 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		treeWikis:  r.treeWikis,
 		// The page belongs to the tree, so its brand and breadcrumb point at the
 		// tree root and name the folders and wiki it sits under.
-		treeBase:  r.cfg.base(),
-		siteRel:   n.rel,
-		siteTitle: title,
-		siteTrail: trail,
+		treeBase:        r.cfg.base(),
+		siteRel:         n.rel,
+		siteTitle:       title,
+		siteDescription: description,
+		siteTrail:       trail,
 	}
 	if err := sub.load(cfg.Content); err != nil {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
@@ -272,6 +279,13 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		graph := sub.BuildGraph()
 		mergeGraph(&r.aggregatedGraph, &graph, title, n.rel)
 		r.crossEdges = append(r.crossEdges, sub.CrossWikiEdges(r.treeWikis)...)
+		pages := sub.AgentPages()
+		for i := range pages {
+			pages[i].ID = n.rel + ":" + pages[i].ID
+			pages[i].Site = title
+			pages[i].SiteKey = n.rel
+		}
+		r.aggregatedPages = append(r.aggregatedPages, pages...)
 	}
 	return 1, nil
 }

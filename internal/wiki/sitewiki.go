@@ -63,6 +63,7 @@ type Page struct {
 	Body         string // rendered HTML, H1 still present; RenderPage strips it
 	TOC          []TOCEntry
 	searchChunks []rawSearchChunk
+	sourceHash   string
 	// links are the page's in-bundle Markdown links, in document order, with
 	// the heading anchor of the section they sit in. The graph catalogue is
 	// built from them; rendering itself only needs the rewritten href.
@@ -109,6 +110,9 @@ type Renderer struct {
 	// aggregatedGraph collects the graph of a tree render the same way, with
 	// each wiki's node IDs namespaced by its path.
 	aggregatedGraph GraphIndex
+	// aggregatedPages collects the agent manifest of a tree render, with each
+	// wiki's page IDs namespaced by its path.
+	aggregatedPages []AgentPage
 	// treeWikis is the set of wiki paths in a tree render. Cross-wiki links
 	// resolve against it after each wiki has loaded.
 	treeWikis map[string]bool
@@ -126,11 +130,12 @@ type Renderer struct {
 	// under the tree root ("" for the root), siteTitle its display title, and
 	// siteTrail the folder crumbs from the tree root down to it. groupIndex
 	// marks a page that is a generated group index rather than a wiki page.
-	treeBase   string
-	siteRel    string
-	siteTitle  string
-	siteTrail  []treeCrumb
-	groupIndex bool
+	treeBase        string
+	siteRel         string
+	siteTitle       string
+	siteDescription string
+	siteTrail       []treeCrumb
+	groupIndex      bool
 
 	// Render caches, populated on first use inside this renderer. A render
 	// runs every page through RenderPage, so values derived from the bundle
@@ -222,6 +227,9 @@ func (r *Renderer) Sections() []Section { return r.sections }
 // own directory; a multi-site tree swaps the output root through RenderSites.
 func (r *Renderer) RenderAll(out string) error {
 	if err := graphCollision(r.cfg.Content); err != nil {
+		return err
+	}
+	if err := agentCollision(r.cfg.Content); err != nil {
 		return err
 	}
 	site, err := r.cfg.SiteDir(out)
@@ -341,6 +349,19 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 	if err := os.WriteFile(filepath.Join(site, "graph.json"), graph, 0o644); err != nil {
 		return err
+	}
+
+	// A wiki below a tree root leaves the agent surface to the tree base, where
+	// one manifest spans every wiki. A single bundle and a root wiki write it
+	// here.
+	if !r.nested || r.siteRel == "" {
+		title := r.siteTitle
+		if title == "" {
+			title = r.cfg.Brand.Title
+		}
+		if err := writeAgentFiles(site, title, r.siteDescription, r.generatedAt, r.AgentPages()); err != nil {
+			return err
+		}
 	}
 
 	// The view is one page at the render root: the bundle base for a single
@@ -547,6 +568,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	p := Page{
 		Section:     section,
 		Slug:        slug,
+		sourceHash:  contentHash(data),
 		Type:        fm.Type,
 		Description: fm.Description,
 		Status:      fm.Status,
