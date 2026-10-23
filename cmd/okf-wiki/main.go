@@ -37,6 +37,10 @@ func main() {
 		runServe(os.Args[2:])
 	case "detect":
 		runDetect(os.Args[2:])
+	case "search":
+		runSearch(os.Args[2:])
+	case "mcp":
+		runMCP(os.Args[2:])
 	case "version", "-v", "--version":
 		fmt.Printf("okf-wiki %s\n", version)
 	case "help", "-h", "--help":
@@ -55,6 +59,8 @@ usage:
   okf-wiki serve  [CONTENT [OUT]] [flags]   render, then serve until interrupted
   okf-wiki render [CONTENT [OUT]] [flags]   render only
   okf-wiki detect [flags]   print the auto-detected content directory
+  okf-wiki search QUERY     search a rendered site
+  okf-wiki mcp              serve search over MCP stdio
   okf-wiki version
 
   render and serve accept the content directory and the output directory
@@ -79,6 +85,19 @@ flags (render):
   --title STR        document title suffix (default "Wiki")
   --sections LIST    section order as id:Title pairs, comma-separated
   --nav-links LIST   header links as Label=URL pairs, comma-separated
+
+flags (search):
+  --out DIR          render output root (default: .scratch/wiki)
+  --base PATH        URL prefix the site was rendered under (default "/wiki/")
+  --json             write JSON
+  --limit N          maximum results, 1 through 20 (default 5)
+  --site SITE        filter by wiki title or site key
+  --tag TAG          filter by page tag
+  --section SECTION  filter by section title
+
+flags (mcp):
+  --out DIR          render output root (default: .scratch/wiki)
+  --base PATH        URL prefix the site was rendered under (default "/wiki/")
 
 flags (serve adds):
   --addr HOST:PORT listen address (default 127.0.0.1:8080, loopback only)

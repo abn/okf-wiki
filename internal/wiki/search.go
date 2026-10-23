@@ -139,8 +139,21 @@ func extractRawBlockText(n ast.Node, src []byte, b *strings.Builder) {
 	switch nn := n.(type) {
 	case *ast.Text:
 		b.Write(nn.Segment.Value(src))
+		if nn.SoftLineBreak() || nn.HardLineBreak() {
+			b.WriteByte(' ')
+		}
 	case *ast.String:
 		b.Write(nn.Value)
+	case *ast.Link:
+		for c := nn.FirstChild(); c != nil; c = c.NextSibling() {
+			extractRawBlockText(c, src, b)
+		}
+		b.WriteByte(' ')
+	case *ast.Image:
+		for c := nn.FirstChild(); c != nil; c = c.NextSibling() {
+			extractRawBlockText(c, src, b)
+		}
+		b.WriteByte(' ')
 	case *ast.CodeSpan:
 		for c := nn.FirstChild(); c != nil; c = c.NextSibling() {
 			extractRawBlockText(c, src, b)

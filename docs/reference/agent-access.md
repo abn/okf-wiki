@@ -92,10 +92,76 @@ to re-read a page without comparing the whole text.
 ## Token use
 
 A manifest entry is a few hundred bytes. The whole current documentation
-manifest is about 20 KB, while the HTML pages together are about 1.85 MB and the
-Markdown sources about 169 KB. An agent should read `llms.txt` or `pages.json`
-first, choose one page, and fetch that page's Markdown source. It should not
-fetch the HTML for discovery.
+manifest is a few tens of kilobytes, while the HTML pages together are over a
+megabyte and the Markdown sources are a few hundred kilobytes. An agent should
+read `llms.txt` or `pages.json` first, choose one page, and fetch that page's
+Markdown source. It should not fetch the HTML for discovery.
+
+## Search from a terminal
+
+Search reads the rendered catalogue, not the source bundle, so render once and
+then query as often as needed:
+
+```bash
+okf-wiki search "cross-wiki" --out ./public --base /wiki/ --json --limit 5
+```
+
+`--site`, `--tag` and `--section` narrow the result. `--limit` is 1 through 20
+and defaults to 5. The JSON response is the same shape the MCP tool returns:
+
+```json
+{
+  "query": "cross-wiki",
+  "total": 6,
+  "results": [
+    {
+      "pageId": "page:usage/graph",
+      "title": "Graph view",
+      "pageTitle": "Graph view",
+      "section": "Usage",
+      "url": "/wiki/usage/graph.html",
+      "markdownUrl": "/wiki/usage/graph.md",
+      "tags": ["usage", "graph"],
+      "snippet": "… a cross-wiki edge in the aggregate …",
+      "score": 44,
+      "contentHash": "…"
+    }
+  ]
+}
+```
+
+`total` is the number of matches after filters, before `--limit`. `snippet` is
+an extractive window around the first matching term. `pageId`, `anchor`,
+`markdownUrl` and `contentHash` are the citation fields. The CLI and MCP share
+one result order. They use the same field weights and tie breaks as the browser
+search for a flat result list; the browser additionally groups a tree's results
+by wiki and applies its own per-site caps.
+
+## MCP search
+
+`okf-wiki mcp` serves the same search as a read-only Model Context Protocol
+stdio server:
+
+```json
+{
+  "mcpServers": {
+    "okf-wiki": {
+      "command": "okf-wiki",
+      "args": ["mcp", "--out", "/srv/wiki/public", "--base", "/wiki/"]
+    }
+  }
+}
+```
+
+The server exposes one tool, `search_wiki`, with `query`, `limit`, `site`, `tag`
+and `section` arguments. Its text content is the same JSON object the CLI
+writes. It has no write tools and does not load page text into the protocol; an
+agent fetches the returned `markdownUrl` only when it needs the full page.
+
+Both the command and the server read `search-index.json` and
+`search-content.json`. When `pages.json` is present they join it for page IDs,
+Markdown URLs and content hashes; the tag and site filters need it. Re-render
+after a content change; the search data is not rebuilt on every query.
 
 ## Multi-site and offline
 
