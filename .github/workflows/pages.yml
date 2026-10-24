@@ -55,6 +55,8 @@ jobs:
           content: docs
           image: ghcr.io/abn/okf-wiki:latest
           deploy: true
+          # The published wiki offers its own source bundle for download.
+          bundle: true
           # Header links on the published site. abn.is and the repository are
           # external and open in a new tab; Branding is a page of this bundle.
           nav-links: "abn.is=https://abn.is/,GitHub=https://github.com/abn/okf-wiki,Branding=design/branding.md"

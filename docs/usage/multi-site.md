@@ -73,6 +73,11 @@ catalogue written at the base, so with `--base /family/` those files sit under
 `_site/family/` rather than at the output root, which the two paths share only
 when the base is `/`.
 
+With `--bundle`, each wiki also writes its own `okf-bundle.zip` at its base and
+offers it from its pages, holding that wiki's content root: its own files, or
+the whole tree when the root is itself a wiki. A group index has no bundle of
+its own, so it carries no control; the wikis inside it each offer theirs.
+
 ## Naming a group
 
 An entry on a group index is named from, in order:

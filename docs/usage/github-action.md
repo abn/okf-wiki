@@ -89,14 +89,18 @@ yourself.
 | `version-tag` | empty | freeform version label beside the wordmark |
 | `title` | `Wiki` | document title suffix |
 | `lang` | `en` | language the pages declare, a tag such as `de` or `pt-BR` |
+| `bundle` | `false` | offer the source bundle as `okf-bundle.zip`; only `true` enables it |
 | `sections` | empty | section order, `id:Title` pairs |
 | `nav-links` | empty | header links, `Label=URL` pairs |
 | `deploy` | `false` | publish to GitHub Pages |
 
-All but `base` and `deploy` are flags on `okf-wiki render`, passed through as
-given. The environment equivalents work too, so `OKF_WIKI_THEME` in the job
-environment is picked up. See
-[`reference/configuration.md`](../reference/configuration.md).
+`base` is computed, `deploy` and `bundle` are switches, and every other input
+is a flag on `okf-wiki render`, passed through as given. The environment
+equivalents work too, so `OKF_WIKI_THEME` in the job environment is picked up.
+See [`reference/configuration.md`](../reference/configuration.md).
+
+`bundle: true` adds the source archive and its download control. It is off by
+default because the archive is a second copy of the bundle in the artifact.
 
 Outputs are `site-dir`, `base`, and `deploy-url`.
 

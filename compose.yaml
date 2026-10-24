@@ -23,4 +23,6 @@ services:
       OKF_WIKI_BRAND: "okf-wiki"
       OKF_WIKI_BRAND_SUB: docs
       OKF_WIKI_TITLE: Wiki
+      # Offer the whole source bundle as okf-bundle.zip. Off unless asked for.
+      # OKF_WIKI_BUNDLE: "true"
       # OKF_WIKI_THEME: /theme

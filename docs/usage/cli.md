@@ -11,6 +11,9 @@ tags: [usage, cli]
 # render a bundle to a static directory
 okf-wiki render --content ./docs --out ./public
 
+# the same, offering the whole source bundle as one download
+okf-wiki render --content ./docs --out ./public --bundle
+
 # render then serve until interrupted
 okf-wiki serve --content ./docs --out .scratch/wiki --addr 127.0.0.1:8080 --open
 
@@ -56,6 +59,14 @@ have environment equivalents, `OKF_WIKI_THEME` and `OKF_WIKI_BASE`. See
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so the rendered directory can be served by any static file server
 unchanged. The default is `/wiki/`.
+
+## Downloading the bundle
+
+`--bundle` writes the source bundle beside the rendered pages as
+`okf-bundle.zip` and adds a download control to every page. It is off by
+default, because the archive is a second copy of the content in the output. The
+environment equivalent is `OKF_WIKI_BUNDLE=true`. See
+[Download the bundle](../design/rendering.md#download-the-bundle).
 
 ## Live reload
 
@@ -193,12 +204,12 @@ source beside it for download, the resolved theme's assets (including the
 search, diagram and graph clients), `search-index.json` and its text companion
 `search-content.json`, the structural `graph.json`, the `graph.html` view,
 `llms.txt` and `pages.json` for agent discovery, `changes.json` and
-`health.json` for change tracking and graph health, and a `theme.json` recording
-which theme produced it. An offline render also writes
-the search and tag data as `.js` scripts, and copies the Mermaid runtime build
-it needs when the bundle has a diagram. The output is a plain static site, so
-any static file server can host it, and an offline folder can be opened from
-disk.
+`health.json` for change tracking and graph health, `okf-bundle.zip` when
+`--bundle` is set, and a `theme.json` recording which theme produced it. An
+offline render also writes the search and tag data as `.js` scripts, and copies
+the Mermaid runtime build it needs when the bundle has a diagram. The output is
+a plain static site, so any static file server can host it, and an offline
+folder can be opened from disk.
 
 ## Local development
 

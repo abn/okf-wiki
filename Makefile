@@ -15,7 +15,10 @@ TITLE   ?= Wiki
 # $(THEME) is only passed when set, so an empty THEME does not become a
 # --theme "" that would resolve the wrong directory.
 THEME_FLAG = $(if $(THEME),--theme $(THEME))
-BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE) $(THEME_FLAG)
+
+# The project's own wiki opts in to the source archive, which is off by default
+# because it puts a second copy of the bundle in the output.
+BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE) --bundle $(THEME_FLAG)
 
 # Keep the Go build cache inside the workspace (sandbox-friendly).
 export GOCACHE ?= $(CURDIR)/.scratch/gocache
