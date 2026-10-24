@@ -1,7 +1,7 @@
 ---
 type: Guide
 title: A multi-site tour
-description: What a tree of wikis looks like: an index of cards, search across the tree, and a header that belongs to the deployment.
+description: "What a tree of wikis looks like: an index of cards, search across the tree, and a header that belongs to the deployment."
 tags: [usage, multi-site, guide]
 ---
 

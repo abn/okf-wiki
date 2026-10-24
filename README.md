@@ -22,8 +22,37 @@ The `:Z` relabels the bind mount so an SELinux host lets the container read it.
 - GitHub alert callouts, syntax-highlighted code, Mermaid diagrams (ELK layout)
   with a full-screen pan/zoom lightbox.
 - Full-text search over a build-time index, opened with `Cmd/Ctrl-K` or `/`.
+- A structural graph with section clusters, semantic zoom, search-to-graph,
+  path finding and cross-wiki edges.
+- An agent surface: `llms.txt`, `pages.json`, Markdown sources, and a read-only
+  MCP server for search, reading, graph navigation, changes and health.
 - A light/dark theme, skinnable at runtime by mounting a theme directory.
 - A container that renders diagrams with no network access.
+
+## Use from an agent
+
+Render the docs, then point an MCP client at the output or at a published wiki:
+
+```bash
+okf-wiki render --content ./docs --out ./public --base /wiki/
+
+# local stdio MCP
+okf-wiki mcp --out ./public --base /wiki/
+
+# one or more published wikis
+okf-wiki mcp --source docs=https://docs.example.com/wiki/
+```
+
+The server exposes read-only search, page and section reads, budgeted context
+packs, neighbours and paths, changes and graph health. `--source` is repeatable
+and each source can use a bearer token from an environment variable. A thin
+HTTP endpoint is available with `--http`, with TLS and authentication handled
+by a proxy.
+
+See [docs/usage/agent-access.md](docs/usage/agent-access.md) for MCP client
+configuration, federation examples and troubleshooting, and
+[docs/reference/agent-access.md](docs/reference/agent-access.md) for the result
+contract.
 
 ## Theming
 

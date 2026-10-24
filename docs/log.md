@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-24
 
+* **Docs**: Added a worked agent access guide covering local MCP, published and
+  federated sources, bearer tokens, HTTP behind a proxy, common workflows and
+  troubleshooting. Linked it from the usage index, the reference page and the
+  README. Fixed the multi-site tour frontmatter quote that blocked validation.
+
 * **Feature**: `okf-wiki mcp` can federate one or more published wikis by base
   URL, with optional per-source bearer tokens. The render base and render ID
   travel in `search-index.json`, so a source mounted under a different path
@@ -19,7 +24,6 @@ deprecated, or restructured. It is deliberately separate from software releases.
   and tags only; the agent graph tools use the catalogue edges. `reference/graph.md`,
   `reference/agent-access.md`, `usage/graph.md` and `design/graph-evolution.md`
   record it.
-
 
 * **Feature**: The graph view has a **Path between pages** picker. It finds the
   shortest undirected link path between two selected pages, highlights the route

@@ -182,8 +182,9 @@ holds in your checkout, which may be ahead of or behind what is published.
 
 `search` reads a rendered site rather than the source bundle. `mcp` reads either
 a rendered output or one or more published wiki base URLs, so it can act as a
-standalone federator. See [Agent access](../reference/agent-access.md) for the
-result contract, source flags and MCP tool schemas.
+standalone federator. See [Agent access](agent-access.md) for local, remote and
+federated examples, and [the reference](../reference/agent-access.md) for the
+result contract and tool schemas.
 
 `--out` receives `index.html`, a redirect to the wiki, and the wiki itself at
 the base path: `out/wiki/` by default, and `out/docs/deep/` for
