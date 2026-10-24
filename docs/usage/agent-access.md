@@ -1,226 +1,98 @@
 ---
 type: Guide
 title: Agent access
-description: Connect a local or federated MCP client to a rendered wiki, with examples for search, reading, graph navigation and change tracking.
+description: The published files an agent reads, how to choose and cite a page, and where the MCP server fits.
 tags: [usage, agents, mcp]
 ---
 
 # Agent access
 
-Every render publishes the agent surface described in
-[Agent access reference](../reference/agent-access.md): `llms.txt`, `pages.json`,
-the search catalogue, `graph.json`, `changes.json`, `health.json` and the
-Markdown source beside each page.
+Every render publishes files that an agent can read without crawling HTML.
+They are described in full in the [agent access
+reference](../reference/agent-access.md), and the [MCP server](mcp.md) can
+serve them over MCP.
 
-The MCP server is a read-only client of that surface. It does not need the
-content directory, and it can run beside `serve`, in a container, or anywhere
-that can reach a published wiki.
+## The published surface
 
-## Quick start: a local render
+| File | What it gives an agent |
+| :--- | :--- |
+| `llms.txt` | A short, sectioned index of pages with links to their Markdown. |
+| `pages.json` | Title, description, IDs, URLs, tags, hashes and heading anchors. |
+| Markdown sources | The page text beside the rendered HTML. |
+| `search-index.json` and `search-content.json` | The browser search catalogue. |
+| `graph.json` | Pages, tags, links and page-order edges. |
+| `changes.json` | Pages added, changed or removed in the latest render. |
+| `health.json` | Broken links, orphans, tag-only pages, cycles, stale pages and hubs. |
 
-Render the bundle, then point an MCP client at the output:
+`llms.txt` and `pages.json` are written at the render root. A tree writes one
+aggregate pair at its base. Inline or offline renders keep the same files.
+
+## Choose a page
+
+Start with the discovery files, then fetch only what you need:
+
+```bash
+curl -s https://docs.example.com/wiki/llms.txt
+curl -s https://docs.example.com/wiki/pages.json
+```
+
+`llms.txt` is enough to choose a page by title. `pages.json` is better when the
+agent needs IDs, tags, status, dates, hashes or heading anchors. Each page
+entry names both `url` and `markdownUrl`. Fetch `markdownUrl` for the source and
+`url#anchor` for a rendered section.
+
+A page hash changes when its source changes, so a cache can re-read only pages
+whose `contentHash` moved.
+
+## Search from a terminal
+
+For a local render, `okf-wiki search` returns ranked snippets without starting
+MCP:
 
 ```bash
 okf-wiki render --content ./docs --out ./public --base /wiki/
+okf-wiki search "federated sources" --out ./public --base /wiki/ --json --limit 5
 ```
 
-```json
-{
-  "mcpServers": {
-    "okf-wiki": {
-      "command": "okf-wiki",
-      "args": ["mcp", "--out", "/srv/wiki/public", "--base", "/wiki/"]
-    }
-  }
-}
-```
+The JSON result carries `pageId`, `anchor`, `url`, `markdownUrl`,
+`contentHash` and an extractive `snippet`. `--site`, `--tag` and `--section`
+narrow it. The CLI and MCP use the same field weights for a flat result list;
+the browser adds per-wiki grouping and caps.
 
-The local source reloads before each tool call, so a re-render is visible
-without restarting the MCP process.
+## Cite accurately
 
-Start with `list_sources` or `context_for`. A typical tool sequence is:
+Use the stable fields rather than reconstructing them:
 
-```text
-list_sources()
-context_for(query="federated search", maxTokens=2000)
-read_section(source="local", pageId="page:reference/agent-access", anchor="federating-sources")
-read_page(source="local", pageId="page:reference/agent-access", maxTokens=4000)
-```
+- `pageId` identifies the graph page, namespaced in a tree aggregate.
+- `anchor` identifies the heading inside the page.
+- `url` opens the rendered section.
+- `markdownUrl` opens the source.
+- `contentHash` checks that a cached copy is current.
 
-Use the returned `url`, `markdownUrl`, `anchor` and `contentHash` as the
-citation. `context_for` returns exact sections within a token budget, so it is
-usually cheaper than reading whole pages.
+An empty `anchor` means the page-level overview, not a missing section.
 
-## One published wiki
+## MCP
 
-Use a source when the wiki is already published at a base URL:
+The MCP server adds the same search plus section reads, budgeted context,
+neighbours, paths, changes and health. See [MCP server](mcp.md) for local,
+published, federated and HTTP setup, tool examples and troubleshooting.
 
-```bash
-export DOCS_TOKEN=...
-okf-wiki mcp \
-  --source docs=https://docs.example.com/wiki/ \
-  --source-token docs=DOCS_TOKEN
-```
+The reference documents every tool argument and result field in [Agent access
+reference](../reference/agent-access.md).
 
-```json
-{
-  "mcpServers": {
-    "okf-wiki": {
-      "command": "okf-wiki",
-      "args": [
-        "mcp",
-        "--source", "docs=https://docs.example.com/wiki/",
-        "--source-token", "docs=DOCS_TOKEN"
-      ]
-    }
-  }
-}
-```
+## Multi-site and offline
 
-The source URL is the published wiki base, not the content directory. It may
-sit under a different path from the render base. The search index carries the
-render base, so citations still point at the right pages.
+In a tree, `pages.json` and `llms.txt` are aggregates at the tree base. Page IDs
+carry the wiki path, for example `alpha:page:index`. A single bundle writes the
+same files at its own base.
 
-HTTPS is recommended but not required. HTTP is useful on a private network,
-and a bearer token over plain HTTP prints a warning.
-
-## Several wikis
-
-Repeat `--source` to federate:
-
-```bash
-okf-wiki mcp \
-  --source docs=https://docs.example.com/wiki/ \
-  --source ops=http://ops.internal/wiki/ \
-  --source-token ops=OPS_TOKEN
-```
-
-When more than one source is configured:
-
-- Page IDs are prefixed, for example `docs:page:usage/cli`.
-- Search results carry a `source` field.
-- `search_wiki` and `context_for` search every source unless you pass
-  `sources`.
-- `read_page`, `read_section`, `neighbors`, `path`, `changes` and `health` take
-  a `source`.
-- `neighbors` and `path` stay inside one source.
-- A multi-site aggregate is one source, not one source per wiki.
-- `list_sources` shows each base, render ID and available state files.
-
-A federated search example:
-
-```json
-{
-  "query": "deployment",
-  "sources": ["docs", "ops"],
-  "limit": 5
-}
-```
-
-If one source cannot answer a filtered search, the response includes its error
-in `errors` and still returns results from the others.
-
-## Remote MCP over HTTP
-
-Serve the same JSON-RPC handler over HTTP at `/mcp`:
-
-```bash
-okf-wiki mcp --http 127.0.0.1:8090 \
-  --source docs=https://docs.example.com/wiki/
-```
-
-The HTTP listener has no built-in TLS or authentication. For a public
-deployment, put it behind a rate-limiting proxy or CDN. For a private
-deployment, use the existing Tailscale, OIDC or reverse-proxy boundary. A
-Caddy example:
-
-```caddyfile
-docs-mcp.example.com {
-  reverse_proxy 127.0.0.1:8090
-}
-```
-
-MCP clients POST JSON-RPC to `https://docs-mcp.example.com/mcp`. A client that
-supports remote MCP can point at that URL directly:
-
-```json
-{
-  "mcpServers": {
-    "okf-wiki": {
-      "url": "https://docs-mcp.example.com/mcp"
-    }
-  }
-}
-```
-
-TLS belongs at Caddy, not in the wiki renderer.
-
-For an upstream source behind OAuth, put a client-credentials proxy or gateway
-in front of that source and let it inject the `Authorization` header. A
-browser-cookie OAuth flow does not work for headless MCP fetches.
-
-## Common workflows
-
-### Answer a question with citations
-
-1. Call `context_for` with a token budget.
-2. Read a returned section only if the excerpt is not enough.
-3. Quote the text and cite the page URL, anchor and content hash.
-
-A context pack can be truncated because of the budget or because the search
-index caps one section at 12,000 bytes. Check `truncated` before treating the
-pack as complete.
-
-### Navigate the structural graph
-
-Use `neighbors` to see a page's local graph and `path` to find a route between
-two pages:
-
-```json
-{
-  "source": "docs",
-  "pageId": "page:usage/graph",
-  "depth": 2,
-  "kinds": ["link", "previous", "next"]
-}
-```
-
-```json
-{
-  "source": "docs",
-  "from": "page:usage/graph",
-  "to": "page:reference/graph",
-  "maxDepth": 6
-}
-```
-
-`path` uses link edges. `previous` and `next` are page-order navigation and
-come from `graph.json`. Tag hubs are not used to claim a page-to-page path.
-
-### Check freshness and health
-
-`changes` reports pages added, changed or removed in the latest render.
-`health` reports broken links, orphans, tag-only pages, cycles, stale pages and
-the most connected pages. A first render reports every page as added.
-
-Long-lived clients should cache by `contentHash` and re-read only pages whose
-hash changed.
-
-## Troubleshooting
-
-| Symptom | Check |
-| :--- | :--- |
-| Source fails with `401` or `403` | The bearer environment variable is set and the upstream expects that token. |
-| Source loads no pages | The base URL points at the published wiki base, not the content directory. |
-| Page IDs have no source prefix | Only one source is configured. Prefixes appear when there are two or more. |
-| `read_page` fails but search works | `pages.json` or the Markdown source is missing at the source. |
-| `changes` or `health` is unavailable | The source has no such file, or it is from another render. Re-render and retry. |
-| A remote change is not visible | Remote sources refresh at most every 30 seconds. Local sources reload on each tool call. |
-| HTTP client cannot connect | Use stdio for a local client, or point the client at the `/mcp` URL behind the proxy. |
+Offline renders use URLs relative to the render root and embed the search and
+graph data as scripts. The Markdown sources remain beside the pages, so an
+offline folder is still readable by an agent.
 
 ## See also
 
-- [Agent access reference](../reference/agent-access.md): the manifest schema,
-  tool arguments and result fields.
-- [Graph view](graph.md): the human-facing graph controls.
-- [Command line](cli.md): render, serve, search and MCP flags.
+- [MCP server](mcp.md): running the server and federating sources.
+- [Agent access reference](../reference/agent-access.md): schema and tool contract.
+- [Graph view](graph.md): the human-facing graph.
+- [Command line](cli.md): render, serve and search.

@@ -49,8 +49,9 @@ and each source can use a bearer token from an environment variable. A thin
 HTTP endpoint is available with `--http`, with TLS and authentication handled
 by a proxy.
 
-See [docs/usage/agent-access.md](docs/usage/agent-access.md) for MCP client
-configuration, federation examples and troubleshooting, and
+See [docs/usage/mcp.md](docs/usage/mcp.md) for MCP client configuration,
+federation examples and troubleshooting, [docs/usage/agent-access.md](docs/usage/agent-access.md)
+for the discovery and citation surface, and
 [docs/reference/agent-access.md](docs/reference/agent-access.md) for the result
 contract.
 

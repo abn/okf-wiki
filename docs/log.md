@@ -5,10 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-24
 
-* **Docs**: Added a worked agent access guide covering local MCP, published and
-  federated sources, bearer tokens, HTTP behind a proxy, common workflows and
-  troubleshooting. Linked it from the usage index, the reference page and the
-  README. Fixed the multi-site tour frontmatter quote that blocked validation.
+* **Docs**: Split the agent documentation into an Agent access guide for the
+  discovery files, Markdown sources and citation fields, and a standalone MCP
+  server guide for local, federated, HTTP and bearer-token setup. Linked both
+  from the usage index, reference page and README. Fixed the multi-site tour
+  frontmatter quote that blocked validation.
 
 * **Feature**: `okf-wiki mcp` can federate one or more published wikis by base
   URL, with optional per-source bearer tokens. The render base and render ID
