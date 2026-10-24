@@ -87,7 +87,9 @@ flowchart LR
    catalogue is written as two files that load at different speeds.
    `search-index.json` is a page table plus the entries that refer to it: an
    entry names its page by index and carries the heading, section and anchor,
-   so a page's url and titles are stored once however many sections it has.
+   so a page's url and titles are stored once however many sections it has. The
+   index also carries the render base and a render ID, so a federated MCP source
+   mounted under a different URL path can resolve its citations without guessing.
    `search-content.json` carries the entry texts in entry order. The deep link
    is the page url plus the entry's anchor, an empty anchor being the page
    itself. The client expands the table into the flat entries it scores,
