@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/abn/okf-wiki/internal/wiki"
@@ -17,16 +19,12 @@ import (
 // transport. It is deliberately read-only: search, page and section reads, and
 // budgeted context packs all return citations, but nothing writes to the wiki.
 type mcpServer struct {
-	siteDir   string
-	base      string
-	corpus    *wiki.SearchCorpus
-	graph     *wiki.GraphCorpus
-	changes   wiki.AgentChanges
-	health    wiki.GraphHealth
-	hasChange bool
-	hasHealth bool
-	changeErr string
-	healthErr string
+	specs    []mcpSource
+	ttl      time.Duration
+	fed      *wiki.Federator
+	loadedAt time.Time
+	localDir string
+	mu       sync.Mutex
 }
 
 type rpcRequest struct {
@@ -50,20 +48,42 @@ type rpcResponse struct {
 
 func runMCP(args []string) {
 	fs := flag.NewFlagSet("mcp", flag.ExitOnError)
-	out := fs.String("out", env("OKF_WIKI_OUT", ".scratch/wiki"), "render output directory")
-	base := fs.String("base", env("OKF_WIKI_BASE", wiki.DefaultBase), "URL prefix the wiki was rendered under")
+	out := fs.String("out", env("OKF_WIKI_OUT", ".scratch/wiki"), "render output directory for a local source")
+	base := fs.String("base", env("OKF_WIKI_BASE", wiki.DefaultBase), "URL prefix the local wiki was rendered under")
+	var sources sourceFlagList
+	var tokens tokenFlagMap = make(map[string]string)
+	httpAddr := fs.String("http", "", "serve MCP over HTTP at HOST:PORT instead of stdio")
+	fs.Var(&sources, "source", "NAME=BASE_URL, repeated")
+	fs.Var(&tokens, "source-token", "NAME=ENV, repeated")
 	fs.Parse(reorderArgs(args, fs))
-	siteDir, err := (wiki.Config{Out: *out, Base: *base}).SiteDir(*out)
+	specs, ttl, err := buildMCPSources(*out, *base, sources, tokens)
 	if err != nil {
 		fatal(err)
 	}
-	s := &mcpServer{siteDir: siteDir, base: *base}
-	if err := s.refresh(); err != nil {
+	s, err := newMCPServer(specs, ttl)
+	if err != nil {
 		fatal(err)
+	}
+	if *httpAddr != "" {
+		if strings.HasPrefix(*httpAddr, ":") || strings.HasPrefix(*httpAddr, "0.0.0.0:") || strings.HasPrefix(*httpAddr, "[::]:") {
+			fmt.Fprintf(os.Stderr, "okf-wiki: warning: MCP HTTP is exposed without built-in TLS or authentication; put it behind a proxy\n")
+		}
+		if err := s.serveHTTP(*httpAddr); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	if err := s.serve(os.Stdin, os.Stdout); err != nil {
 		fatal(err)
 	}
+}
+
+func newMCPServer(specs []mcpSource, ttl time.Duration) (*mcpServer, error) {
+	s := &mcpServer{specs: specs, ttl: ttl}
+	if err := s.refresh(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // refresh reloads the rendered files before each tool call. A long-running
@@ -71,9 +91,21 @@ func runMCP(args []string) {
 // search and graph files are required; changes and health are optional so a
 // site rendered before those files existed still answers search and reads.
 func (s *mcpServer) refresh() error {
+	if s.fed != nil && s.ttl > 0 && time.Since(s.loadedAt) < s.ttl {
+		return nil
+	}
+	// A running server keeps the last good snapshot when an upstream is
+	// temporarily unavailable. Startup still fails loudly when no snapshot
+	// exists.
+	if s.fed != nil {
+		if err := s.loadSources(); err == nil {
+			return nil
+		}
+		return nil
+	}
 	var last error
 	for attempt := 0; attempt < 3; attempt++ {
-		if err := s.refreshOnce(); err == nil {
+		if err := s.loadSources(); err == nil {
 			return nil
 		} else {
 			last = err
@@ -85,45 +117,60 @@ func (s *mcpServer) refresh() error {
 	return last
 }
 
-func (s *mcpServer) refreshOnce() error {
-	corpus, err := wiki.LoadSearchCorpus(s.siteDir, s.base)
-	if err != nil {
-		return fmt.Errorf("load rendered search data: %w", err)
+func (s *mcpServer) loadSources() error {
+	loaded := make([]*wiki.AgentSource, 0, len(s.specs))
+	for _, spec := range s.specs {
+		src, err := wiki.LoadAgentSource(spec.name, spec.basePath, spec.read)
+		if err != nil {
+			return err
+		}
+		src.Base = spec.base
+		loaded = append(loaded, src)
 	}
-	graph, err := wiki.LoadGraphCorpus(s.siteDir)
-	if err != nil {
-		return fmt.Errorf("load rendered graph data: %w", err)
-	}
-	if corpus.RenderID != "" && graph.RenderID != "" && corpus.RenderID != graph.RenderID {
-		return fmt.Errorf("search and graph files are from different renders")
-	}
-	s.corpus = corpus
-	s.graph = graph
-	s.hasChange = false
-	s.hasHealth = false
-	s.changeErr = ""
-	s.healthErr = ""
-	if changes, err := wiki.LoadAgentChanges(s.siteDir); err == nil {
-		s.changes = changes
-		s.hasChange = true
-	} else {
-		s.changeErr = err.Error()
-	}
-	if health, err := wiki.LoadGraphHealth(s.siteDir); err == nil {
-		s.health = health
-		s.hasHealth = true
-	} else {
-		s.healthErr = err.Error()
-	}
-	if s.hasChange && s.changes.RenderID != "" && corpus.RenderID != "" && s.changes.RenderID != corpus.RenderID {
-		s.hasChange = false
-		s.changeErr = "changes.json is from another render; render the site again"
-	}
-	if s.hasHealth && s.health.RenderID != "" && corpus.RenderID != "" && s.health.RenderID != corpus.RenderID {
-		s.hasHealth = false
-		s.healthErr = "health.json is from another render; render the site again"
-	}
+	s.fed = wiki.NewFederator(loaded)
+	s.loadedAt = time.Now()
 	return nil
+}
+
+// serveHTTP exposes the same JSON-RPC handler at one POST endpoint. It is
+// intentionally transport-thin: TLS, authentication, quotas and proxying stay
+// at the edge, and the process remains stateless apart from its source cache.
+func (s *mcpServer) serveHTTP(addr string) error {
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           s.httpHandler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       20 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return server.ListenAndServe()
+}
+
+func (s *mcpServer) httpHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/mcp", func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		body, err := io.ReadAll(http.MaxBytesReader(w, req.Body, 4<<20))
+		if err != nil {
+			http.Error(w, "read request", http.StatusRequestEntityTooLarge)
+			return
+		}
+		resp := s.handle(body)
+		if resp == nil {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			return
+		}
+	})
+	return mux
 }
 
 // serve reads one JSON-RPC message per line, as the MCP stdio transport does,
@@ -187,7 +234,7 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			ID:      req.ID,
 			Result: map[string]any{"tools": []any{
 				mcpSearchTool(), mcpReadPageTool(), mcpReadSectionTool(), mcpContextTool(),
-				mcpNeighborsTool(), mcpPathTool(), mcpChangesTool(), mcpHealthTool(),
+				mcpNeighborsTool(), mcpPathTool(), mcpChangesTool(), mcpHealthTool(), mcpListSourcesTool(),
 			}},
 		}
 	case "tools/call":
@@ -209,6 +256,7 @@ func mcpReadPageTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
+				"source":    map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
 				"pageId":    map[string]any{"type": "string", "description": "Page ID from search, pages.json or the graph."},
 				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 4000},
 			},
@@ -225,6 +273,7 @@ func mcpReadSectionTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
+				"source":    map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
 				"pageId":    map[string]any{"type": "string", "description": "Page ID from search or pages.json."},
 				"anchor":    map[string]any{"type": "string", "description": "Heading anchor from a search result or pages.json."},
 				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 2000},
@@ -245,6 +294,7 @@ func mcpContextTool() map[string]any {
 				"query":     map[string]any{"type": "string", "description": "Words or a phrase to search for."},
 				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 3000},
 				"limit":     map[string]any{"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+				"sources":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional source names; omit for every source."},
 				"site":      map[string]any{"type": "string", "description": "Wiki title or site key."},
 				"tag":       map[string]any{"type": "string", "description": "Page tag."},
 				"section":   map[string]any{"type": "string", "description": "Section title."},
@@ -260,8 +310,10 @@ func mcpChangesTool() map[string]any {
 		"name":        "changes",
 		"description": "Return the pages added, changed or removed in the latest render, with page IDs and source hashes.",
 		"inputSchema": map[string]any{
-			"type":                 "object",
-			"properties":           map[string]any{},
+			"type": "object",
+			"properties": map[string]any{
+				"source": map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
+			},
 			"additionalProperties": false,
 		},
 	}
@@ -272,8 +324,10 @@ func mcpHealthTool() map[string]any {
 		"name":        "health",
 		"description": "Return broken links, orphans, tag-only pages, link cycles, stale pages and the most connected pages.",
 		"inputSchema": map[string]any{
-			"type":                 "object",
-			"properties":           map[string]any{},
+			"type": "object",
+			"properties": map[string]any{
+				"source": map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
+			},
 			"additionalProperties": false,
 		},
 	}
@@ -286,6 +340,7 @@ func mcpNeighborsTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
+				"source": map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
 				"pageId": map[string]any{"type": "string", "description": "Page ID from search, pages.json or the graph."},
 				"depth":  map[string]any{"type": "integer", "minimum": 1, "maximum": 3, "default": 1},
 				"kinds":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional edge kinds: link, tag, previous, next."},
@@ -303,12 +358,25 @@ func mcpPathTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
+				"source":   map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
 				"from":     map[string]any{"type": "string", "description": "Starting page ID."},
 				"to":       map[string]any{"type": "string", "description": "Target page ID."},
 				"maxDepth": map[string]any{"type": "integer", "minimum": 1, "maximum": 10, "default": 6},
 				"kinds":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional edge kinds: link, tag, previous, next."},
 			},
 			"required":             []string{"from", "to"},
+			"additionalProperties": false,
+		},
+	}
+}
+
+func mcpListSourcesTool() map[string]any {
+	return map[string]any{
+		"name":        "list_sources",
+		"description": "List the wikis this federator can read, with their render IDs and optional change and health surfaces.",
+		"inputSchema": map[string]any{
+			"type":                 "object",
+			"properties":           map[string]any{},
 			"additionalProperties": false,
 		},
 	}
@@ -323,6 +391,7 @@ func mcpSearchTool() map[string]any {
 			"properties": map[string]any{
 				"query":   map[string]any{"type": "string", "description": "Words or a phrase to search for."},
 				"limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+				"sources": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional source names; omit for every source."},
 				"site":    map[string]any{"type": "string", "description": "Wiki title or site key."},
 				"tag":     map[string]any{"type": "string", "description": "Page tag."},
 				"section": map[string]any{"type": "string", "description": "Section title."},
@@ -339,14 +408,17 @@ type mcpCallParams struct {
 }
 
 type mcpSearchArgs struct {
-	Query   string `json:"query"`
-	Limit   int    `json:"limit"`
-	Site    string `json:"site"`
-	Tag     string `json:"tag"`
-	Section string `json:"section"`
+	Query   string   `json:"query"`
+	Sources []string `json:"sources"`
+	Limit   int      `json:"limit"`
+	Site    string   `json:"site"`
+	Tag     string   `json:"tag"`
+	Section string   `json:"section"`
 }
 
 func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := s.refresh(); err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -368,15 +440,11 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 	case "path":
 		return s.pathTool(params.Arguments)
 	case "changes":
-		if !s.hasChange {
-			return mcpToolError("changes unavailable: " + s.changeErr + "; render the site again")
-		}
-		return mcpToolJSON(s.changes)
+		return s.changesTool(params.Arguments)
 	case "health":
-		if !s.hasHealth {
-			return mcpToolError("health unavailable: " + s.healthErr + "; render the site again")
-		}
-		return mcpToolJSON(s.health)
+		return s.healthTool(params.Arguments)
+	case "list_sources":
+		return mcpToolJSON(s.fed.Info())
 	default:
 		return mcpToolError("unknown tool " + params.Name)
 	}
@@ -396,9 +464,9 @@ func (s *mcpServer) searchTool(raw json.RawMessage) map[string]any {
 	if args.Limit < 1 || args.Limit > 20 {
 		return mcpToolError("limit must be between 1 and 20")
 	}
-	resp, err := s.corpus.Search(args.Query, wiki.SearchOptions{
+	resp, err := s.fed.Search(args.Query, wiki.SearchOptions{
 		Limit: args.Limit, Site: args.Site, Tag: args.Tag, Section: args.Section,
-	})
+	}, args.Sources)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -406,6 +474,7 @@ func (s *mcpServer) searchTool(raw json.RawMessage) map[string]any {
 }
 
 type mcpReadPageArgs struct {
+	Source    string `json:"source"`
 	PageID    string `json:"pageId"`
 	MaxTokens int    `json:"maxTokens"`
 }
@@ -421,7 +490,7 @@ func (s *mcpServer) readPageTool(raw json.RawMessage) map[string]any {
 	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
 		return mcpToolError("maxTokens must be between 1 and 32000")
 	}
-	page, err := s.corpus.ReadPage(args.PageID, args.MaxTokens)
+	page, err := s.fed.ReadPage(args.Source, args.PageID, args.MaxTokens)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -429,6 +498,7 @@ func (s *mcpServer) readPageTool(raw json.RawMessage) map[string]any {
 }
 
 type mcpReadSectionArgs struct {
+	Source    string `json:"source"`
 	PageID    string `json:"pageId"`
 	Anchor    string `json:"anchor"`
 	MaxTokens int    `json:"maxTokens"`
@@ -445,7 +515,7 @@ func (s *mcpServer) readSectionTool(raw json.RawMessage) map[string]any {
 	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
 		return mcpToolError("maxTokens must be between 1 and 32000")
 	}
-	section, err := s.corpus.ReadSection(args.PageID, args.Anchor, args.MaxTokens)
+	section, err := s.fed.ReadSection(args.Source, args.PageID, args.Anchor, args.MaxTokens)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -453,12 +523,13 @@ func (s *mcpServer) readSectionTool(raw json.RawMessage) map[string]any {
 }
 
 type mcpContextArgs struct {
-	Query     string `json:"query"`
-	MaxTokens int    `json:"maxTokens"`
-	Limit     int    `json:"limit"`
-	Site      string `json:"site"`
-	Tag       string `json:"tag"`
-	Section   string `json:"section"`
+	Query     string   `json:"query"`
+	Sources   []string `json:"sources"`
+	MaxTokens int      `json:"maxTokens"`
+	Limit     int      `json:"limit"`
+	Site      string   `json:"site"`
+	Tag       string   `json:"tag"`
+	Section   string   `json:"section"`
 }
 
 func (s *mcpServer) contextTool(raw json.RawMessage) map[string]any {
@@ -478,9 +549,9 @@ func (s *mcpServer) contextTool(raw json.RawMessage) map[string]any {
 	if args.Limit < 1 || args.Limit > 20 {
 		return mcpToolError("limit must be between 1 and 20")
 	}
-	resp, err := s.corpus.ContextFor(args.Query, wiki.SearchOptions{
+	resp, err := s.fed.ContextFor(args.Query, wiki.SearchOptions{
 		Limit: args.Limit, Site: args.Site, Tag: args.Tag, Section: args.Section,
-	}, args.MaxTokens)
+	}, args.MaxTokens, args.Sources)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -488,6 +559,7 @@ func (s *mcpServer) contextTool(raw json.RawMessage) map[string]any {
 }
 
 type mcpNeighborsArgs struct {
+	Source string   `json:"source"`
 	PageID string   `json:"pageId"`
 	Depth  int      `json:"depth"`
 	Kinds  []string `json:"kinds"`
@@ -501,7 +573,7 @@ func (s *mcpServer) neighborsTool(raw json.RawMessage) map[string]any {
 	if args.PageID == "" {
 		return mcpToolError("pageId is required")
 	}
-	resp, err := s.graph.Neighbors(args.PageID, args.Depth, args.Kinds)
+	resp, err := s.fed.Neighbors(args.Source, args.PageID, args.Depth, args.Kinds)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}
@@ -509,6 +581,7 @@ func (s *mcpServer) neighborsTool(raw json.RawMessage) map[string]any {
 }
 
 type mcpPathArgs struct {
+	Source   string   `json:"source"`
 	From     string   `json:"from"`
 	To       string   `json:"to"`
 	MaxDepth int      `json:"maxDepth"`
@@ -523,7 +596,35 @@ func (s *mcpServer) pathTool(raw json.RawMessage) map[string]any {
 	if args.From == "" || args.To == "" {
 		return mcpToolError("from and to are required")
 	}
-	resp, err := s.graph.Path(args.From, args.To, args.MaxDepth, args.Kinds)
+	resp, err := s.fed.Path(args.Source, args.From, args.To, args.MaxDepth, args.Kinds)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+type mcpSourceArg struct {
+	Source string `json:"source"`
+}
+
+func (s *mcpServer) changesTool(raw json.RawMessage) map[string]any {
+	var args mcpSourceArg
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid changes arguments")
+	}
+	resp, err := s.fed.Changes(args.Source)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+func (s *mcpServer) healthTool(raw json.RawMessage) map[string]any {
+	var args mcpSourceArg
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid health arguments")
+	}
+	resp, err := s.fed.Health(args.Source)
 	if err != nil {
 		return mcpToolError(err.Error())
 	}

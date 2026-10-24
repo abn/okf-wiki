@@ -153,18 +153,19 @@ stdio server:
 }
 ```
 
-The server exposes eight read-only tools:
+The server exposes nine read-only tools:
 
 | Tool | Arguments | Returns |
 | :--- | :--- | :--- |
-| `search_wiki` | `query`, `limit`, `site`, `tag`, `section` | Ranked snippets with citations. |
-| `read_page` | `pageId`, `maxTokens` | The page's Markdown source, capped at the budget. |
-| `read_section` | `pageId`, `anchor`, `maxTokens` | One heading-anchored section as plain text. |
-| `context_for` | `query`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
-| `neighbors` | `pageId`, `depth`, `kinds` | The local graph with typed edges. |
-| `path` | `from`, `to`, `maxDepth`, `kinds` | The shortest undirected path and its edges. |
-| `changes` | none | Pages added, changed or removed in the latest render. |
-| `health` | none | Broken links, orphans, tag-only pages, cycles, stale pages and most connected pages. |
+| `list_sources` | none | Configured wikis, their base URLs and render IDs. |
+| `search_wiki` | `query`, `sources`, `limit`, `site`, `tag`, `section` | Ranked snippets with citations. |
+| `read_page` | `source`, `pageId`, `maxTokens` | The page's Markdown source, capped at the budget. |
+| `read_section` | `source`, `pageId`, `anchor`, `maxTokens` | One heading-anchored section as plain text. |
+| `context_for` | `query`, `sources`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
+| `neighbors` | `source`, `pageId`, `depth`, `kinds` | The local graph with typed edges. |
+| `path` | `source`, `from`, `to`, `maxDepth`, `kinds` | The shortest undirected path and its edges. |
+| `changes` | `source` | Pages added, changed or removed in the latest render. |
+| `health` | `source` | Broken links, orphans, tag-only pages, cycles, stale pages and most connected pages. |
 
 `read_page` defaults to 4,000 tokens, `read_section` to 2,000 and `context_for`
 to 3,000. The limit is an estimate of four bytes per token, not a model
@@ -201,6 +202,44 @@ the site directory. The server reloads the rendered files before each tool call,
 so a re-render is visible without restarting the MCP process. If `changes.json`
 or `health.json` is absent or unreadable, only those two tools fail; search and
 reads still work.
+
+## Federating sources
+
+`okf-wiki mcp` is a standalone process. It can read the local output with
+`--out`, or one or more published wikis by base URL:
+
+```bash
+okf-wiki mcp \
+  --source docs=https://docs.example.com/wiki/ \
+  --source ops=http://ops.internal/wiki/ \
+  --source-token docs=DOCS_BEARER_TOKEN
+```
+
+`--source` is repeatable. `--source-token NAME=ENV` adds a bearer header for
+that source only. HTTPS is recommended but not required: HTTP is useful behind
+a tailnet or an authenticated proxy. A bearer token sent over plain HTTP
+prints a warning.
+
+When more than one source is configured, page IDs are namespaced as
+`<source>:<id>`, and search results carry a `source` field. Pass `source` to
+the page, graph, change and health tools and `sources` to search and
+`context_for`. `neighbors` and `path` stay inside one source. A source that is
+already a multi-site aggregate is one source, not one source per wiki.
+
+Remote sources are refreshed at most every 30 seconds. Local `--out` sources
+reload before each tool call. A source that fails to load stops startup with
+its name and error, rather than serving a partial federation silently.
+`list_sources` names the configured bases.
+
+For upstream OAuth, put a client-credentials proxy or gateway in front of the
+source and let it inject the `Authorization` header. A browser-cookie OAuth
+flow is not suitable for headless MCP fetches. The MCP endpoint itself has no
+mandatory auth: public deployments can run behind a rate-limiting proxy, and
+private deployments use their existing proxy, Tailscale or OIDC boundary.
+
+`okf-wiki mcp --http 127.0.0.1:8090` serves the same JSON-RPC handler at
+`/mcp`. TLS and authentication belong at the edge. The HTTP listener is
+stateless apart from the source cache.
 
 ## Multi-site and offline
 

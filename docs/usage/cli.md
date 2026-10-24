@@ -17,8 +17,10 @@ okf-wiki serve --content ./docs --out .scratch/wiki --addr 127.0.0.1:8080 --open
 # search a rendered site
 okf-wiki search "graph" --out .scratch/wiki --base /wiki/ --json
 
-# serve search over MCP stdio
+# serve search over MCP stdio, locally or from published wikis
 okf-wiki mcp --out .scratch/wiki --base /wiki/
+okf-wiki mcp --source docs=https://docs.example.com/wiki/ --source-token docs=DOCS_TOKEN
+okf-wiki mcp --http 127.0.0.1:8090 --source docs=https://docs.example.com/wiki/
 
 # print the auto-detected content directory
 okf-wiki detect
@@ -178,9 +180,10 @@ holds in your checkout, which may be ahead of or behind what is published.
 
 ## Rendered output
 
-`search` and `mcp` read a rendered site rather than the source bundle. See
-[Agent access](../reference/agent-access.md) for the result contract and the
-MCP tool schema.
+`search` reads a rendered site rather than the source bundle. `mcp` reads either
+a rendered output or one or more published wiki base URLs, so it can act as a
+standalone federator. See [Agent access](../reference/agent-access.md) for the
+result contract, source flags and MCP tool schemas.
 
 `--out` receives `index.html`, a redirect to the wiki, and the wiki itself at
 the base path: `out/wiki/` by default, and `out/docs/deep/` for

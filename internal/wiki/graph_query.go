@@ -2,7 +2,9 @@ package wiki
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,7 +70,13 @@ type adjEdge struct {
 // LoadGraphCorpus reads graph.json and, when present, pages.json from a
 // rendered site directory.
 func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "graph.json"))
+	return LoadGraphCorpusFrom(func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(dir, name))
+	})
+}
+
+func LoadGraphCorpusFrom(read SourceReader) (*GraphCorpus, error) {
+	raw, err := read("graph.json")
 	if err != nil {
 		return nil, fmt.Errorf("read graph.json: %w", err)
 	}
@@ -92,7 +100,7 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 		c.adj[e.From] = append(c.adj[e.From], adjEdge{peer: e.To, edge: info, kind: e.Kind})
 		c.adj[e.To] = append(c.adj[e.To], adjEdge{peer: e.From, edge: info, kind: e.Kind})
 	}
-	if manifestRaw, err := os.ReadFile(filepath.Join(dir, "pages.json")); err == nil {
+	if manifestRaw, err := read("pages.json"); err == nil {
 		if err := json.Unmarshal(manifestRaw, &c.Pages); err != nil {
 			return nil, fmt.Errorf("decode pages.json: %w", err)
 		}
@@ -104,7 +112,7 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 		if !c.hasOrderEdges() {
 			c.addOrderEdges()
 		}
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 	return c, nil
@@ -148,6 +156,49 @@ func (c *GraphCorpus) addSynthetic(e GraphEdgeInfo) {
 	}
 	c.edges = append(c.edges, e)
 	c.adj[e.From] = append(c.adj[e.From], adjEdge{peer: e.To, edge: e, kind: e.Kind})
+}
+
+// Namespace prefixes every graph and page ID for a federated source and
+// rebuilds the lookup and adjacency maps.
+func (c *GraphCorpus) Namespace(prefix string) {
+	if prefix == "" {
+		return
+	}
+	for i := range c.Graph.Nodes {
+		c.Graph.Nodes[i].ID = prefix + ":" + c.Graph.Nodes[i].ID
+	}
+	for i := range c.Graph.Edges {
+		c.Graph.Edges[i].From = prefix + ":" + c.Graph.Edges[i].From
+		c.Graph.Edges[i].To = prefix + ":" + c.Graph.Edges[i].To
+	}
+	for i := range c.Pages.Pages {
+		c.Pages.Pages[i].ID = prefix + ":" + c.Pages.Pages[i].ID
+	}
+	c.rebuild()
+}
+
+func (c *GraphCorpus) rebuild() {
+	c.nodes = make(map[string]GraphNode, len(c.Graph.Nodes))
+	c.adj = make(map[string][]adjEdge)
+	c.edges = nil
+	for _, n := range c.Graph.Nodes {
+		c.nodes[n.ID] = n
+	}
+	for _, e := range c.Graph.Edges {
+		if _, ok := c.nodes[e.From]; !ok {
+			continue
+		}
+		if _, ok := c.nodes[e.To]; !ok {
+			continue
+		}
+		info := GraphEdgeInfo{From: e.From, To: e.To, Kind: e.Kind, Anchor: e.Anchor, Text: e.Text}
+		c.edges = append(c.edges, info)
+		c.adj[e.From] = append(c.adj[e.From], adjEdge{peer: e.To, edge: info, kind: e.Kind})
+		c.adj[e.To] = append(c.adj[e.To], adjEdge{peer: e.From, edge: info, kind: e.Kind})
+	}
+	if !c.hasOrderEdges() {
+		c.addOrderEdges()
+	}
 }
 
 func nodeInfo(n GraphNode) GraphNodeInfo {
