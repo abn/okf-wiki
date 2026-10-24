@@ -3834,6 +3834,7 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 	// key leaked into the file it would be dropped here and the two would differ.
 	// The entry text is not part of the index: it travels in search-content.json.
 	type barePage struct {
+		ID    string `json:"id"`
 		URL   string `json:"u"`
 		Title string `json:"t"`
 	}

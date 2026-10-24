@@ -47,6 +47,7 @@
   // equal there is no tree to search across.
   var base = window.__WIKI_BASE || '/wiki/';
   var searchBase = window.__WIKI_SEARCH || base;
+  var graphHref = searchBase + 'graph.html';
   var multiSite = !!window.__WIKI_SEARCH && window.__WIKI_SEARCH !== window.__WIKI_BASE;
   // Offline pages cannot fetch a sibling JSON file, so they carry their
   // catalogues as classic data scripts instead.
@@ -58,6 +59,7 @@
   var backdrop = document.getElementById('searchBackdrop');
   var input = document.getElementById('searchInput');
   var closeBtn = document.getElementById('searchCloseBtn');
+  var graphBtn = document.getElementById('searchGraph');
   var scopeBtn = document.getElementById('searchScope');
   var resultsContainer = document.getElementById('searchResults');
   var resultsHost = null;
@@ -85,6 +87,7 @@
         p: url,
         t: entry.t || page.t,
         d: page.t,
+        i: page.id || '',
         s: entry.s,
         // Content arrives later, in search-content.json, and is attached to
         // this entry in place when it does.
@@ -476,6 +479,7 @@
 
   function renderInitialState() {
     currentGroups = null;
+    if (graphBtn) graphBtn.hidden = true;
     var links = (window.__WIKI_QUICK || []).slice(0, 6);
     var html = '<div class="search-empty-state">' +
       '<p>Type a search term, or jump to a section.</p>' +
@@ -722,11 +726,13 @@
         '<p class="search-empty-hint">Try a host, a command, or a topic.</p>' +
         '</div>';
       input.removeAttribute('aria-activedescendant');
+      if (graphBtn) graphBtn.hidden = true;
       announceResults();
       return;
     }
 
     selectedIndex = 0;
+    if (graphBtn) graphBtn.hidden = !currentResults.some(function (item) { return !!item.i; });
     // A background text refresh re-runs the search under a reader who may
     // already have arrowed to a row. The same row is selected again when it is
     // still in the results, so the refresh does not move the selection; otherwise
@@ -793,6 +799,18 @@
     }
   }
 
+  // Open the selected hit in the graph with the query still active, so the
+  // graph's existing filter highlights every match and the hit is selected.
+  function openGraph() {
+    if (selectedIndex < 0 || selectedIndex >= currentResults.length) return;
+    var item = currentResults[selectedIndex];
+    if (!item.i) return;
+    var query = input.value.trim();
+    var href = graphHref + '?focus=' + encodeURIComponent(item.i) + '&depth=1';
+    if (query) href += '&q=' + encodeURIComponent(query);
+    window.location.assign(new URL(href, document.baseURI).href);
+  }
+
   function isEditable(el) {
     if (!el) return false;
     var tag = el.tagName ? el.tagName.toLowerCase() : '';
@@ -805,6 +823,7 @@
     searchBtn.addEventListener('focus', fetchIndex, { once: true });
   }
   if (closeBtn) closeBtn.addEventListener('click', closeSearch);
+  if (graphBtn) graphBtn.addEventListener('click', openGraph);
 
   // The scope toggle is only meaningful in a tree, where the index at the tree
   // base spans more than the current wiki. A single bundle and a group index

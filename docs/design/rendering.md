@@ -93,6 +93,8 @@ flowchart LR
    itself. The client expands the table into the flat entries it scores,
    reading the page fields through the table rather than copying them, and
    searches titles, documents and sections as soon as the light index arrives.
+   A page row carries its graph node ID, so the modal can open the selected hit
+   in the graph with the query filter still active.
    It fetches `search-content.json` in the background, attaches each text to
    its entry by position, and ignores the file whole if its count does not
    match the index. An open query is re-run when the texts arrive, so content

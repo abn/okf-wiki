@@ -238,7 +238,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 `search-result-section`, `search-result-sep`, `search-result-doc`,
 `search-result-title`, `search-result-icon`, `search-result-snippet`,
 `search-match`, and, when a tree's index carries the wiki of each hit,
-`search-result-group` with `search-group-heading`.
+`search-result-group` with `search-group-heading`. The template's footer carries
+`#searchGraph` for opening the selected hit in the graph; the client leaves it
+hidden when the result has no graph node.
 
 `diagrams.js` wraps each diagram in `mermaid-frame` with a `mermaid-toolbar`
 carrying `mermaid-type`, `mermaid-actions`, the card zoom in `mermaid-zoom`,

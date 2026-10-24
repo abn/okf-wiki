@@ -90,6 +90,13 @@ A large catalogue shows a first page of rows with a **Show all** button in each
 section. The status line gives the full counts. The list follows the URL state;
 it does not add another parameter.
 
+## From search
+
+Search results carry a **Open in graph** action when the hit has a graph node.
+It opens the graph focused on that page with the query still active, so the
+focused neighbourhood and every other matching node stay lit while the rest
+fades. The action is hidden for tag-search rows, which do not name a page node.
+
 ## Shareable view state
 
 The graph writes its view state into the URL. Focus, depth, Show, Filter and

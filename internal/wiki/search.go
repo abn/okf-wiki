@@ -12,8 +12,9 @@ import (
 // entries refer to it by index, so a page's url and titles are not repeated on
 // every section it contributed.
 type SearchPage struct {
-	URL   string `json:"u"` // page url
-	Title string `json:"t"` // page title
+	ID    string `json:"id,omitempty"` // graph node ID
+	URL   string `json:"u"`            // page url
+	Title string `json:"t"`            // page title
 	// Site is the wiki's display title, set only on a tree's aggregate index so
 	// the client can head a group of results with the wiki they came from.
 	Site string `json:"w,omitempty"`
@@ -205,7 +206,7 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 			pageURL := r.urlBase() + p.Slug + ".html"
 			docTitle := pageTitle(p)
 			page := len(index.Pages)
-			index.Pages = append(index.Pages, SearchPage{URL: pageURL, Title: docTitle})
+			index.Pages = append(index.Pages, SearchPage{ID: pageNodeID(p.Slug), URL: pageURL, Title: docTitle})
 
 			if len(p.searchChunks) == 0 {
 				index.Entries = append(index.Entries, SearchEntry{
@@ -273,6 +274,9 @@ func labelSearchIndex(index SearchIndex, site, key string) SearchIndex {
 	for i, p := range index.Pages {
 		p.Site = site
 		p.SiteKey = key
+		if p.ID != "" {
+			p.ID = key + ":" + p.ID
+		}
 		pages[i] = p
 	}
 	return SearchIndex{Pages: pages, Entries: index.Entries}
