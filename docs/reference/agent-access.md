@@ -7,7 +7,7 @@ tags: [reference, agents, metadata]
 
 # Agent access
 
-For a quick start, local and remote MCP configuration, federation examples and troubleshooting, see the [Agent access guide](../usage/agent-access.md).
+For a quick start, local and remote MCP configuration, federation examples and troubleshooting, see the [MCP server guide](../usage/mcp.md). The [agent access guide](../usage/agent-access.md) covers the discovery files and citation fields.
 
 Every render writes two small discovery files beside the search and graph
 catalogues: `llms.txt` and `pages.json`. They describe the content pages and
