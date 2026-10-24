@@ -18,7 +18,7 @@ try:
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.firefox.options import Options
-    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support.ui import Select, WebDriverWait
 except ImportError as exc:
     raise SystemExit(
         "Selenium is required: python3 -m pip install selenium"
@@ -436,6 +436,26 @@ def main():
             driver.find_element(By.ID, "graphTagHubs").is_selected(),
             "Tag hubs is not on by default",
         )
+        driver.find_element(By.CSS_SELECTOR, "#graphPath summary").click()
+        Select(driver.find_element(By.ID, "graphPathFrom")).select_by_value("page:usage/graph")
+        Select(driver.find_element(By.ID, "graphPathTo")).select_by_value("page:reference/graph")
+        driver.find_element(By.ID, "graphPathFind").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: "Path:" in d.find_element(By.ID, "graphPathStatus").text
+        )
+        must(
+            len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.is-path")) >= 2,
+            "the path did not highlight both endpoints",
+        )
+        driver.find_element(By.ID, "graphPathClear").click()
+        WebDriverWait(driver, 5).until(
+            lambda d: "Path cleared" in d.find_element(By.ID, "graphPathStatus").text
+        )
+        must(
+            not driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.is-path"),
+            "clearing the path left highlighted nodes",
+        )
+
         tiers = visible_label_tiers(driver)
         must(tiers.get("1", 0) > 0, "no hub label is visible at the overview")
         must(
