@@ -349,6 +349,11 @@ func (r *Renderer) writeSiteRoot(root string) error {
 func (r *Renderer) writeAggregateSearchIndex(root string) error {
 	index := r.aggregated
 	index.RenderID = agentRenderID(r.aggregatedPages)
+	if r.cfg.Offline {
+		index.Base = ""
+	} else {
+		index.Base = r.cfg.base()
+	}
 	// Marshal empty slices, not nil ones, so the catalogue is an empty table
 	// rather than null: the client parses either, but a group page expecting
 	// pages and entries should find both.

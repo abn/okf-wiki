@@ -127,12 +127,17 @@ func (c *SearchCorpus) ReadSection(pageID, anchor string, maxTokens int) (Sectio
 		title = page.Title
 	}
 	return SectionContent{
-		PageID:          page.ID,
-		Title:           title,
-		PageTitle:       page.Title,
-		Section:         entry.Section,
-		Anchor:          anchor,
-		URL:             page.URL + "#" + anchor,
+		PageID:    page.ID,
+		Title:     title,
+		PageTitle: page.Title,
+		Section:   entry.Section,
+		Anchor:    anchor,
+		URL: page.URL + func() string {
+			if anchor == "" {
+				return ""
+			}
+			return "#" + anchor
+		}(),
 		MarkdownURL:     page.MarkdownURL,
 		ContentHash:     page.ContentHash,
 		Text:            text,

@@ -207,3 +207,34 @@ func TestFederatorContextWithoutManifest(t *testing.T) {
 		t.Errorf("context without pages.json = %+v", resp)
 	}
 }
+
+func TestFederatorTreeBaseStoredInSearchIndex(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "clients", "example", "ops"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "ops", "index.md"), "# Ops\n\nOps page.\n")
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "family")
+	src, err := LoadAgentSource("tree", "/family/", func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(site, name))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src.Corpus.Base != "/family/" {
+		t.Errorf("tree search base = %q", src.Corpus.Base)
+	}
+	page, err := src.Corpus.ReadPage("clients/example/ops:page:index", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(page.Content, "Ops page") {
+		t.Errorf("tree page = %+v", page)
+	}
+}

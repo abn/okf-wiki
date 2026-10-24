@@ -46,6 +46,7 @@ type SearchEntry struct {
 // refer to it. Entry text is not part of it; SearchContent holds that.
 type SearchIndex struct {
 	RenderID string        `json:"renderId,omitempty"`
+	Base     string        `json:"base,omitempty"`
 	Pages    []SearchPage  `json:"pages"`
 	Entries  []SearchEntry `json:"entries"`
 }
@@ -233,6 +234,7 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 func (r *Renderer) SearchIndexJSON() ([]byte, error) {
 	index := r.BuildSearchIndex()
 	index.RenderID = agentRenderID(r.AgentPages())
+	index.Base = r.urlBase()
 	return json.Marshal(index)
 }
 
