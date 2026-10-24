@@ -1279,6 +1279,8 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   border-radius: var(--radius-pill); padding: 6px var(--space-3); min-height: 36px;
 }
 .graph-field input[type="search"] { width: min(260px, 50vw); }
+.graph-path-controls .graph-field { flex: 1 1 220px; min-width: 0; }
+.graph-path-controls .graph-field select { width: 100%; max-width: 100%; }
 .graph-field input[type="search"]:focus-visible, .graph-field select:focus-visible {
   outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
 }
@@ -1368,7 +1370,9 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 .graph-app.has-path .graph-node-group:not(.is-path) { opacity: .12; }
 .graph-app.has-path .graph-node-group.is-path { opacity: 1; }
 .graph-app.has-path .graph-edge:not(.is-path) { opacity: .04; }
-.graph-app.has-path .graph-edge.is-path { stroke-opacity: .7; }
+.graph-app.has-path .graph-edge.is-path {
+  display: block; opacity: .7; stroke-opacity: .7;
+}
 .graph-download {
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
   color: var(--color-on-accent); background: var(--color-accent);
