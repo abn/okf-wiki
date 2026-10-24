@@ -103,9 +103,13 @@ func (s *HTTPSource) Read(name string) ([]byte, error) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("source returned HTTP %d for %s", resp.StatusCode, name)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	const maxSourceBytes = 64 << 20
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSourceBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(body) > maxSourceBytes {
+		return nil, fmt.Errorf("source file %s exceeds the 64 MiB limit", name)
 	}
 	return body, nil
 }
@@ -229,10 +233,52 @@ func NewFederator(sources []*AgentSource) *Federator {
 	return f
 }
 
-func resolveSourceURL(base, raw string) string {
+// inferPageBase finds the URL prefix shared by the page table. A wiki mounted
+// under /b/wiki/ can still have page URLs rooted at /wiki/, so the source URL
+// path and the render base must not be assumed to be the same.
+func inferPageBase(pages []SearchPage) string {
+	base := ""
+	for _, page := range pages {
+		u := page.URL
+		if i := strings.IndexAny(u, "?#"); i >= 0 {
+			u = u[:i]
+		}
+		dir := path.Dir(u)
+		prefix := dir + "/"
+		if dir == "." {
+			prefix = "./"
+		} else if dir == "/" {
+			prefix = "/"
+		}
+		if base == "" {
+			base = prefix
+			continue
+		}
+		i := 0
+		for i < len(base) && i < len(prefix) && base[i] == prefix[i] {
+			i++
+		}
+		base = base[:i]
+		if cut := strings.LastIndexByte(base, '/'); cut >= 0 {
+			base = base[:cut+1]
+		}
+	}
+	return base
+}
+
+func resolveSourceURL(base, renderBase, raw string) string {
 	if raw == "" || strings.Contains(raw, "://") {
 		return raw
 	}
+	// Local sources already carry the URL mode the renderer chose, including
+	// relative URLs for an offline folder.
+	if !strings.Contains(base, "://") {
+		return raw
+	}
+	if renderBase != "" && strings.HasPrefix(raw, renderBase) {
+		raw = strings.TrimPrefix(raw, renderBase)
+	}
+	raw = strings.TrimPrefix(raw, "/")
 	b, err := url.Parse(base)
 	if err != nil {
 		return raw
@@ -292,18 +338,38 @@ func (f *Federator) Search(query string, opts SearchOptions, sources []string) (
 		limit = 20
 	}
 	opts.Limit = 20
-	all := []SearchResult{}
-	total := 0
-	for _, src := range selected {
+	if len(selected) == 1 {
+		src := selected[0]
 		resp, err := src.Corpus.Search(query, opts)
 		if err != nil {
 			return SearchResponse{}, fmt.Errorf("%s: %w", src.Name, err)
 		}
+		for i := range resp.Results {
+			resp.Results[i].Source = src.Name
+			resp.Results[i].rawURL = resp.Results[i].URLWithoutFragment()
+			resp.Results[i].URL = resolveSourceURL(src.Base, src.Corpus.Base, resp.Results[i].URL)
+			resp.Results[i].MarkdownURL = resolveSourceURL(src.Base, src.Corpus.Base, resp.Results[i].MarkdownURL)
+		}
+		if len(resp.Results) > limit {
+			resp.Results = resp.Results[:limit]
+		}
+		return resp, nil
+	}
+	all := []SearchResult{}
+	total := 0
+	errs := []string{}
+	for _, src := range selected {
+		resp, err := src.Corpus.Search(query, opts)
+		if err != nil {
+			errs = append(errs, src.Name+": "+err.Error())
+			continue
+		}
 		total += resp.Total
 		for _, result := range resp.Results {
 			result.Source = src.Name
-			result.URL = resolveSourceURL(src.Base, result.URL)
-			result.MarkdownURL = resolveSourceURL(src.Base, result.MarkdownURL)
+			result.rawURL = result.URLWithoutFragment()
+			result.URL = resolveSourceURL(src.Base, src.Corpus.Base, result.URL)
+			result.MarkdownURL = resolveSourceURL(src.Base, src.Corpus.Base, result.MarkdownURL)
 			all = append(all, result)
 		}
 	}
@@ -322,7 +388,7 @@ func (f *Federator) Search(query string, opts SearchOptions, sources []string) (
 	if len(all) > limit {
 		all = all[:limit]
 	}
-	return SearchResponse{Query: strings.TrimSpace(strings.ToLower(query)), Total: total, Results: all}, nil
+	return SearchResponse{Query: strings.TrimSpace(strings.ToLower(query)), Total: total, Results: all, Errors: errs}, nil
 }
 
 // ContextFor merges the best sections from the selected sources into one
@@ -351,6 +417,9 @@ func (f *Federator) ContextFor(query string, opts SearchOptions, maxTokens int, 
 		}
 		section, err := src.Corpus.ReadSection(result.PageID, result.Anchor, remaining)
 		if err != nil {
+			section, err = src.Corpus.ReadSectionByURL(result.rawURL, result.Anchor, remaining)
+		}
+		if err != nil {
 			continue
 		}
 		out.Results = append(out.Results, ContextResult{
@@ -360,8 +429,8 @@ func (f *Federator) ContextFor(query string, opts SearchOptions, maxTokens int, 
 			PageTitle:       section.PageTitle,
 			Section:         section.Section,
 			Anchor:          section.Anchor,
-			URL:             resolveSourceURL(src.Base, section.URL),
-			MarkdownURL:     resolveSourceURL(src.Base, section.MarkdownURL),
+			URL:             resolveSourceURL(src.Base, src.Corpus.Base, section.URL),
+			MarkdownURL:     resolveSourceURL(src.Base, src.Corpus.Base, section.MarkdownURL),
 			ContentHash:     section.ContentHash,
 			Text:            section.Text,
 			EstimatedTokens: section.EstimatedTokens,
@@ -409,8 +478,8 @@ func (f *Federator) ReadPage(source, pageID string, maxTokens int) (PageContent,
 	if err != nil {
 		return PageContent{}, err
 	}
-	page.URL = resolveSourceURL(s.Base, page.URL)
-	page.MarkdownURL = resolveSourceURL(s.Base, page.MarkdownURL)
+	page.URL = resolveSourceURL(s.Base, s.Corpus.Base, page.URL)
+	page.MarkdownURL = resolveSourceURL(s.Base, s.Corpus.Base, page.MarkdownURL)
 	return page, nil
 }
 
@@ -423,8 +492,8 @@ func (f *Federator) ReadSection(source, pageID, anchor string, maxTokens int) (S
 	if err != nil {
 		return SectionContent{}, err
 	}
-	section.URL = resolveSourceURL(s.Base, section.URL)
-	section.MarkdownURL = resolveSourceURL(s.Base, section.MarkdownURL)
+	section.URL = resolveSourceURL(s.Base, s.Corpus.Base, section.URL)
+	section.MarkdownURL = resolveSourceURL(s.Base, s.Corpus.Base, section.MarkdownURL)
 	return section, nil
 }
 
@@ -437,9 +506,9 @@ func (f *Federator) Neighbors(source, pageID string, depth int, kinds []string) 
 	if err != nil {
 		return NeighborsResponse{}, err
 	}
-	resp.Center.URL = resolveSourceURL(s.Base, resp.Center.URL)
+	resp.Center.URL = resolveSourceURL(s.Base, s.Corpus.Base, resp.Center.URL)
 	for i := range resp.Nodes {
-		resp.Nodes[i].URL = resolveSourceURL(s.Base, resp.Nodes[i].URL)
+		resp.Nodes[i].URL = resolveSourceURL(s.Base, s.Corpus.Base, resp.Nodes[i].URL)
 	}
 	return resp, nil
 }
@@ -453,10 +522,10 @@ func (f *Federator) Path(source, from, to string, maxDepth int, kinds []string) 
 	if err != nil {
 		return PathResponse{}, err
 	}
-	resp.From.URL = resolveSourceURL(s.Base, resp.From.URL)
-	resp.To.URL = resolveSourceURL(s.Base, resp.To.URL)
+	resp.From.URL = resolveSourceURL(s.Base, s.Corpus.Base, resp.From.URL)
+	resp.To.URL = resolveSourceURL(s.Base, s.Corpus.Base, resp.To.URL)
 	for i := range resp.Nodes {
-		resp.Nodes[i].URL = resolveSourceURL(s.Base, resp.Nodes[i].URL)
+		resp.Nodes[i].URL = resolveSourceURL(s.Base, s.Corpus.Base, resp.Nodes[i].URL)
 	}
 	return resp, nil
 }

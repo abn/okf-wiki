@@ -133,3 +133,77 @@ func TestFederatorNamespacesTwoSources(t *testing.T) {
 		t.Errorf("federated page = %+v", page)
 	}
 }
+
+func TestHTTPSourceMountedUnderPathPrefix(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n\nMounted page.\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.StripPrefix("/mount", http.FileServer(http.Dir(out))))
+	defer server.Close()
+	hs, err := NewHTTPSource(server.URL+"/mount/wiki", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadAgentSource("docs", hs.BasePath(), hs.Read)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src.Base = hs.BaseURL()
+	fed := NewFederator([]*AgentSource{src})
+	resp, err := fed.Search("mounted", SearchOptions{Limit: 5}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Results) == 0 {
+		t.Fatal("mounted search returned no results")
+	}
+	want := server.URL + "/mount/wiki/index.html"
+	if resp.Results[0].URL != want {
+		t.Errorf("mounted URL = %q, want %q", resp.Results[0].URL, want)
+	}
+	page, err := fed.ReadPage("", "page:index", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.URL != want || !strings.Contains(page.Content, "Mounted page") {
+		t.Errorf("mounted page = %+v", page)
+	}
+}
+
+func TestFederatorContextWithoutManifest(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "# Home\n\n## Install\n\nThe install guide starts here.\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "wiki")
+	if err := os.Remove(filepath.Join(site, "pages.json")); err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadAgentSource("docs", "/wiki/", func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(site, name))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fed := NewFederator([]*AgentSource{src})
+	resp, err := fed.ContextFor("install", SearchOptions{Limit: 5}, 500, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Results) == 0 || resp.Results[0].Text == "" {
+		t.Errorf("context without pages.json = %+v", resp)
+	}
+}
