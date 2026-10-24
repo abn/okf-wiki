@@ -319,7 +319,13 @@ func writeAgentState(dir string, previous, current []AgentPage, graph GraphIndex
 
 // LoadAgentChanges reads changes.json from a rendered site.
 func LoadAgentChanges(dir string) (AgentChanges, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "changes.json"))
+	return LoadAgentChangesFrom(func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(dir, name))
+	})
+}
+
+func LoadAgentChangesFrom(read SourceReader) (AgentChanges, error) {
+	raw, err := read("changes.json")
 	if err != nil {
 		return AgentChanges{}, fmt.Errorf("read changes.json: %w", err)
 	}
@@ -332,7 +338,13 @@ func LoadAgentChanges(dir string) (AgentChanges, error) {
 
 // LoadGraphHealth reads health.json from a rendered site.
 func LoadGraphHealth(dir string) (GraphHealth, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "health.json"))
+	return LoadGraphHealthFrom(func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(dir, name))
+	})
+}
+
+func LoadGraphHealthFrom(read SourceReader) (GraphHealth, error) {
+	raw, err := read("health.json")
 	if err != nil {
 		return GraphHealth{}, fmt.Errorf("read health.json: %w", err)
 	}

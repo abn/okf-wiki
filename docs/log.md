@@ -5,6 +5,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-24
 
+* **Feature**: `okf-wiki mcp` can federate one or more published wikis by base
+  URL, with optional per-source bearer tokens. Multi-source page IDs are
+  namespaced, search and context merge across sources, and graph navigation is
+  source-scoped. `--http` exposes the same JSON-RPC handler at `/mcp` for a
+  remote deployment behind a proxy. `reference/agent-access.md` and
+  `usage/cli.md` record the source contract.
+
 * **Feature**: `graph.json` now carries `previous` and `next` structural edges
   for page order inside a section. The browser drawing continues to draw links
   and tags only; the agent graph tools use the catalogue edges. `reference/graph.md`,
@@ -16,7 +23,6 @@ deprecated, or restructured. It is deliberately separate from software releases.
   shortest undirected link path between two selected pages, highlights the route
   and fades everything else, with a clear action and status line. `usage/graph.md`,
   `reference/themes.md` and `design/rendering.md` record it.
-
 
 * **Feature**: Search results carry their graph node ID. The selected hit can
   open in the graph with `focus` and the search query in `q`, so the hit is

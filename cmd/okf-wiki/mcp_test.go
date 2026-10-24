@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abn/okf-wiki/internal/wiki"
 )
@@ -24,10 +27,15 @@ func testMCPServer(t *testing.T) *mcpServer {
 	if err := r.RenderAll(out); err != nil {
 		t.Fatal(err)
 	}
-	s := &mcpServer{siteDir: filepath.Join(out, "wiki"), base: "/wiki/"}
-	if err := s.refresh(); err != nil {
+	siteDir := filepath.Join(out, "wiki")
+	read := func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(siteDir, name))
+	}
+	s, err := newMCPServer([]mcpSource{{name: "local", base: "/wiki/", basePath: "/wiki/", read: read}}, 0)
+	if err != nil {
 		t.Fatal(err)
 	}
+	s.localDir = siteDir
 	return s
 }
 
@@ -55,14 +63,14 @@ func TestMCPInitializeAndTools(t *testing.T) {
 	}
 	result = resp.Result.(map[string]any)
 	tools, ok := result["tools"].([]any)
-	if !ok || len(tools) != 8 {
+	if !ok || len(tools) != 9 {
 		t.Fatalf("tools = %+v", result["tools"])
 	}
 	names := map[string]bool{}
 	for _, item := range tools {
 		names[item.(map[string]any)["name"].(string)] = true
 	}
-	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path", "changes", "health"} {
+	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path", "changes", "health", "list_sources"} {
 		if !names[want] {
 			t.Errorf("tools are missing %q: %v", want, names)
 		}
@@ -191,7 +199,7 @@ func TestMCPReadAndContext(t *testing.T) {
 func TestMCPOptionalState(t *testing.T) {
 	s := testMCPServer(t)
 	for _, name := range []string{"changes.json", "health.json"} {
-		if err := os.Remove(filepath.Join(s.siteDir, name)); err != nil {
+		if err := os.Remove(filepath.Join(s.localDir, name)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -216,7 +224,7 @@ func TestMCPOptionalState(t *testing.T) {
 // search and reads.
 func TestMCPMalformedOptionalState(t *testing.T) {
 	s := testMCPServer(t)
-	if err := os.WriteFile(filepath.Join(s.siteDir, "changes.json"), []byte("{"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.localDir, "changes.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	resp := s.handle([]byte(`{"jsonrpc":"2.0","id":30,"method":"tools/call","params":{"name":"search_wiki","arguments":{"query":"install"}}}`))
@@ -226,5 +234,54 @@ func TestMCPMalformedOptionalState(t *testing.T) {
 	resp = s.handle([]byte(`{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"changes","arguments":{}}}`))
 	if resp == nil || resp.Result.(map[string]any)["isError"] != true {
 		t.Errorf("changes after malformed state = %+v", resp)
+	}
+}
+
+// TestMCPHTTPHandler covers the transport wrapper around the same JSON-RPC
+// handler used by stdio.
+func TestMCPHTTPHandler(t *testing.T) {
+	s := testMCPServer(t)
+	server := httptest.NewServer(s.httpHandler())
+	defer server.Close()
+	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	resp, err := http.Post(server.URL+"/mcp", "application/json", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var envelope rpcResponse
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Result == nil {
+		t.Errorf("response = %+v", envelope)
+	}
+	resp, err = http.Get(server.URL + "/mcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("GET status = %d, want 405", resp.StatusCode)
+	}
+}
+
+func TestBuildMCPSources(t *testing.T) {
+	t.Setenv("DOCS_TOKEN", "secret")
+	specs, ttl, err := buildMCPSources("", "/wiki/", []string{"docs=http://127.0.0.1:9/wiki/"}, map[string]string{"docs": "DOCS_TOKEN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 1 || specs[0].name != "docs" || specs[0].basePath != "/wiki/" || ttl != 30*time.Second {
+		t.Fatalf("specs = %+v, ttl = %s", specs, ttl)
+	}
+	if _, _, err := buildMCPSources("", "/wiki/", []string{"docs=http://example.invalid/wiki/"}, map[string]string{"missing": "DOCS_TOKEN"}); err == nil {
+		t.Error("an unknown source token was accepted")
+	}
+	if specs, ttl, err := buildMCPSources("", "/wiki/", nil, nil); err != nil || len(specs) != 1 || specs[0].name != "local" || ttl != 0 {
+		t.Errorf("local source = %+v, ttl %s, err %v", specs, ttl, err)
 	}
 }

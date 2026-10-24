@@ -25,6 +25,7 @@ type SearchOptions struct {
 // it is present, so a result carries the same ID, Markdown URL and source hash
 // an agent would find in the manifest.
 type SearchResult struct {
+	Source      string   `json:"source,omitempty"`
 	PageID      string   `json:"pageId,omitempty"`
 	Title       string   `json:"title"`
 	PageTitle   string   `json:"pageTitle"`
@@ -60,6 +61,7 @@ type SearchCorpus struct {
 	pageByURL   map[string]AgentPage
 	pageByID    map[string]AgentPage
 	hasManifest bool
+	readFile    SourceReader
 }
 
 // LoadSearchCorpus reads search-index.json, search-content.json and, when
@@ -67,6 +69,10 @@ type SearchCorpus struct {
 // count does not match the index is refused rather than attached by position:
 // a mismatch would put another render's text on the wrong result.
 func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
+	base := ""
+	if len(bases) > 0 {
+		base = bases[0]
+	}
 	read := func(name string) ([]byte, error) {
 		b, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
@@ -74,6 +80,15 @@ func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
 		}
 		return b, nil
 	}
+	c, err := LoadSearchCorpusFrom(read, base)
+	if err != nil {
+		return nil, err
+	}
+	c.SiteDir = dir
+	return c, nil
+}
+
+func LoadSearchCorpusFrom(read SourceReader, base string) (*SearchCorpus, error) {
 	indexRaw, err := read("search-index.json")
 	if err != nil {
 		return nil, err
@@ -82,10 +97,7 @@ func LoadSearchCorpus(dir string, bases ...string) (*SearchCorpus, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &SearchCorpus{SiteDir: dir}
-	if len(bases) > 0 {
-		c.Base = normalizeCorpusBase(bases[0])
-	}
+	c := &SearchCorpus{readFile: read, Base: normalizeCorpusBase(base)}
 	if err := json.Unmarshal(indexRaw, &c.Index); err != nil {
 		return nil, fmt.Errorf("decode search-index.json: %w", err)
 	}

@@ -2,7 +2,6 @@ package wiki
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -38,6 +37,7 @@ type SectionContent struct {
 
 // ContextResult is one section selected for a task-sized context pack.
 type ContextResult struct {
+	Source          string `json:"source,omitempty"`
 	PageID          string `json:"pageId,omitempty"`
 	Title           string `json:"title"`
 	PageTitle       string `json:"pageTitle"`
@@ -75,11 +75,11 @@ func (c *SearchCorpus) ReadPage(pageID string, maxTokens int) (PageContent, erro
 	if err != nil {
 		return PageContent{}, err
 	}
-	path, err := c.markdownPath(page)
+	rel, err := c.markdownRel(page)
 	if err != nil {
 		return PageContent{}, err
 	}
-	raw, err := os.ReadFile(path)
+	raw, err := c.readFile(rel)
 	if err != nil {
 		return PageContent{}, fmt.Errorf("read page %s: %w", pageID, err)
 	}
@@ -109,9 +109,6 @@ func (c *SearchCorpus) ReadSection(pageID, anchor string, maxTokens int) (Sectio
 	page, err := c.page(pageID)
 	if err != nil {
 		return SectionContent{}, err
-	}
-	if strings.TrimSpace(anchor) == "" {
-		return SectionContent{}, fmt.Errorf("anchor is required")
 	}
 	index, ok := c.entryFor(page.URL, anchor)
 	if !ok {
@@ -225,7 +222,7 @@ func (c *SearchCorpus) entryFor(pageURL, anchor string) (int, bool) {
 	return 0, false
 }
 
-func (c *SearchCorpus) markdownPath(page AgentPage) (string, error) {
+func (c *SearchCorpus) markdownRel(page AgentPage) (string, error) {
 	u := page.MarkdownURL
 	if u == "" {
 		return "", fmt.Errorf("page %s has no Markdown URL", page.ID)
@@ -247,7 +244,7 @@ func (c *SearchCorpus) markdownPath(page AgentPage) (string, error) {
 	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
 		return "", fmt.Errorf("unsafe Markdown path %q", page.MarkdownURL)
 	}
-	return filepath.Join(c.SiteDir, clean), nil
+	return clean, nil
 }
 
 // URLWithoutFragment is the page URL of a search result without its anchor.

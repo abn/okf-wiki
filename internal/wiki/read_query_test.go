@@ -54,6 +54,13 @@ func TestReadPageSectionAndContext(t *testing.T) {
 	if context.Results[0].PageID == "" || context.Results[0].Text == "" {
 		t.Errorf("context citation = %+v", context.Results[0])
 	}
+	overview, err := c.ContextFor("home", SearchOptions{Limit: 5}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(overview.Results) == 0 || overview.Results[0].Anchor != "" {
+		t.Errorf("page-level context was dropped: %+v", overview)
+	}
 }
 
 func TestReadPageOffline(t *testing.T) {
