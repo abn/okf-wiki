@@ -7,6 +7,8 @@ tags: [reference, agents, metadata]
 
 # Agent access
 
+For a quick start, local and remote MCP configuration, federation examples and troubleshooting, see the [Agent access guide](../usage/agent-access.md).
+
 Every render writes two small discovery files beside the search and graph
 catalogues: `llms.txt` and `pages.json`. They describe the content pages and
 point at the Markdown source that is already copied beside each page. Neither

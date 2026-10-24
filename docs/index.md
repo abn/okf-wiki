@@ -12,7 +12,7 @@ auto-detects a mounted content directory.
 
 - [Overview](overview.md) - Purpose, scope, and the problems okf-wiki solves.
 - [Design](design/index.md) - The rendering pipeline and the default theme.
-- [Usage](usage/index.md) - Running okf-wiki as a binary, a container, and a GitHub Action.
+- [Usage](usage/index.md) - Running okf-wiki as a binary, a container, or an agent-facing MCP server.
 - [Reference](reference/index.md) - Every flag and environment variable, and the theme contract.
 - [Contribution](contribution/index.md) - How to work on okf-wiki, and the rules that keep the wiki public-ready.
 - [Architecture decision records](adr/index.md) - Why okf-wiki is a standalone renderer, ships as a container, themes at runtime, and re-renders the whole tree when watched.

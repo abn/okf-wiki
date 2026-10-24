@@ -1,7 +1,7 @@
 # Usage
 
 - [Command line](cli.md)
-- [Agent access](../reference/agent-access.md)
+- [Agent access](agent-access.md)
 - [Graph view](graph.md)
 - [Offline folder](offline.md)
 - [Multi-site trees](multi-site.md)

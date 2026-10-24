@@ -289,13 +289,17 @@ def main():
             driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.is-focus-far"),
             "the local graph did not fade nodes outside the neighbourhood",
         )
+        focus_text = driver.find_element(By.ID, "graphStatus").text
+        focus_match = re.search(r": (\d+) nodes? within", focus_text)
+        must(focus_match, f"no focus count in {focus_text!r}")
+        focus_count = int(focus_match.group(1))
         must(
-            "10 nodes" in driver.find_element(By.ID, "graphListStatus").text,
+            f"{focus_count} nodes" in driver.find_element(By.ID, "graphListStatus").text,
             "the list did not follow the focus",
         )
         must(
             len(driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-node"))
-            == 10,
+            == focus_count,
             "the list did not narrow to the focus set",
         )
         must(
