@@ -49,6 +49,10 @@ accent colour and labelled `cross-wiki` in the list.
   in, or as soon as a filter or focus asks for them. A small graph that already
   fits at a readable scale can show page names immediately. Names keep their
   screen size at every zoom. Hover a node or select it to reveal its own name.
+- **Path between pages** opens a From and To picker. **Find path** highlights the
+  shortest undirected link path between the two pages and fades everything else.
+  **Clear path** returns to the unfiltered view. The path is a local view state,
+  not a URL parameter.
 - Select a node for its kind, section, tags, and incoming and outgoing counts.
   The rest of the drawing fades to that node's neighbourhood: two hops for a
   page (one when that set is very large), one for a tag. When the neighbourhood

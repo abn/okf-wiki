@@ -1336,6 +1336,39 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 .graph-fit[hidden] { display: none; }
 .graph-fit:hover { border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
+.graph-path { margin: 0 0 var(--space-3); }
+.graph-path-summary {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  list-style: none; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+  color: var(--color-text-muted); background: var(--color-surface);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  padding: 6px var(--space-3); min-height: 36px;
+}
+.graph-path-summary::-webkit-details-marker { display: none; }
+.graph-path-summary::marker { content: ""; }
+.graph-path-summary::after {
+  content: ""; width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.graph-path[open] .graph-path-summary::after { transform: rotate(-135deg); }
+.graph-path-summary:focus-visible { outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring); }
+.graph-path-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); margin-top: var(--space-2);
+  border: 1px solid var(--color-line); border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.graph-path-status {
+  margin: var(--space-2) 0 0; font-family: var(--font-ui);
+  font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.graph-path-status:empty { display: none; }
+.graph-app.has-path .graph-node-group:not(.is-path) { opacity: .12; }
+.graph-app.has-path .graph-node-group.is-path { opacity: 1; }
+.graph-app.has-path .graph-edge:not(.is-path) { opacity: .04; }
+.graph-app.has-path .graph-edge.is-path { stroke-opacity: .7; }
 .graph-download {
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
   color: var(--color-on-accent); background: var(--color-accent);

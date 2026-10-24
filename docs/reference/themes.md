@@ -138,7 +138,8 @@ that URL but has no entry point. The body's ids are `graphApp`, `graphFilter`, `
 `graphSvg`, `graphSectionLayer`, `graphEdges`, `graphNodes`, `graphList`,
 `graphListStatus`, `graphListNodes`,
 `graphListEdges`, `graphListNodesTitle`, `graphListEdgesTitle`, `graphDetails`,
-and the optional inline `graphData`.
+`graphPath`, `graphPathFrom`, `graphPathTo`, `graphPathFind`, `graphPathClear`,
+`graphPathStatus`, and the optional inline `graphData`.
 
 The `{{.Connections}}` field is static page HTML. A template that omits it drops
 the backlinks and the Local graph entry point, while the graph page itself

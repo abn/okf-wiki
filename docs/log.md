@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-24
 
+* **Feature**: The graph view has a **Path between pages** picker. It finds the
+  shortest undirected link path between two selected pages, highlights the route
+  and fades everything else, with a clear action and status line. `usage/graph.md`,
+  `reference/themes.md` and `design/rendering.md` record it.
+
+
 * **Feature**: Search results carry their graph node ID. The selected hit can
   open in the graph with `focus` and the search query in `q`, so the hit is
   selected and other matches stay lit while non-matches fade. Tag-search rows,

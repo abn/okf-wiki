@@ -322,6 +322,45 @@ func TestGraphCrossWikiContract(t *testing.T) {
 	}
 }
 
+// TestGraphPathContract pins the path picker's markup and client hooks.
+func TestGraphPathContract(t *testing.T) {
+	r := newGraphRenderer(t, graphViewBundle(t))
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(out, "wiki", "graph.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"id=\"graphPath\"", "id=\"graphPathFrom\"", "id=\"graphPathTo\"", "id=\"graphPathFind\"", "id=\"graphPathClear\"", "id=\"graphPathStatus\""} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("graph.html is missing %s", want)
+		}
+	}
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js, css string
+	for _, f := range th.files {
+		switch f.Path {
+		case "graph.js":
+			js = string(f.Data)
+		case "wiki.css":
+			css = string(f.Data)
+		}
+	}
+	for _, want := range []string{"function shortestPath", "function findPath", "has-path"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	if !strings.Contains(css, ".graph-app.has-path") {
+		t.Error("wiki.css has no path highlight rule")
+	}
+}
+
 // TestGraphInlineEmbedsCatalogue covers inline mode: the page carries the same
 // bytes the served site would fetch, so the client never calls fetch.
 func TestGraphInlineEmbedsCatalogue(t *testing.T) {

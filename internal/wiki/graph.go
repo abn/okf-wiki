@@ -273,6 +273,7 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(template.HTMLEscapeString(base + "graph.json"))
 	b.WriteString(`">Raw JSON</a>`)
 	b.WriteString(`</div>`)
+	b.WriteString(`<details class="graph-path" id="graphPath"><summary class="graph-path-summary">Path between pages</summary><div class="graph-path-controls"><label class="graph-field"><span class="graph-field-label">From</span><select id="graphPathFrom"></select></label><label class="graph-field"><span class="graph-field-label">To</span><select id="graphPathTo"></select></label><button type="button" class="graph-fit" id="graphPathFind">Find path</button><button type="button" class="graph-fit" id="graphPathClear" hidden>Clear path</button></div><p class="graph-path-status" id="graphPathStatus" role="status" aria-live="polite"></p></details>`)
 	b.WriteString(`<p class="graph-status" id="graphStatus" role="status">Loading the graph...</p>`)
 	b.WriteString(`<div class="graph-main">`)
 	b.WriteString(`<div class="graph-canvas"><svg id="graphSvg" viewBox="0 0 1000 700" role="group" aria-labelledby="graphTitle graphDesc" preserveAspectRatio="xMidYMid meet">`)

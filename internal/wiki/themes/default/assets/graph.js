@@ -34,6 +34,11 @@
   var sectionsCheck = document.getElementById('graphSections');
   var tagHubsCheck = document.getElementById('graphTagHubs');
   var labels = document.getElementById('graphLabels');
+  var pathFrom = document.getElementById('graphPathFrom');
+  var pathTo = document.getElementById('graphPathTo');
+  var pathFind = document.getElementById('graphPathFind');
+  var pathClear = document.getElementById('graphPathClear');
+  var pathStatus = document.getElementById('graphPathStatus');
   var tagsDetails = document.getElementById('graphTags');
   var tagsSummary = document.getElementById('graphTagsSummary');
   var tagsMenu = document.getElementById('graphTagsMenu');
@@ -79,6 +84,7 @@
     listAllEdges: false,
     anchor: null,
     hubIDs: Object.create(null),
+    path: null,
     overview: false,
     query: '',
     labelScale: 0,
@@ -732,6 +738,7 @@
       state.adj[e.from.id].push({ node: e.to, dir: 'out' });
       state.adj[e.to.id].push({ node: e.from, dir: 'in' });
     });
+    fillPathOptions();
   }
 
   // A page is a hub when it sits in the busiest quarter of the connected
@@ -752,6 +759,114 @@
     return hubs;
   }
 
+  function fillPathOptions() {
+    if (!pathFrom || !pathTo) return;
+    var pages = state.nodes.filter(function (n) {
+      return n.kind === 'page' && !n.stub;
+    }).sort(function (a, b) {
+      var as = (a.site || '') + '\x00' + (a.section || '') + '\x00' + a.title;
+      var bs = (b.site || '') + '\x00' + (b.section || '') + '\x00' + b.title;
+      return as.localeCompare(bs);
+    });
+    var fromValue = pathFrom.value;
+    var toValue = pathTo.value;
+    pathFrom.textContent = '';
+    pathTo.textContent = '';
+    pages.forEach(function (n) {
+      var option = document.createElement('option');
+      option.value = n.id;
+      option.textContent = n.title + (n.site ? ' (' + n.site + ')' : '');
+      pathFrom.appendChild(option);
+      pathTo.appendChild(option.cloneNode(true));
+    });
+    if (pages.some(function (n) { return n.id === fromValue; })) pathFrom.value = fromValue;
+    else if (pages[0]) pathFrom.value = pages[0].id;
+    if (pages.some(function (n) { return n.id === toValue; })) pathTo.value = toValue;
+    else if (pages[1]) pathTo.value = pages[1].id;
+    else if (pages[0]) pathTo.value = pages[0].id;
+  }
+
+  // Path finding uses the rendered link edges, undirected, so a page's outgoing
+  // and incoming links both lead to a neighbour. Tags are hubs rather than
+  // content, so they do not make a page-to-page path by themselves.
+  function shortestPath(fromID, toID) {
+    if (fromID === toID) return { nodes: [state.nodeByID[fromID]], edges: [] };
+    var adjacency = Object.create(null);
+    state.edges.forEach(function (e) {
+      if (e.kind !== 'link') return;
+      (adjacency[e.from.id] || (adjacency[e.from.id] = [])).push({ edge: e, peer: e.to.id });
+      (adjacency[e.to.id] || (adjacency[e.to.id] = [])).push({ edge: e, peer: e.from.id });
+    });
+    var queue = [fromID];
+    var seen = Object.create(null);
+    seen[fromID] = true;
+    var previous = Object.create(null);
+    while (queue.length) {
+      var current = queue.shift();
+      if (current === toID) break;
+      (adjacency[current] || []).forEach(function (step) {
+        if (seen[step.peer]) return;
+        seen[step.peer] = true;
+        previous[step.peer] = { from: current, edge: step.edge };
+        queue.push(step.peer);
+      });
+    }
+    if (!seen[toID]) return null;
+    var nodes = [];
+    var edges = [];
+    for (var id = toID; ;) {
+      nodes.push(state.nodeByID[id]);
+      if (id === fromID) break;
+      var step = previous[id];
+      edges.push(step.edge);
+      id = step.from;
+    }
+    nodes.reverse();
+    edges.reverse();
+    return { nodes: nodes, edges: edges };
+  }
+
+  function applyPath() {
+    var active = !!state.path;
+    app.classList.toggle('has-path', active);
+    state.nodes.forEach(function (n) {
+      if (n.el) n.el.classList.toggle('is-path', active && state.path.nodes.indexOf(n) !== -1);
+    });
+    state.edgeElements.forEach(function (item) {
+      item.el.classList.toggle('is-path', active && state.path.edges.indexOf(item.edge) !== -1);
+    });
+    if (pathClear) pathClear.hidden = !active;
+  }
+
+  function clearPath(announce) {
+    state.path = null;
+    applyPath();
+    if (pathStatus) pathStatus.textContent = announce ? 'Path cleared.' : '';
+  }
+
+  function findPath() {
+    if (!pathFrom || !pathTo || !pathStatus || !state.nodes.length) return;
+    var from = state.nodeByID[pathFrom.value];
+    var to = state.nodeByID[pathTo.value];
+    if (!from || !to) {
+      pathStatus.textContent = 'Choose two pages.';
+      clearPath(false);
+      return;
+    }
+    var path = shortestPath(from.id, to.id);
+    if (!path) {
+      clearPath(false);
+      pathStatus.textContent = 'No link path between ' + from.title + ' and ' + to.title + '.';
+      return;
+    }
+    state.path = path;
+    applyPath();
+    pathStatus.textContent = path.edges.length === 0
+      ? 'Same page: ' + from.title + '.'
+      : 'Path: ' + path.edges.length + (path.edges.length === 1 ? ' step' : ' steps') +
+        ' between ' + from.title + ' and ' + to.title + '.';
+  }
+
   function updateTagKindOption() {
     var option = kind ? kind.querySelector('option[value="tag"]') : null;
     if (option) option.disabled = !state.showTagHubs;
@@ -762,6 +877,7 @@
   // the old focus or tag hub may no longer be on the canvas, then rebuilds and
   // runs the same render path as the first load.
   function relayoutGraph(rebuild) {
+    clearPath(false);
     state.selected = null;
     state.focus = null;
     state.focusCount = 0;
@@ -1317,6 +1433,7 @@
 
     renderPositions();
     applyLabels();
+    applyPath();
   }
 
   function renderPositions(withEdges) {
@@ -2335,6 +2452,9 @@
   });
 
   window.addEventListener('popstate', applyURLState);
+
+  if (pathFind) pathFind.addEventListener('click', findPath);
+  if (pathClear) pathClear.addEventListener('click', function () { clearPath(true); });
 
   // A local face swaps in after first paint; widths measured against the
   // fallback would keep names overlapping for the life of the page.
