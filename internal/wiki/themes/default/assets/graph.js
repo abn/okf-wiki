@@ -1900,14 +1900,16 @@
   function applyFocus() {
     var ids = state.focus;
     state.nodes.forEach(function (n) {
-      if (n.el) n.el.classList.toggle('is-focus-far', !!ids && ids[n.id] == null);
+      var keepMatch = !!ids && !!state.query && n.matched;
+      if (n.el) n.el.classList.toggle('is-focus-far', !!ids && ids[n.id] == null && !keepMatch);
     });
     app.classList.toggle('has-focus', !!ids);
     if (clearFocusLink) clearFocusLink.hidden = !ids;
     updateEdgeVisibility();
     state.edgeElements.forEach(function (item) {
       var e = item.edge;
-      var on = !ids || (ids[e.from.id] != null && ids[e.to.id] != null);
+      var on = !ids || (ids[e.from.id] != null && ids[e.to.id] != null) ||
+        (!!state.query && e.from.matched && e.to.matched);
       item.el.classList.toggle('is-focus-far', !on);
     });
     ensureTabbable();

@@ -434,12 +434,16 @@
     if (!tagQuery) {
       selectedIndex = -1;
       currentResults = [];
+      if (graphBtn) graphBtn.hidden = true;
       resultsHost.innerHTML =
         '<div class="search-empty-state"><p>Type a tag name after #.</p></div>';
       announce('Type a tag name after #');
       return;
     }
     if (!tagsIndex) {
+      selectedIndex = -1;
+      currentResults = [];
+      if (graphBtn) graphBtn.hidden = true;
       resultsHost.innerHTML = '<div class="search-empty-state"><p>Loading tags...</p></div>';
       announce('Loading tags');
       fetchTags().then(runSearch);
