@@ -141,6 +141,49 @@ func (c *SearchCorpus) ReadSection(pageID, anchor string, maxTokens int) (Sectio
 	}, nil
 }
 
+// ReadSectionByURL reads a section without a page manifest. It is the fallback
+// for an older render where search-index.json exists but pages.json does not.
+func (c *SearchCorpus) ReadSectionByURL(pageURL, anchor string, maxTokens int) (SectionContent, error) {
+	index, ok := c.entryFor(pageURL, anchor)
+	if !ok {
+		return SectionContent{}, fmt.Errorf("no section %q on %s", anchor, pageURL)
+	}
+	entry := c.Index.Entries[index]
+	page := SearchPage{URL: pageURL, Title: entry.Title}
+	for _, candidate := range c.Index.Pages {
+		if candidate.URL == pageURL {
+			page = candidate
+			break
+		}
+	}
+	title := entry.Title
+	if title == "" {
+		title = page.Title
+	}
+	if maxTokens <= 0 {
+		maxTokens = defaultSectionTokens
+	}
+	if maxTokens > maxReadTokens {
+		maxTokens = maxReadTokens
+	}
+	text, truncated := truncateToTokens(c.Content.Texts[index], maxTokens)
+	url := pageURL
+	if anchor != "" {
+		url += "#" + anchor
+	}
+	return SectionContent{
+		PageID:          page.ID,
+		Title:           title,
+		PageTitle:       page.Title,
+		Section:         entry.Section,
+		Anchor:          anchor,
+		URL:             url,
+		Text:            text,
+		EstimatedTokens: estimateTokens(text),
+		Truncated:       truncated || entry.Truncated,
+	}, nil
+}
+
 // ContextFor returns ranked sections that fit a token budget. It stops at the
 // first result that would cross the budget, so the caller never receives a
 // silently incomplete set without the truncated flag.

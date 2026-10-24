@@ -25,7 +25,8 @@ type SearchOptions struct {
 // it is present, so a result carries the same ID, Markdown URL and source hash
 // an agent would find in the manifest.
 type SearchResult struct {
-	Source      string   `json:"source,omitempty"`
+	Source      string `json:"source,omitempty"`
+	rawURL      string
 	PageID      string   `json:"pageId,omitempty"`
 	Title       string   `json:"title"`
 	PageTitle   string   `json:"pageTitle"`
@@ -47,6 +48,7 @@ type SearchResponse struct {
 	Query   string         `json:"query"`
 	Total   int            `json:"total"`
 	Results []SearchResult `json:"results"`
+	Errors  []string       `json:"errors,omitempty"`
 }
 
 // SearchCorpus is a rendered site's search files plus its optional page
@@ -118,6 +120,9 @@ func LoadSearchCorpusFrom(read SourceReader, base string) (*SearchCorpus, error)
 			return nil, fmt.Errorf("decode pages.json: %w", err)
 		}
 		c.hasManifest = true
+		if inferred := inferPageBase(c.Index.Pages); inferred != "" {
+			c.Base = inferred
+		}
 		manifestID := agentRenderID(c.Manifest.Pages)
 		if c.RenderID != "" && c.RenderID != manifestID {
 			return nil, fmt.Errorf("search index and pages.json are from different renders")

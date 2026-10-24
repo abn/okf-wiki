@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ type mcpServer struct {
 	ttl      time.Duration
 	fed      *wiki.Federator
 	loadedAt time.Time
+	retryAt  time.Time
 	localDir string
 	mu       sync.Mutex
 }
@@ -65,7 +67,9 @@ func runMCP(args []string) {
 		fatal(err)
 	}
 	if *httpAddr != "" {
-		if strings.HasPrefix(*httpAddr, ":") || strings.HasPrefix(*httpAddr, "0.0.0.0:") || strings.HasPrefix(*httpAddr, "[::]:") {
+		host, _, splitErr := net.SplitHostPort(*httpAddr)
+		if splitErr != nil || host == "" || host == "0.0.0.0" || host == "::" ||
+			(host != "127.0.0.1" && host != "localhost" && host != "::1") {
 			fmt.Fprintf(os.Stderr, "okf-wiki: warning: MCP HTTP is exposed without built-in TLS or authentication; put it behind a proxy\n")
 		}
 		if err := s.serveHTTP(*httpAddr); err != nil {
@@ -98,8 +102,14 @@ func (s *mcpServer) refresh() error {
 	// temporarily unavailable. Startup still fails loudly when no snapshot
 	// exists.
 	if s.fed != nil {
-		if err := s.loadSources(); err == nil {
+		if time.Now().Before(s.retryAt) {
 			return nil
+		}
+		if err := s.loadSources(); err != nil {
+			s.retryAt = time.Now().Add(30 * time.Second)
+			fmt.Fprintf(os.Stderr, "okf-wiki: source refresh failed: %v (serving cached data)\n", err)
+		} else {
+			s.retryAt = time.Time{}
 		}
 		return nil
 	}
@@ -153,6 +163,10 @@ func (s *mcpServer) httpHandler() http.Handler {
 		if req.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if ct := req.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+			http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
 			return
 		}
 		body, err := io.ReadAll(http.MaxBytesReader(w, req.Body, 4<<20))
@@ -275,10 +289,10 @@ func mcpReadSectionTool() map[string]any {
 			"properties": map[string]any{
 				"source":    map[string]any{"type": "string", "description": "Source name; omit when one wiki is configured."},
 				"pageId":    map[string]any{"type": "string", "description": "Page ID from search or pages.json."},
-				"anchor":    map[string]any{"type": "string", "description": "Heading anchor from a search result or pages.json."},
+				"anchor":    map[string]any{"type": "string", "description": "Heading anchor; empty for the page-level overview."},
 				"maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 32000, "default": 2000},
 			},
-			"required":             []string{"pageId", "anchor"},
+			"required":             []string{"pageId"},
 			"additionalProperties": false,
 		},
 	}
@@ -509,8 +523,8 @@ func (s *mcpServer) readSectionTool(raw json.RawMessage) map[string]any {
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return mcpToolError("invalid read_section arguments")
 	}
-	if args.PageID == "" || args.Anchor == "" {
-		return mcpToolError("pageId and anchor are required")
+	if args.PageID == "" {
+		return mcpToolError("pageId is required")
 	}
 	if args.MaxTokens < 0 || args.MaxTokens > 32000 {
 		return mcpToolError("maxTokens must be between 1 and 32000")
