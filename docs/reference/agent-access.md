@@ -229,7 +229,10 @@ already a multi-site aggregate is one source, not one source per wiki.
 Remote sources are refreshed at most every 30 seconds. Local `--out` sources
 reload before each tool call. A source that fails to load stops startup with
 its name and error, rather than serving a partial federation silently.
-`list_sources` names the configured bases.
+`list_sources` names the configured bases. A source URL may be mounted under a
+different path from the render base; the search index carries the render base,
+so citations still point at the published files. Multi-source search reports a
+per-source failure in `errors` and returns the healthy results.
 
 For upstream OAuth, put a client-credentials proxy or gateway in front of the
 source and let it inject the `Authorization` header. A browser-cookie OAuth
