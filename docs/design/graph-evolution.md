@@ -42,7 +42,7 @@ the semantic layer.
   working back and forward.
 - [x] Accessible list view: a table or list of nodes, edges and connections
   beside the drawing.
-- [ ] Search integration: open a search hit in the graph, and highlight graph
+- [x] Search integration: open a search hit in the graph, and highlight graph
   matches from the search modal.
 
 ### Scale and readability
@@ -50,15 +50,15 @@ the semantic layer.
 - [x] Collapse tag hubs and cluster by section.
 - [x] Stable or precomputed layout, so a graph looks the same on every visit.
 - [x] Semantic zoom: labels for hubs first, page names as the reader zooms in.
-- [ ] Path finding between two pages.
-- [ ] Graph health: orphans, broken links, tag-only pages, cycles and the most
+- [x] Path finding between two pages.
+- [x] Graph health: orphans, broken links, tag-only pages, cycles and the most
   connected pages.
 
 ### Schema and multi-site
 
 - [x] Cross-wiki edges, using the namespaced aggregate IDs.
-- [ ] Typed structural edges beyond `link` and `tag`, for example section,
-  previous and next.
+- [x] Typed structural edges beyond `link` and `tag`: previous and next page
+  order edges.
 - [ ] Export formats such as GraphML, DOT, CSV and JSON-LD.
 - [ ] Graph diff between two renders or commits.
 
@@ -74,5 +74,6 @@ the semantic layer.
 ## Current
 
 Local graph and backlinks, shareable view state, the accessible list view,
-collapsed tag hubs, section clusters, a deterministic layout, semantic zoom and
-cross-wiki edges are shipped. The next item is path finding between two pages.
+collapsed tag hubs, section clusters, a deterministic layout, semantic zoom,
+cross-wiki edges and typed page-order edges are shipped. The next item is
+graph diff between two renders or commits.

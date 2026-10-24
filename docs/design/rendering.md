@@ -158,7 +158,8 @@ flowchart LR
    tag hubs and missing pages in their own cells; collapsing tag hubs drops
    their nodes and edges without dropping the tag filter. Outside that mode the
    force layout seeds its random tie-breaks from the visible catalogue, so a
-   reload does not reshuffle the graph.
+   reload does not reshuffle the graph. The catalogue also carries previous and
+   next page-order edges; the drawing does not add them to the canvas.
 
    Every content page also gets a **Connections** panel inside the article. The
    renderer indexes the recorded page links by target after the bundle is
