@@ -16,7 +16,9 @@ other page loads the catalogue, and `--graph-inline` removes even that request.
 The drawing has one node per page and per tag. A page linked from the bundle
 but missing from it appears as a dashed node, so a broken link is visible here
 as well as in the file. Edges are solid for Markdown links and dashed for
-frontmatter tags. In a tree, a relative Markdown link that climbs out of one
+frontmatter tags. The catalogue also carries previous and next page-order edges;
+the drawing keeps those out of the canvas and uses links and tags only. In a
+tree, a relative Markdown link that climbs out of one
 wiki and lands on a page in another becomes a cross-wiki edge in the
 aggregate; both ends keep their namespaced IDs, and the edge is drawn in the
 accent colour and labelled `cross-wiki` in the list.
@@ -96,7 +98,7 @@ it does not add another parameter.
 
 ## From search
 
-Search results carry a **Open in graph** action when the hit has a graph node.
+Search results carry an **Open in graph** action when the hit has a graph node.
 It opens the graph focused on that page with the query still active, so the
 focused neighbourhood and every other matching node stay lit while the rest
 fades. The action is hidden for tag-search rows, which do not name a page node.

@@ -56,19 +56,22 @@ link is visible in the catalogue instead of disappearing from it.
 | Field | Meaning |
 | :--- | :--- |
 | `from`, `to` | node IDs |
-| `kind` | `link` or `tag` |
+| `kind` | `link`, `tag`, `previous` or `next` |
 | `anchor` | the heading anchor of the section the link sits in |
 | `text` | the link text |
 
 `anchor` and `text` belong to link edges. A link repeated under one heading
-produces one edge, and a link from a page to itself is left out.
+produces one edge, and a link from a page to itself is left out. Previous and
+next are structural page-order edges inside one section; they carry no anchor or
+text.
 
-Only an in-bundle Markdown link becomes an edge. In an aggregate, a relative
+A link edge comes from an in-bundle Markdown link. In an aggregate, a relative
 link that climbs out of one wiki and lands on a page in another wiki also
-becomes an edge; the two ends carry namespaced IDs. A link that leaves the tree,
-points at an asset, or is external is not one, because the catalogue follows
-what the renderer can serve: an escaping link is a `/repo/` target at most, and
-an asset has no page node to point at.
+becomes a link edge; the two ends carry namespaced IDs. A link that leaves the
+tree, points at an asset, or is external is not one, because the catalogue
+follows what the renderer can serve: an escaping link is a `/repo/` target at
+most, and an asset has no page node to point at. Page order adds the
+`previous` and `next` edges separately.
 
 ## Example
 

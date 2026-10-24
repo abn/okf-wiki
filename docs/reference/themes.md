@@ -123,6 +123,7 @@ word would be announced twice. A table header cell is a `th` with
 | `searchInput` `searchResults` `searchBackdrop` | `search.js` | search returns early and does nothing |
 | `searchCloseBtn` | `search.js` | the modal opens and cannot be dismissed |
 | `searchScope` | `search.js` | the All-wikis / This-wiki toggle of a multi-site tree is not offered; single-wiki search is unaffected |
+| `searchGraph` | `search.js` | the selected search hit cannot open in the graph |
 | `menuBtn` `drawerBackdrop` `sideDrawer` | the drawer script in the template | the drawer script throws, so the mobile menu and Escape-to-close both die |
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `readingToggle` | the reading-mode script in the template | the full width reading mode does not toggle |

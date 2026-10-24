@@ -178,10 +178,10 @@ budget or the 12,000-byte index cap shortened any section. The text is
 extractive; no summary is generated.
 
 `neighbors` accepts `link`, `tag`, `previous` and `next` in `kinds`. Previous
-and next are derived from the page order in `pages.json` inside each site and
-section; they are not stored in `graph.json`. `path` uses the same undirected
-graph, so it can follow links, tags or page order. A path result includes the
-edge that connects each pair.
+and next are stored in `graph.json` from the page order inside each site and
+section; the agent reader also derives them from `pages.json` for older
+catalogues. `path` uses the same undirected graph, so it can follow links, tags
+or page order. A path result includes the edge that connects each pair.
 
 `changes` reads `changes.json`, which compares the current `pages.json` with the
 previous render in the output directory. It reports `added`, `changed` and
@@ -194,7 +194,8 @@ Stale dates are parsed as RFC 3339, like the tag badge.
 `search_wiki` works without `pages.json`, with the Markdown URL derived from the
 HTML URL. Page IDs, `read_page`, `read_section`, the tag filter and the site
 filter need `pages.json`. `neighbors` and `path` work from `graph.json`;
-previous and next edges need `pages.json`. `read_page` also needs `--base` when
+new catalogues store previous and next there, while an older catalogue without
+them uses `pages.json`. `read_page` also needs `--base` when
 the render uses absolute URLs, so the server can resolve a Markdown URL back to
 the site directory. The server reloads the rendered files before each tool call,
 so a re-render is visible without restarting the MCP process. If `changes.json`

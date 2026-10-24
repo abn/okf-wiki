@@ -155,11 +155,13 @@ func buildGraphHealth(g GraphIndex, pages []AgentPage, generatedAt string, extra
 		if !ok {
 			continue
 		}
-		if from.Kind == "page" {
-			degree[from.ID]++
-		}
-		if to.Kind == "page" {
-			degree[to.ID]++
+		if e.Kind == "link" || e.Kind == "tag" {
+			if from.Kind == "page" {
+				degree[from.ID]++
+			}
+			if to.Kind == "page" {
+				degree[to.ID]++
+			}
 		}
 		if e.Kind != "link" {
 			continue

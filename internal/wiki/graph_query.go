@@ -47,10 +47,9 @@ type PathResponse struct {
 	Edges  []GraphEdgeInfo `json:"edges"`
 }
 
-// GraphCorpus is a rendered graph.json plus the page order needed for typed
-// previous and next relations. Previous and next are derived from pages.json,
-// not stored in graph.json, so they are available to agents without changing
-// the browser drawing.
+// GraphCorpus is a rendered graph.json plus an older-catalogue fallback for
+// typed previous and next relations. New catalogues store those edges; the
+// fallback derives them from pages.json when an older graph.json lacks them.
 type GraphCorpus struct {
 	Graph    GraphIndex
 	RenderID string
@@ -102,15 +101,26 @@ func LoadGraphCorpus(dir string) (*GraphCorpus, error) {
 			return nil, fmt.Errorf("graph.json and pages.json are from different renders")
 		}
 		c.RenderID = manifestID
-		c.addOrderEdges()
+		if !c.hasOrderEdges() {
+			c.addOrderEdges()
+		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
 	return c, nil
 }
 
-// addOrderEdges adds previous and next relations inside each site and section.
-// They are deterministic because pages.json is in render order.
+func (c *GraphCorpus) hasOrderEdges() bool {
+	for _, e := range c.edges {
+		if e.Kind == "previous" || e.Kind == "next" {
+			return true
+		}
+	}
+	return false
+}
+
+// addOrderEdges adds previous and next relations inside each site and section
+// for an older graph.json that predates the catalogue edges.
 func (c *GraphCorpus) addOrderEdges() {
 	last := make(map[string]AgentPage)
 	for _, p := range c.Pages.Pages {

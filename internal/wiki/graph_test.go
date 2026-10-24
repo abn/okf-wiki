@@ -209,6 +209,28 @@ func TestBuildGraphAddsTagHubs(t *testing.T) {
 	}
 }
 
+// TestBuildGraphAddsPageOrderEdges covers typed structural navigation: pages
+// in one section carry previous and next edges in the catalogue.
+func TestBuildGraphAddsPageOrderEdges(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"index", "a", "b"} {
+		mustWrite(t, filepath.Join(dir, name+".md"), "---\ntitle: "+name+"\n---\n# "+name+"\n")
+	}
+	g := newGraphRenderer(t, dir).BuildGraph()
+	if edges := graphEdges(g, "page:index", "page:a", "next"); len(edges) != 1 {
+		t.Errorf("index -> a next edges = %+v", edges)
+	}
+	if edges := graphEdges(g, "page:a", "page:b", "next"); len(edges) != 1 {
+		t.Errorf("a -> b next edges = %+v", edges)
+	}
+	if edges := graphEdges(g, "page:a", "page:index", "previous"); len(edges) != 1 {
+		t.Errorf("a -> index previous edges = %+v", edges)
+	}
+	if edges := graphEdges(g, "page:b", "page:a", "previous"); len(edges) != 1 {
+		t.Errorf("b -> a previous edges = %+v", edges)
+	}
+}
+
 // TestGraphSeparatesPageAndTagNamespaces pins the reason both node kinds carry
 // a prefix: a file may be named tag:foo.md, and its page must not swallow the
 // hub for a tag called foo.
@@ -417,6 +439,9 @@ func TestMultiSiteWritesAggregateGraph(t *testing.T) {
 	}
 	if edges := graphEdges(agg, "alpha:page:child", "alpha:page:index", "link"); len(edges) != 1 {
 		t.Errorf("aggregate edge = %v, want one inside alpha", edges)
+	}
+	if edges := graphEdges(agg, "alpha:page:index", "alpha:page:child", "next"); len(edges) != 1 {
+		t.Errorf("namespaced typed edge = %v, want index -> child next", edges)
 	}
 	if _, ok := graphNode(agg, "page:index"); ok {
 		t.Error("the aggregate kept an unnamespaced node id")

@@ -5,6 +5,13 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-24
 
+* **Feature**: `graph.json` now carries `previous` and `next` structural edges
+  for page order inside a section. The browser drawing continues to draw links
+  and tags only; the agent graph tools use the catalogue edges. `reference/graph.md`,
+  `reference/agent-access.md`, `usage/graph.md` and `design/graph-evolution.md`
+  record it.
+
+
 * **Feature**: The graph view has a **Path between pages** picker. It finds the
   shortest undirected link path between two selected pages, highlights the route
   and fades everything else, with a clear action and status line. `usage/graph.md`,

@@ -205,3 +205,27 @@ func TestTreeChangesUseNamespacedIDs(t *testing.T) {
 		}
 	}
 }
+
+// TestMostConnectedIgnoresPageOrderEdges keeps typed navigation from making an
+// unlinked island look like the best starting point.
+func TestMostConnectedIgnoresPageOrderEdges(t *testing.T) {
+	pages := []AgentPage{{ID: "page:a", Title: "A"}, {ID: "page:b", Title: "B"}, {ID: "page:c", Title: "C"}}
+	graph := GraphIndex{
+		Version: graphVersion,
+		Nodes: []GraphNode{
+			{ID: "page:a", Title: "A", Kind: "page"},
+			{ID: "page:b", Title: "B", Kind: "page"},
+			{ID: "page:c", Title: "C", Kind: "page"},
+		},
+		Edges: []GraphEdge{
+			{From: "page:a", To: "page:b", Kind: "next"},
+			{From: "page:b", To: "page:a", Kind: "previous"},
+			{From: "page:b", To: "page:c", Kind: "next"},
+			{From: "page:c", To: "page:b", Kind: "previous"},
+		},
+	}
+	health := buildGraphHealth(graph, pages, "2026-10-24")
+	if len(health.MostConnected) != 0 {
+		t.Errorf("page-order edges produced most-connected pages: %+v", health.MostConnected)
+	}
+}

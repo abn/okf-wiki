@@ -71,9 +71,10 @@ type GraphNode struct {
 	SiteKey string `json:"siteKey,omitempty"`
 }
 
-// GraphEdge is one relation. Kind is "link" for a Markdown link, carrying the
-// heading anchor and the link text that place it in the page, or "tag" for a
-// frontmatter tag.
+// GraphEdge is one relation. Kind is "link" for a Markdown link, "tag" for a
+// frontmatter tag, or "previous"/"next" for the page order inside a section.
+// A link carries the heading anchor and the link text that place it in the
+// page; the page-order edges carry neither.
 type GraphEdge struct {
 	From   string `json:"from"`
 	To     string `json:"to"`
@@ -172,6 +173,22 @@ func (r *Renderer) BuildGraph() GraphIndex {
 				seen[key] = true
 				g.Edges = append(g.Edges, GraphEdge{From: from, To: id, Kind: "tag"})
 			}
+		}
+	}
+
+	// Page order is structural navigation, not a Markdown link. Keep it in the
+	// catalogue so agents and exporters see previous/next without guessing from
+	// section order; the browser can choose whether to draw those edges.
+	for _, s := range r.sections {
+		ids := make([]string, 0, len(s.Pages))
+		for _, p := range s.Pages {
+			ids = append(ids, pageNodeID(p.Slug))
+		}
+		for i := 1; i < len(ids); i++ {
+			g.Edges = append(g.Edges,
+				GraphEdge{From: ids[i-1], To: ids[i], Kind: "next"},
+				GraphEdge{From: ids[i], To: ids[i-1], Kind: "previous"},
+			)
 		}
 	}
 	return g
