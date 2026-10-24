@@ -679,7 +679,7 @@
       state.allEdges.push({
         from: from,
         to: to,
-        kind: e.kind === 'tag' ? 'tag' : 'link',
+        kind: e.kind === 'tag' ? 'tag' : e.kind === 'previous' ? 'previous' : e.kind === 'next' ? 'next' : 'link',
         anchor: e.anchor ? String(e.anchor) : '',
         text: e.text ? String(e.text) : ''
       });
@@ -724,8 +724,12 @@
       n.degree = 0;
       visible[n.id] = true;
     });
+    // Previous and next are catalogue edges for navigation and agent tools.
+    // The drawing stays links and tags, so page order does not add another 2n
+    // springs or a second set of lines.
     state.edges = state.allEdges.filter(function (e) {
-      return visible[e.from.id] && visible[e.to.id];
+      return visible[e.from.id] && visible[e.to.id] &&
+        (e.kind === 'link' || e.kind === 'tag');
     });
     state.edges.forEach(function (e) {
       e.from.degree += 1;
@@ -835,6 +839,7 @@
     state.edgeElements.forEach(function (item) {
       item.el.classList.toggle('is-path', active && state.path.edges.indexOf(item.edge) !== -1);
     });
+    scheduleLabels();
     if (pathClear) pathClear.hidden = !active;
   }
 
@@ -861,10 +866,11 @@
     }
     state.path = path;
     applyPath();
+    var route = path.nodes.map(function (n) { return n.title; }).join(' -> ');
     pathStatus.textContent = path.edges.length === 0
       ? 'Same page: ' + from.title + '.'
       : 'Path: ' + path.edges.length + (path.edges.length === 1 ? ' step' : ' steps') +
-        ' between ' + from.title + ' and ' + to.title + '.';
+        ' between ' + from.title + ' and ' + to.title + '. Route: ' + route + '.';
   }
 
   function updateTagKindOption() {
@@ -1841,7 +1847,8 @@
       var n = order[i];
       if (!n.matched) continue;
       if (labelTier(n) === 2 && !pagesMayLabel()) continue;
-      if (state.focus && state.focus[n.id] == null) continue;
+      if (state.focus && state.focus[n.id] == null &&
+          !(state.path && state.path.nodes.indexOf(n) !== -1)) continue;
       var view = state.view;
       var margin = 40 / scale;
       if (n.x < view.x - margin || n.x > view.x + view.w + margin ||
@@ -2454,7 +2461,10 @@
   window.addEventListener('popstate', applyURLState);
 
   if (pathFind) pathFind.addEventListener('click', findPath);
-  if (pathClear) pathClear.addEventListener('click', function () { clearPath(true); });
+  if (pathClear) pathClear.addEventListener('click', function () {
+    clearPath(true);
+    if (pathFind) pathFind.focus();
+  });
 
   // A local face swaps in after first paint; widths measured against the
   // fallback would keep names overlapping for the life of the page.
