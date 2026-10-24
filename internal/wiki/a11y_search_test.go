@@ -45,7 +45,7 @@ func TestSearchClientInitialisesOnTheDocumentedIds(t *testing.T) {
 	js := searchClient(t)
 	for _, id := range []string{
 		"searchBtn", "searchInput", "searchResults", "searchBackdrop",
-		"searchCloseBtn", "searchScope",
+		"searchCloseBtn", "searchScope", "searchGraph",
 	} {
 		if !strings.Contains(js, "getElementById('"+id+"')") {
 			t.Errorf("search.js no longer looks up #%s, which the DOM contract requires", id)
@@ -305,6 +305,7 @@ const wantModal = `<div class="search-modal-backdrop" id="searchBackdrop" aria-h
     <div class="search-modal-body" id="searchResults"></div>
     <div class="search-modal-footer">
       <button type="button" class="search-scope" id="searchScope" aria-pressed="true" hidden>All wikis</button>
+      <button type="button" class="search-graph" id="searchGraph" hidden>Open in graph</button>
       <div class="search-footer-hint"><kbd class="kbd-key">↑</kbd><kbd class="kbd-key">↓</kbd> <span>Navigate</span></div>
       <div class="search-footer-hint"><kbd class="kbd-key">↵</kbd> <span>Select</span></div>
       <div class="search-footer-hint"><kbd class="kbd-key">ESC</kbd> <span>Close</span></div>

@@ -3,6 +3,14 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-24
+
+* **Feature**: Search results carry their graph node ID. The selected hit can
+  open in the graph with `focus` and the search query in `q`, so the hit is
+  selected and other matches stay lit while non-matches fade. Tag-search rows,
+  which have no page node, hide the action. `usage/graph.md`,
+  `reference/themes.md` and `design/rendering.md` record it.
+
 ## 2026-10-23
 
 * **Feature**: Every render writes `changes.json` and `health.json`. Changes

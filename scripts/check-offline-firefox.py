@@ -248,8 +248,20 @@ def main():
         must(results, "search returned no results")
         content = driver.execute_script("return typeof window.__WIKI_SEARCH_CONTENT;")
         must(content == "object", "the content catalogue did not load")
-        field.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
-        WebDriverWait(driver, 5).until(lambda d: d.current_url != base + "index.html")
+        graph_button = driver.find_element(By.ID, "searchGraph")
+        must(graph_button.is_displayed(), "the search graph action is hidden for a page hit")
+        graph_button.click()
+        WebDriverWait(driver, 10).until(lambda d: "focus=" in d.current_url and "q=offline" in d.current_url)
+        wait_for(driver, ".graph-node-group")
+        wait_layout(driver)
+        must(
+            driver.find_element(By.ID, "graphFilter").get_attribute("value") == "offline",
+            "the search query did not reach the graph filter",
+        )
+        must(
+            "Focused on" in driver.find_element(By.ID, "graphStatus").text,
+            "the search hit did not focus a graph node",
+        )
 
         driver.get(base + "index.html")
         field = open_search(driver)
@@ -261,6 +273,10 @@ def main():
                 for a in driver.find_elements(By.CSS_SELECTOR, ".search-result-item")
             ),
             "tag search did not reach the tag page",
+        )
+        must(
+            not driver.find_element(By.ID, "searchGraph").is_displayed(),
+            "the graph action stayed visible for a tag result",
         )
 
         check_page(driver, base + "usage/graph.html", ".connections-graph")
