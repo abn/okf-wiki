@@ -355,6 +355,9 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
    header has no room for a row of them. Hidden on desktop, which shows them in
    the header instead, so only one copy is ever in the accessibility tree. */
 .side-links { display: none; }
+/* The archive row replaces the header control at the narrowest widths, so the
+   two are never in the accessibility tree together. */
+.side-download { display: none; }
 
 /* ------------------------------------------------------------------ prose */
 .prose { min-width: 0; line-height: 1.7; }
@@ -1253,10 +1256,49 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .prose table, .prose pre.code { max-width: 100%; }
 }
 
+@media (max-width: 430px) {
+  /* Each control is a 44px touch target, and five of them plus the brand leave
+     8px gaps that cost the wordmark its last letters on a 390px phone. The
+     cluster tightens rather than the name shortening. */
+  .site-header.has-bundle .nav-cluster { gap: var(--space-1); }
+}
+
+@media (max-width: 389px) {
+  /* The fifth control would take the wordmark's room. The reading control is a
+     desktop convenience and goes first: below 860 the layout is already one
+     column and the sidebar already a drawer, so it changes nothing visible. */
+  .site-header.has-bundle .reading-toggle { display: none; }
+}
+
 @media (max-width: 360px) {
   /* At the narrowest phones the brand keeps its name by giving up the reading
      control, which is a desktop convenience and remains in the DOM. */
   .reading-toggle { display: none; }
+}
+
+@media (max-width: 349px) {
+  /* The fourth header control starts to take the wordmark's room, so the
+     archive control moves to a labelled row in the drawer. The row carries the
+     same 44px touch floor as the header controls it replaces. */
+  .bundle-btn { display: none; }
+  .side-download {
+    display: block; margin-top: var(--space-5); padding-top: var(--space-4);
+    border-top: 1px solid var(--color-line);
+  }
+  /* A second rule above a row that already sits under one reads as a gap
+     rather than a separation. */
+  .side-links + .side-download { margin-top: var(--space-3); padding-top: 0; border-top: 0; }
+  .side-download a {
+    display: flex; align-items: center; gap: var(--space-2); min-height: 44px;
+    padding: 6px var(--space-3); border-radius: var(--radius-sm);
+    font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+  }
+  .side-download a:hover { color: var(--color-heading); background: var(--color-accent-soft); }
+  /* The graph view has no drawer to hold the row, and its own graph control is
+     redundant on the page it opens, so the archive stays in the header and the
+     graph control yields instead. */
+  .site-header.has-bundle.graph-page .graph-btn { display: none; }
+  .site-header.has-bundle.graph-page .bundle-btn { display: inline-flex; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1583,7 +1625,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   color: var(--color-heading); background: var(--color-surface);
 }
 .graph-noscript { margin-top: var(--space-3); color: var(--color-text-muted); }
-.graph-btn { padding: 0 var(--space-2); text-decoration: none; }
+.graph-btn, .bundle-btn { padding: 0 var(--space-2); text-decoration: none; }
 .graph-btn[aria-current="page"] { color: var(--color-accent-text); background: var(--color-accent-soft); }
 @media (max-width: 720px) {
   .graph-canvas { height: 60vh; }

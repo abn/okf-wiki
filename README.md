@@ -27,6 +27,7 @@ The `:Z` relabels the bind mount so an SELinux host lets the container read it.
 - An agent surface: `llms.txt`, `pages.json`, Markdown sources, and a read-only
   MCP server for search, reading, graph navigation, changes and health.
 - A light/dark theme, skinnable at runtime by mounting a theme directory.
+- The whole source bundle as one download, with `--bundle`.
 - A container that renders diagrams with no network access.
 
 ## Use from an agent

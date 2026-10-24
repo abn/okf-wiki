@@ -46,7 +46,7 @@
 </head>
 <body>
 <a class="skip-link" href="{{.PageHref}}#main">Skip to content</a>
-<header class="site-header">
+<header class="site-header{{if .GraphPage}} graph-page{{end}}{{if .BundleHref}} has-bundle{{end}}">
   <div class="wrap header-inner">
     <div class="brand-cluster">
       <a class="brand" href="{{.HomeHref}}">
@@ -61,6 +61,9 @@
       <a class="icon-btn graph-btn" href="{{.GraphHref}}" aria-label="Knowledge graph" title="Knowledge graph"{{if .GraphPage}} aria-current="page"{{end}}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="8" r="2.4"/><circle cx="11" cy="18" r="2.4"/><path d="M8.3 6.8 15.7 7.6M7.6 8.2 10.4 15.7M16.5 10.2 12.2 16.3"/></svg>
       </a>
+      {{if .BundleHref}}<a class="icon-btn bundle-btn" href="{{.BundleHref}}" download aria-label="Download the OKF bundle" title="Download the OKF bundle">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </a>{{end}}
       <button type="button" class="icon-btn search-btn" id="searchBtn" aria-label="Search documentation" aria-keyshortcuts="Control+k Meta+k /">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <span class="search-btn-text">Search</span>
@@ -89,7 +92,7 @@
 </div>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="layout wrap{{if not .Nav}} layout-solo{{end}}">
-  {{if .Nav}}<aside class="sidebar" id="sideDrawer">{{.Nav}}{{if or .TopNavInternal .TopNavExternal}}<div class="side-links">{{if .TopNavInternal}}<p class="side-links-title">On this wiki</p>{{.TopNavInternal}}{{end}}{{if .TopNavExternal}}<p class="side-links-title">Elsewhere</p>{{.TopNavExternal}}{{end}}</div>{{end}}</aside>{{end}}
+  {{if .Nav}}<aside class="sidebar" id="sideDrawer">{{.Nav}}{{if or .TopNavInternal .TopNavExternal}}<div class="side-links">{{if .TopNavInternal}}<p class="side-links-title">On this wiki</p>{{.TopNavInternal}}{{end}}{{if .TopNavExternal}}<p class="side-links-title">Elsewhere</p>{{.TopNavExternal}}{{end}}</div>{{end}}{{if .BundleHref}}<div class="side-download"><a href="{{.BundleHref}}" download><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Download the OKF bundle</a></div>{{end}}</aside>{{end}}
   <main class="content{{if .GraphPage}} content-graph{{end}}" id="main">
     <article class="prose{{if .GraphPage}} prose-graph{{end}}">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}

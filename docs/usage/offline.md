@@ -41,6 +41,10 @@ environment equivalent is `OKF_WIKI_OFFLINE=true`.
   than pretending to be offline.
 - The root redirect names the wiki's `index.html` rather than a directory.
 
+With `--bundle`, each wiki also writes its `okf-bundle.zip` beside its pages, so
+the whole bundle downloads from a `file://` page as it does online. The control
+is relative to the page's `<base>`, and the archive is an ordinary file on disk.
+
 ## Moving it
 
 Keep the folder together. Links are relative to each page's render root, so a

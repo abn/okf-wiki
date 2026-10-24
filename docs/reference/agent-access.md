@@ -254,7 +254,8 @@ the render's URL mode: absolute paths online, and paths relative to the render
 root for an offline folder.
 
 The generated files reserve `llms.txt`, `pages.json`, `changes.json` and
-`health.json` at the render root. A bundle that already contains one of those
+`health.json` at the render root. With `--bundle`, every wiki also reserves
+`okf-bundle.zip` at its own base. A bundle that already contains one of those
 names fails the render and names the collision rather than overwriting the
 reader's file.
 

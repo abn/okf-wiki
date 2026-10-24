@@ -146,6 +146,15 @@ The `{{.Connections}}` field is static page HTML. A template that omits it drops
 the backlinks and the Local graph entry point, while the graph page itself
 remains reachable from the header.
 
+`{{.BundleHref}}` is the wiki's own `okf-bundle.zip`. It is empty when
+`--bundle` is not set, and it is empty on a generated group index and on the
+graph view of a tree whose root is a group. The default theme uses it twice: an
+`.icon-btn.bundle-btn` in the header, and a labelled `.side-download` row in the
+drawer, which replaces the header control below 350px. The graph view has no
+drawer, so it keeps the header control there and hides its own `.graph-btn`
+instead. A template that keeps neither drops the download, while the file stays
+at that URL.
+
 `search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
 `role="status"` and `aria-live="polite"`, clipped out of the layout by the
 stylesheet, carrying the result count and in a tree the wikis it came from, and

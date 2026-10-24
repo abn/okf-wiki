@@ -173,13 +173,14 @@ flowchart LR
    between namespaced IDs; the per-wiki catalogue stays inside its wiki.
 5. **Emit.** In order: the pages, one tag page per tag under `tags/`, the
    bundle's own files under their own paths, so an image resolves and each page
-   has its Markdown source beside it, the resolved theme's assets (stylesheet,
-   fonts, tokens, the search, diagram and graph clients, favicon), the Mermaid
-   vendor bundle when the bundle has a diagram, `search-index.json`,
-   `search-content.json`, `graph.json`, `graph.html`, `tags.json`, `llms.txt`,
-   `pages.json`, `changes.json`, `health.json`, and a
-   `theme.json` recording which theme produced the output. An offline render
-   also writes the search index, texts and tags as classic `.js` data scripts.
+   has its Markdown source beside it, `okf-bundle.zip` when `--bundle` is set,
+   the resolved theme's assets (stylesheet, fonts, tokens, the search, diagram
+   and graph clients, favicon), the Mermaid vendor bundle when the bundle has a
+   diagram, `search-index.json`, `search-content.json`, `graph.json`,
+   `graph.html`, `tags.json`, `llms.txt`, `pages.json`, `changes.json`,
+   `health.json`, and a `theme.json` recording which theme produced the output.
+   An offline render also writes the search index, texts and tags as classic
+   `.js` data scripts.
    The output directory is emptied first, so a page removed from the bundle does
    not linger.
 
@@ -283,6 +284,35 @@ of one, and a callout, a code block or a diagram stays whole. A table breaks, bu
 its header repeats on each page, so the columns stay named. A dark screen still
 prints the light document, and a printed code block is light with ink text rather
 than the on-screen dark surface.
+
+## Download the bundle
+
+With `--bundle`, every wiki writes `okf-bundle.zip` at its base, beside its
+pages. It holds the bundle the render read, not the rendered site: the Markdown
+with its frontmatter and every non-Markdown file, under one folder named after
+the content directory. Extract it and it is an OKF bundle that renders again,
+rather than a copy of the HTML.
+
+The flag is off by default, because the archive is a second copy of the source
+beside the files the site already carries: one copy per page for the Markdown
+download, one per asset so a link resolves, and then the archive. A deployment
+that wants the whole bundle in one file turns it on and pays that cost
+deliberately.
+
+The header offers it as a download control on every page of a wiki. At the
+narrowest widths the control moves to a labelled row in the navigation drawer,
+so the header keeps room for the brand. The graph view has no drawer: a single
+bundle and a root-wiki tree keep the header control there and give up the graph
+button, which is redundant on the page it opens, while the graph view of a
+group-rooted tree has no archive at all. A generated group index in a multi-site
+tree has no bundle of its own and carries no control; each wiki of the tree
+downloads its own.
+
+Dotfiles and dot-directories are left out, as they are from the served site, so
+a checkout's `.git` never rides along. The path is reserved while the flag is
+on: a bundle that already holds a file named `okf-bundle.zip` fails the render
+with the file named, rather than losing it to the export. With the flag off,
+that file is an ordinary asset and renders like any other.
 
 ## Trees of wikis
 
