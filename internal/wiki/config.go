@@ -93,6 +93,11 @@ type Config struct {
 	// from vendor/. The site root is named by a per-page <base>, so every asset
 	// and page URL is relative to it.
 	Offline bool
+	// Bundle writes the source bundle as okf-bundle.zip and offers it from the
+	// pages. It is off by default because the archive is a second copy of the
+	// content in the output, so a deployment opts in rather than paying for it
+	// unasked.
+	Bundle bool
 }
 
 // base returns the URL prefix, normalised to a leading and a trailing slash so

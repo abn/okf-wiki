@@ -53,6 +53,10 @@ inputs:
     description: Language the pages declare, a tag such as de or pt-BR.
     required: false
     default: en
+  bundle:
+    description: Offer the source bundle as okf-bundle.zip from every page.
+    required: false
+    default: "false"
   sections:
     description: Section order as comma-separated id:Title pairs.
     required: false
@@ -134,6 +138,7 @@ runs:
         VERSION_TAG: ${{ inputs.version-tag }}
         TITLE: ${{ inputs.title }}
         LANG: ${{ inputs.lang }}
+        BUNDLE: ${{ inputs.bundle }}
         SECTIONS: ${{ inputs.sections }}
         NAV_LINKS: ${{ inputs.nav-links }}
         BASE: ${{ steps.resolve.outputs.base }}
@@ -147,6 +152,7 @@ runs:
         [ -n "$SECTIONS" ] && args+=(--sections "$SECTIONS")
         [ -n "$NAV_LINKS" ] && args+=(--nav-links "$NAV_LINKS")
         [ -n "$THEME" ] && args+=(--theme "$THEME")
+        [ "$BUNDLE" = true ] && args+=(--bundle)
 
         # Root in the container is the runner user under rootless podman; the
         # image's own uid cannot write the workspace.

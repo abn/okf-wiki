@@ -72,6 +72,7 @@ flags (render):
   --multi-site       treat the content directory as a tree of wikis: each
                      directory holding an index.md is a wiki and the rest get
                      a generated index of their children
+  --bundle           offer the source bundle as okf-bundle.zip (default false)
   --out DIR          output directory (default: .scratch/wiki)
   --base PATH        URL prefix the wiki is served under (default "/wiki/")
   --lang TAG         language the pages declare, e.g. de or pt-BR (default "en")
@@ -114,7 +115,7 @@ environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE,
   OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB, OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE,
   OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
   OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_WATCH_INTERVAL,
-  OKF_WIKI_MULTI_SITE
+  OKF_WIKI_MULTI_SITE, OKF_WIKI_BUNDLE
 `)
 }
 
@@ -225,6 +226,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.BoolVar(&c.MultiSite, "multi-site", envBool("OKF_WIKI_MULTI_SITE", false), "treat the content directory as a tree of wikis")
 	fs.BoolVar(&c.InlineGraph, "graph-inline", envBool("OKF_WIKI_GRAPH_INLINE", false), "embed the graph catalogue in the graph page")
 	fs.BoolVar(&c.Offline, "offline", envBool("OKF_WIKI_OFFLINE", false), "write a portable folder for opening from file://")
+	fs.BoolVar(&c.Bundle, "bundle", envBool("OKF_WIKI_BUNDLE", false), "offer the source bundle as okf-bundle.zip")
 	return c
 }
 

@@ -251,6 +251,11 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		siteTrail:       trail,
 		previousPages:   r.previousPages,
 	}
+	if cfg.Bundle {
+		if err := bundleCollision(cfg.Content); err != nil {
+			return 0, err
+		}
+	}
 	if err := sub.load(cfg.Content); err != nil {
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
 		return 0, nil
@@ -428,6 +433,7 @@ func (r *Renderer) writeTreeGraphPage(out string, root *siteNode) error {
 		siteRel:      "",
 		siteTitle:    title,
 		graphPage:    true,
+		noBundle:     true,
 	}
 	var inline []byte
 	if r.cfg.InlineGraph {

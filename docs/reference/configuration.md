@@ -15,6 +15,7 @@ Resolution order is flag, then environment variable, then default.
 | `--multi-site` | `OKF_WIKI_MULTI_SITE` | `false` | Treat the content directory as a tree of wikis |
 | `--graph-inline` | `OKF_WIKI_GRAPH_INLINE` | `false` | Embed the graph catalogue in the graph page, with no fetch |
 | `--offline` | `OKF_WIKI_OFFLINE` | `false` | Write a portable folder for file://; implies `--graph-inline` |
+| `--bundle` | `OKF_WIKI_BUNDLE` | `false` | Offer the source bundle as `okf-bundle.zip` |
 | `--out` | `OKF_WIKI_OUT` | `.scratch/wiki` | Rendered output root |
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--lang` | `OKF_WIKI_LANG` | `en` | Language the pages declare, a tag such as `de` or `pt-BR` |
@@ -55,6 +56,13 @@ because a repository mount is a server endpoint. `--base` still names the
 directory inside `--out`; it is not used as an absolute URL prefix. See
 [Offline folder](../usage/offline.md).
 
+`--bundle` writes `okf-bundle.zip` at each wiki's base and offers it from the
+pages. It is off by default: the archive is a second copy of the content in the
+output, so a deployment opts in when it wants the whole source downloadable in
+one file. The path is reserved while it is on, and a bundle that already holds
+that file fails the render rather than losing it. See
+[Download the bundle](../design/rendering.md#download-the-bundle).
+
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server
 unchanged. In offline mode it is only the directory; the URLs are relative. It
@@ -93,6 +101,9 @@ interval is quieter on a large tree. The default of one second suits authoring.
 - `/wiki/` and `/wiki/<slug>.html`: the rendered wiki, under `--base`.
   `/wiki/graph.html` is the graph view, and it fetches `/wiki/graph.json`
   unless the catalogue was inlined.
+- `/wiki/okf-bundle.zip`: with `--bundle`, the wiki's source bundle, Markdown
+  and assets under one folder. A multi-site tree writes one per wiki at that
+  wiki's base.
 - `/repo/<path>`: read-only repository mount, when `--repo` is set. Dotfiles are
   refused.
 - `/healthz`: liveness probe.

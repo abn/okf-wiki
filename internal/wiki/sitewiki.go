@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -142,6 +141,10 @@ type Renderer struct {
 	siteDescription string
 	siteTrail       []treeCrumb
 	groupIndex      bool
+	// noBundle suppresses the archive control on a page whose render root
+	// holds no archive: the tree's graph view, written at the tree base, which
+	// is a group rather than a wiki.
+	noBundle bool
 
 	// Render caches, populated on first use inside this renderer. A render
 	// runs every page through RenderPage, so values derived from the bundle
@@ -238,6 +241,11 @@ func (r *Renderer) RenderAll(out string) error {
 	if err := agentCollision(r.cfg.Content); err != nil {
 		return err
 	}
+	if r.cfg.Bundle {
+		if err := bundleCollision(r.cfg.Content); err != nil {
+			return err
+		}
+	}
 	site, err := r.cfg.SiteDir(out)
 	if err != nil {
 		return err
@@ -310,6 +318,14 @@ func (r *Renderer) renderInto(out, site string) error {
 	}
 	if err := copyBundleFiles(r.cfg.Content, site); err != nil {
 		return err
+	}
+	// The whole bundle, beside the pages that came from it, so a reader can
+	// take the wiki away as one file. A wiki of a tree writes its own archive
+	// at its own path, the same way it writes its own pages.
+	if r.cfg.Bundle {
+		if err := r.writeBundle(site); err != nil {
+			return err
+		}
 	}
 	// Only a bundle that actually has a diagram needs the runtime. A missing
 	// vendor directory is an error in that case, since the browser would
@@ -911,44 +927,19 @@ func (r *Renderer) hasMermaid() bool {
 }
 
 // markdownFiles lists the Markdown files under root, at any depth, as paths
-// relative to root. Dotfiles and dot-directories are skipped, for the same
-// reason copyBundleFiles skips them.
-//
-// The root is resolved first: WalkDir does not follow a symlink it is handed as
-// its starting point, so a bundle directory that is itself a symlink would
-// otherwise yield nothing. Links under the root are followed by the walk as
-// usual.
+// relative to root. It walks the same list as the site copy and the archive
+// export, so a page that renders is a page that also serves and downloads.
 func markdownFiles(root string) ([]string, error) {
-	real, err := resolveRoot(root)
+	_, files, err := bundleFiles(root)
 	if err != nil {
 		return nil, err
 	}
 	var out []string
-	err = filepath.WalkDir(real, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, rel := range files {
+		if strings.EqualFold(filepath.Ext(rel), ".md") {
+			out = append(out, filepath.Join(root, filepath.FromSlash(rel)))
 		}
-		name := d.Name()
-		if p != real && strings.HasPrefix(name, ".") {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() || !strings.EqualFold(filepath.Ext(name), ".md") {
-			return nil
-		}
-		rel, err := filepath.Rel(real, p)
-		if err != nil {
-			return err
-		}
-		out = append(out, filepath.Join(root, rel))
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-	sort.Strings(out)
 	return out, nil
 }
 
@@ -958,42 +949,19 @@ func markdownFiles(root string) ([]string, error) {
 // bearing because without it an image ships as a broken link and no error; the
 // second is what a reader downloads when they want the Markdown.
 //
-// Dotfiles and dot-directories are skipped: a bundle directory is a real
-// working tree as often as not, and nothing in a wiki should be able to publish
-// a .git directory or a .env.
-//
-// The root is resolved first, for the same reason as markdownFiles: WalkDir
-// treats a symlinked starting point as a file, so a bundle reached through a
-// link would copy nothing, which is how a linked wiki came to serve pages with
-// every image broken.
+// It walks the same list as the archive export, so a file that serves is a file
+// that downloads, and a symlinked bundle copies like a real one.
 func copyBundleFiles(root, dest string) error {
-	real, err := resolveRoot(root)
+	real, files, err := bundleFiles(root)
 	if err != nil {
 		return err
 	}
-	return filepath.WalkDir(real, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
+	for _, rel := range files {
+		if err := copyFile(filepath.Join(real, filepath.FromSlash(rel)), filepath.Join(dest, rel)); err != nil {
 			return err
 		}
-		rel, relErr := filepath.Rel(real, p)
-		if relErr != nil {
-			return relErr
-		}
-		if rel == "." {
-			return nil
-		}
-		name := d.Name()
-		if strings.HasPrefix(name, ".") {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		return copyFile(p, filepath.Join(dest, rel))
-	})
+	}
+	return nil
 }
 
 // resolveRoot returns the path a walk should start from, following a symlink at

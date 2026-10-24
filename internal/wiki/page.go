@@ -68,6 +68,10 @@ type shellData struct {
 	GraphBase string
 	// GraphHref is the graph page's URL: GraphBase plus graph.html.
 	GraphHref string
+	// BundleHref is this wiki's archive, at its own base beside its pages.
+	// Empty on a group index or the tree's graph view, which have no bundle of
+	// their own.
+	BundleHref string
 	// GraphPage marks the graph view itself, so a theme can widen the column
 	// and mark the header control as current.
 	GraphPage bool
@@ -408,6 +412,12 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		pageHref = r.pagePath(p)
 		docBase = r.docBase(p)
 	}
+	// A group index and the tree's graph view have no archive to point at, so
+	// they carry no control rather than a link to a file that is not there.
+	bundleHref := ""
+	if r.cfg.Bundle && !r.groupIndex && !r.noBundle {
+		bundleHref = base + bundleName
+	}
 	// A synthetic page has no file in the bundle, so there is nothing to
 	// download; a real one points at the source the render copied beside it.
 	markdown := ""
@@ -437,6 +447,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		SearchBase:     searchBase,
 		GraphBase:      graphBase,
 		GraphHref:      graphBase + "graph.html",
+		BundleHref:     bundleHref,
 		GraphPage:      r.graphPage,
 		Offline:        r.cfg.Offline,
 		HasMermaid:     strings.Contains(p.Body, `<pre class="mermaid">`),

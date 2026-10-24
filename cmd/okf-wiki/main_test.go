@@ -148,11 +148,12 @@ func TestReorderArgs(t *testing.T) {
 func TestIsBoolFlag(t *testing.T) {
 	fs := flag.NewFlagSet("t", flag.ContinueOnError)
 	fs.Bool("multi-site", false, "")
+	fs.Bool("bundle", false, "")
 	fs.Bool("watch", false, "")
 	fs.Duration("watch-interval", time.Second, "")
 	fs.String("base", "", "")
 
-	for _, name := range []string{"--multi-site", "-multi-site", "--watch"} {
+	for _, name := range []string{"--multi-site", "-multi-site", "--bundle", "--watch"} {
 		if !isBoolFlag(fs, name) {
 			t.Errorf("isBoolFlag(%q) = false, want true", name)
 		}
@@ -229,6 +230,37 @@ func TestBindCommonLang(t *testing.T) {
 			}
 			if cfg.Lang != tc.want {
 				t.Errorf("Lang = %q, want %q", cfg.Lang, tc.want)
+			}
+		})
+	}
+}
+
+// --bundle is off unless it is asked for, and the flag beats the environment
+// the way every other bound flag does.
+func TestBindCommonBundle(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		env  string
+		want bool
+	}{
+		{name: "unset is off", env: "", want: false},
+		{name: "flag turns it on", args: []string{"--bundle"}, env: "", want: true},
+		{name: "explicit false beats the environment", args: []string{"--bundle=false"}, env: "true", want: false},
+		{name: "environment turns it on", env: "true", want: true},
+		{name: "environment stays off", env: "false", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("OKF_WIKI_BUNDLE", tc.env)
+			fs := flag.NewFlagSet("render", flag.ContinueOnError)
+			fs.SetOutput(nil)
+			cfg := bindCommon(fs)
+			if err := fs.Parse(tc.args); err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Bundle != tc.want {
+				t.Errorf("Bundle = %v, want %v", cfg.Bundle, tc.want)
 			}
 		})
 	}

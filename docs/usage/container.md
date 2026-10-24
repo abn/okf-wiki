@@ -35,6 +35,10 @@ podman run --rm -p 8080:8080 \
   ghcr.io/abn/okf-wiki:latest
 ```
 
+Add `-e OKF_WIKI_BUNDLE=true` to offer the whole source bundle as a download. It
+is off by default, because the archive is a second copy of the content in the
+output.
+
 ## Mounting a theme
 
 A theme is a read-only bind mount and one environment variable. No rebuild, and

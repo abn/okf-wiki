@@ -77,6 +77,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.Offline}}` | true when the page is written for opening without a server |
 | `{{.HasMermaid}}` | true when this page carries a diagram, so an offline page can load the classic runtime |
 | `{{.GraphBase}}` `{{.GraphHref}}` | where the graph catalogue is fetched and where the graph page lives |
+| `{{.BundleHref}}` | the wiki's own `okf-bundle.zip`, empty without `--bundle`, and on a group index and the graph view of a group-rooted tree |
 | `{{.AssetVersion}}` | the resolved theme's content hash |
 | `{{.BrandName}}` `{{.BrandTail}}` `{{.BrandSub}}` `{{.BrandTitle}}` | the configured brand |
 | `{{.VersionTag}}` | a freeform version label beside the wordmark, empty when unset |
