@@ -3846,6 +3846,7 @@ func TestSingleBundleSearchIndexOmitsSiteFields(t *testing.T) {
 	}
 	type bareIndex struct {
 		RenderID string      `json:"renderId"`
+		Base     string      `json:"base"`
 		Pages    []barePage  `json:"pages"`
 		Entries  []bareEntry `json:"entries"`
 	}

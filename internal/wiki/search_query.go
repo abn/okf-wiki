@@ -103,6 +103,9 @@ func LoadSearchCorpusFrom(read SourceReader, base string) (*SearchCorpus, error)
 	if err := json.Unmarshal(indexRaw, &c.Index); err != nil {
 		return nil, fmt.Errorf("decode search-index.json: %w", err)
 	}
+	if c.Index.Base != "" {
+		c.Base = normalizeCorpusBase(c.Index.Base)
+	}
 	if err := json.Unmarshal(contentRaw, &c.Content); err != nil {
 		return nil, fmt.Errorf("decode search-content.json: %w", err)
 	}
@@ -120,8 +123,10 @@ func LoadSearchCorpusFrom(read SourceReader, base string) (*SearchCorpus, error)
 			return nil, fmt.Errorf("decode pages.json: %w", err)
 		}
 		c.hasManifest = true
-		if inferred := inferPageBase(c.Index.Pages); inferred != "" {
-			c.Base = inferred
+		if c.Base == "" {
+			if inferred := inferPageBase(c.Index.Pages); inferred != "" {
+				c.Base = inferred
+			}
 		}
 		manifestID := agentRenderID(c.Manifest.Pages)
 		if c.RenderID != "" && c.RenderID != manifestID {
@@ -141,7 +146,8 @@ func LoadSearchCorpusFrom(read SourceReader, base string) (*SearchCorpus, error)
 // normalizeCorpusBase keeps a URL prefix usable for stripping a rendered page
 // URL back to a path under SiteDir.
 func normalizeCorpusBase(base string) string {
-	if base == "" {
+	base = strings.TrimSpace(base)
+	if base == "" || base == "." || base == "./" {
 		return ""
 	}
 	if !strings.HasPrefix(base, "/") {
