@@ -277,12 +277,15 @@
     update();
   })();
 
-  // Heading anchor links. Every section heading gets a # permalink, revealed
-  // on hover and focus. Built client-side so the renderer never rewrites
-  // heading content; without JS the headings are simply unlinked.
+  // Heading anchor links. Every heading in the article body gets a # permalink,
+  // subheadings included, revealed on hover and focus. Built client-side so the
+  // renderer never rewrites heading content; without JS the headings are simply
+  // unlinked. A heading inside a marked widget labels app chrome rather than a
+  // document section, so it opts out.
   (function () {
     var pageHref = '{{.PageHref}}';
-    document.querySelectorAll('article h2[id]').forEach(function (h) {
+    document.querySelectorAll('article h2[id], article h3[id], article h4[id], article h5[id], article h6[id]').forEach(function (h) {
+      if (h.closest('[data-no-heading-anchor]')) return;
       var a = document.createElement('a');
       a.className = 'heading-anchor';
       a.href = pageHref + '#' + h.id;

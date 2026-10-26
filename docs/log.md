@@ -3,6 +3,14 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-26
+
+* **Fix**: Heading permalinks cover subheadings. Every level from two to six
+  grows the `#` link on hover, not only the level-two sections, and every level
+  takes the scroll margin that lands a deep-link jump below the sticky bars.
+  Headings that label an app widget opt out. `design/rendering.md`,
+  `reference/themes.md` and `testbed/headings.md` record it.
+
 ## 2026-10-24
 
 * **Docs**: Split the agent documentation into an Agent access guide for the

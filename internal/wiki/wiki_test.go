@@ -1559,6 +1559,44 @@ func TestHeadingIDsAreUnique(t *testing.T) {
 	}
 }
 
+// The permalink is built client-side, so its selector is the contract. It has
+// to reach every heading under the page title, or a subheading keeps an id that
+// nothing on the page turns into a link.
+func TestHeadingPermalinkCoversEveryLevel(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(docsRoot(t), "internal", "wiki",
+		"themes", "default", "template.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(raw)
+	for _, level := range []string{"h2", "h3", "h4", "h5", "h6"} {
+		if want := "article " + level + "[id]"; !strings.Contains(page, want) {
+			t.Errorf("the heading permalink selector does not cover %s, missing %q", level, want)
+		}
+	}
+	// Headings inside an app widget label the widget, not a place in the page.
+	if !strings.Contains(page, "closest('[data-no-heading-anchor]')") {
+		t.Error("the heading permalink does not let app chrome opt out")
+	}
+
+	css, err := os.ReadFile(filepath.Join(docsRoot(t), "internal", "wiki",
+		"themes", "default", "assets", "wiki.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sheet := string(css)
+	if !strings.Contains(sheet, ".prose .heading-anchor {") {
+		t.Error("wiki.css styles the heading permalink only per heading level")
+	}
+	if !strings.Contains(sheet, ".prose :hover > .heading-anchor") {
+		t.Error("wiki.css reveals the heading permalink only for level-two headings")
+	}
+	// A permalink jump has to clear the two sticky bars at every level.
+	if !strings.Contains(sheet, ".prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {") {
+		t.Error("wiki.css does not give every heading a scroll margin")
+	}
+}
+
 // GitHub matches an alert marker without regard to case, so a lowercase or
 // mixed-case marker has to become the same card as its uppercase spelling.
 func TestAlertMarkersMatchAnyCase(t *testing.T) {

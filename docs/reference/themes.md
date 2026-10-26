@@ -275,6 +275,9 @@ inherited. This is the right answer nine times out of ten.
 **Reskin.** The same, plus `wiki.css` and a `fonts/` subtree, and optionally
 `brand-mark.svg` and `favicon.svg`. You keep the default's `template.html`,
 `search.js` and `graph.js`, so the DOM contract above stays satisfied for free.
+The template's heading permalink lands on every level below the page title, so
+a reskin's `wiki.css` has to style `.heading-anchor` at every level rather than
+on the level-two headings alone.
 
 **Relayout.** Replace `template.html` as well, or use slots to inject into the
 default's shell without owning it. Read the DOM contract section first; this is
