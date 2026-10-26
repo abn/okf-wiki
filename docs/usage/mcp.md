@@ -28,12 +28,24 @@ The endpoint is `http://127.0.0.1:8080/wiki/_/mcp`, under the render `--base`.
 It shares the wiki's listener, its shutdown path and its render output, so
 there is no second port to publish and no second process to supervise.
 
-The `_/` segment is deliberate. The endpoint lives under the base, beside the
-wiki, but outside the page namespace, so an ordinary page, section or theme
-asset named `mcp` cannot shadow it. While `--mcp` is on, `<base>/_/` is reserved
-for server endpoints, not content. With the default base the URL is
+The `_/` segment is deliberate. With the default prefix the endpoint lives
+under the base, beside the wiki, but outside the page namespace, so an ordinary
+page, section or theme asset named `mcp` cannot shadow it. `<base>/_/` is then
+reserved for server endpoints, not content. With the default base the URL is
 `/wiki/_/mcp`; `--base /docs/` gives `/docs/_/mcp`, and `--base /` gives
 `/_/mcp`.
+
+Set `--mcp-prefix ""` to skip the segment and mount at `<base>/mcp` instead.
+Any single segment of letters, digits, dot, dash or underscore works too, for
+example `--mcp-prefix api` for `<base>/api/mcp`; leading and trailing slashes
+around a segment are ignored. `OKF_WIKI_MCP_PREFIX` is the environment equivalent. It must be set to
+an empty value, not left unset, to remove the prefix.
+
+The endpoint's exact path and its trailing-slash form win over the file server,
+so a section whose directory URL equals that path is answered by the endpoint
+rather than its index. The `_/` default makes that collision unlikely. Without
+it, a section named `mcp` at `<base>/mcp/` loses its index route; a custom prefix
+like `api` can collide with a section directory `api/mcp/`.
 
 Point a client at that URL:
 
@@ -263,7 +275,7 @@ hash changed.
 | `read_page` fails but search works | `pages.json` or the Markdown source is missing at the source. |
 | `changes` or `health` is unavailable | The source has no such file, or it is from another render. Re-render and retry. |
 | A remote change is not visible | Remote sources refresh at most every 30 seconds. Local sources reload on each tool call. |
-| The `serve --mcp` URL returns 404 | `--mcp` is set (or `OKF_WIKI_MCP=true`), and the path is `<base>/_/mcp`, not `<base>/mcp`. |
+| The `serve --mcp` URL returns 404 | `--mcp` is set (or `OKF_WIKI_MCP=true`), and the path matches `--mcp-prefix`: `<base>/_/mcp` by default, `<base>/mcp` with an empty prefix. |
 | HTTP client cannot connect | Use stdio for a local client, or point the client at the `/mcp` URL behind the proxy. |
 
 ## See also

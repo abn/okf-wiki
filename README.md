@@ -43,6 +43,9 @@ okf-wiki mcp --out ./public --base /wiki/
 # the same endpoint on the wiki's own port, at /wiki/_/mcp
 okf-wiki serve --content ./docs --mcp
 
+# the same, without the _ segment: /wiki/mcp
+okf-wiki serve --content ./docs --mcp --mcp-prefix ""
+
 # one or more published wikis
 okf-wiki mcp --source docs=https://docs.example.com/wiki/
 ```
@@ -52,7 +55,8 @@ packs, neighbours and paths, changes and graph health. `--source` is repeatable
 and each source can use a bearer token from an environment variable. A thin
 HTTP endpoint is available with `--http`, with TLS and authentication handled
 by a proxy, and `serve --mcp` mounts the same handler under the wiki base so one
-port serves both.
+port serves both. `--mcp-prefix ""` drops the default `_/` segment and mounts it
+at `<base>/mcp`.
 
 See [docs/usage/mcp.md](docs/usage/mcp.md) for MCP client configuration,
 federation examples and troubleshooting, [docs/usage/agent-access.md](docs/usage/agent-access.md)

@@ -249,7 +249,8 @@ stateless apart from the source cache.
 `okf-wiki serve --mcp` mounts the same handler on the wiki's listener under the
 render base, at `<base>/_/mcp`, so one process and one port publish the pages
 and the agent surface. The mounted endpoint reads the local render and reloads
-before each tool call. Both HTTP shapes are read-only and unauthenticated.
+before each tool call. `--mcp-prefix ""` mounts it at `<base>/mcp` instead. Both
+HTTP shapes are read-only and unauthenticated.
 
 ## Multi-site and offline
 

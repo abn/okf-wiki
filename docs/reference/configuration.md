@@ -32,7 +32,8 @@ Resolution order is flag, then environment variable, then default.
 | `--open` | `OKF_WIKI_OPEN` | `false` | Open a browser (serve only) |
 | `--watch` | `OKF_WIKI_WATCH` | `false` | Re-render when the bundle or theme changes (serve only) |
 | `--watch-interval` | `OKF_WIKI_WATCH_INTERVAL` | `1s` | How often `--watch` polls for changes (serve only) |
-| `--mcp` | `OKF_WIKI_MCP` | `false` | Serve the read-only MCP endpoint at `<base>/_/mcp` (serve only) |
+| `--mcp` | `OKF_WIKI_MCP` | `false` | Serve the read-only MCP endpoint under the base (serve only) |
+| `--mcp-prefix` | `OKF_WIKI_MCP_PREFIX` | `_` | Segment before `mcp`; empty mounts at `<base>/mcp` (serve only) |
 
 `--multi-site` turns the content directory from one bundle into a tree of
 them. A directory holding an `index.md` is a wiki and is rendered at the path
@@ -99,10 +100,15 @@ interval is quieter on a large tree. The default of one second suits authoring.
 
 `--mcp` adds the read-only MCP endpoint to the wiki's listener at
 `<base>/_/mcp`, so one process and one port publish the pages and the agent
-surface. The `_/` segment is reserved for server endpoints, outside the page
-namespace. The endpoint has no authentication and no TLS, like the wiki beside
-it; it follows `--addr` and is loopback by default. See
-[MCP server](../usage/mcp.md).
+surface. With the default prefix, the `_/` segment is reserved for server
+endpoints, outside the page namespace. `--mcp-prefix ""` removes it, mounting
+the endpoint at `<base>/mcp`; a single segment of letters, digits, dot, dash or
+underscore such as `api` mounts it at `<base>/api/mcp`, and leading and trailing
+slashes around a segment are ignored. The endpoint path wins over a section at
+the same URL, so an empty prefix can shadow a section named `mcp`, and `api` can
+shadow `api/mcp`. The
+endpoint has no authentication and no TLS, like the wiki beside it; it follows
+`--addr` and is loopback by default. See [MCP server](../usage/mcp.md).
 
 ## Endpoints
 
@@ -114,7 +120,8 @@ it; it follows `--addr` and is loopback by default. See
   wiki's base.
 - `/wiki/_/mcp`: read-only MCP endpoint, when `--mcp` is set. It sits under
   `--base`, so a base of `/docs/` puts it at `/docs/_/mcp`, and a base of `/`
-  puts it at `/_/mcp`.
+  puts it at `/_/mcp`. With `--mcp-prefix ""` it is at `/wiki/mcp` (or the
+  equivalent under the base), and with `--mcp-prefix api` at `/wiki/api/mcp`.
 - `/repo/<path>`: read-only repository mount, when `--repo` is set. Dotfiles are
   refused.
 - `/healthz`: liveness probe.

@@ -283,13 +283,15 @@ func waitForHealth(t *testing.T, addr string) {
 }
 
 // The MCP endpoint is mounted inside the wiki base, and its exact route beats
-// the file server. The _/ segment keeps the endpoint out of the page namespace,
-// so a rendered page or asset named mcp cannot shadow it.
+// the file server. The default _/ segment keeps the endpoint out of the page
+// namespace; an empty prefix opts into sharing it.
 func TestServeMountsMCPUnderTheBase(t *testing.T) {
 	dir := t.TempDir()
 	mustMkdir(t, filepath.Join(dir, "wiki"))
+	mustMkdir(t, filepath.Join(dir, "wiki", "mcp"))
 	mustWrite(t, filepath.Join(dir, "wiki", "index.html"), "HOME")
 	mustWrite(t, filepath.Join(dir, "wiki", "mcp.html"), "A PAGE CALLED MCP")
+	mustWrite(t, filepath.Join(dir, "wiki", "mcp", "index.html"), "A SECTION CALLED MCP")
 
 	mcp := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -299,6 +301,9 @@ func TestServeMountsMCPUnderTheBase(t *testing.T) {
 		}
 		_, _ = w.Write([]byte("MCP"))
 	})
+	under := func(base string) ServeOptions {
+		return ServeOptions{OutDir: dir, Base: base, MCP: mcp, MCPPrefix: "_"}
+	}
 
 	tests := []struct {
 		name   string
@@ -308,14 +313,23 @@ func TestServeMountsMCPUnderTheBase(t *testing.T) {
 		code   int
 		body   string
 	}{
-		{"base with trailing slash", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp", http.StatusOK, "MCP"},
-		{"trailing slash on the endpoint", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp/", http.StatusOK, "MCP"},
-		{"base is the site root", ServeOptions{OutDir: dir, Base: "/", MCP: mcp}, "POST", "/_/mcp", http.StatusOK, "MCP"},
-		{"the endpoint stays POST only", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/_/mcp", http.StatusMethodNotAllowed, ""},
-		{"a page named mcp still renders", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/mcp.html", http.StatusOK, "A PAGE CALLED MCP"},
-		{"the wiki home still renders", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/", http.StatusOK, "HOME"},
-		{"a deeper path under the endpoint is not the endpoint", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp/extra", http.StatusNotFound, ""},
-		{"no endpoint without the handler", ServeOptions{OutDir: dir, Base: "/wiki/"}, "POST", "/wiki/_/mcp", http.StatusNotFound, ""},
+		{"base with trailing slash", under("/wiki/"), "POST", "/wiki/_/mcp", http.StatusOK, "MCP"},
+		{"trailing slash on the endpoint", under("/wiki/"), "POST", "/wiki/_/mcp/", http.StatusOK, "MCP"},
+		{"base is the site root", under("/"), "POST", "/_/mcp", http.StatusOK, "MCP"},
+		{"the endpoint stays POST only", under("/wiki/"), "GET", "/wiki/_/mcp", http.StatusMethodNotAllowed, ""},
+		{"a page named mcp still renders", under("/wiki/"), "GET", "/wiki/mcp.html", http.StatusOK, "A PAGE CALLED MCP"},
+		{"the wiki home still renders", under("/wiki/"), "GET", "/wiki/", http.StatusOK, "HOME"},
+		{"a deeper path under the endpoint is not the endpoint", under("/wiki/"), "POST", "/wiki/_/mcp/extra", http.StatusNotFound, ""},
+		{"no prefix mounts at the base", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/mcp", http.StatusOK, "MCP"},
+		{"no prefix at the site root", ServeOptions{OutDir: dir, Base: "/", MCP: mcp}, "POST", "/mcp", http.StatusOK, "MCP"},
+		{"no prefix takes the section URL", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/mcp/", http.StatusMethodNotAllowed, ""},
+		{"the shadowed section file still serves", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/mcp/index.html", http.StatusOK, "A SECTION CALLED MCP"},
+		{"no prefix accepts a trailing slash", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/mcp/", http.StatusOK, "MCP"},
+		{"a custom prefix", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp, MCPPrefix: "api"}, "POST", "/wiki/api/mcp", http.StatusOK, "MCP"},
+		{"a custom prefix moves the endpoint", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp, MCPPrefix: "api"}, "POST", "/wiki/_/mcp", http.StatusNotFound, ""},
+		{"a custom prefix at the site root", ServeOptions{OutDir: dir, Base: "/", MCP: mcp, MCPPrefix: "api"}, "POST", "/api/mcp", http.StatusOK, "MCP"},
+		{"surrounding slashes are ignored", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp, MCPPrefix: "/api/"}, "POST", "/wiki/api/mcp", http.StatusOK, "MCP"},
+		{"no endpoint without the handler", ServeOptions{OutDir: dir, Base: "/wiki/", MCPPrefix: "_"}, "POST", "/wiki/_/mcp", http.StatusNotFound, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -334,35 +348,90 @@ func TestServeMountsMCPUnderTheBase(t *testing.T) {
 	}
 }
 
-// The endpoint follows --base, and an empty base takes the default.
+// The endpoint follows --base, an empty prefix mounts directly under it, and an
+// empty base takes the default.
 func TestMCPPath(t *testing.T) {
 	tests := []struct {
-		base string
-		want string
+		base   string
+		prefix string
+		want   string
 	}{
-		{"/wiki/", "/wiki/_/mcp"},
-		{"/wiki", "/wiki/_/mcp"},
-		{"/", "/_/mcp"},
-		{"", "/wiki/_/mcp"},
-		{"/docs/deep/", "/docs/deep/_/mcp"},
+		{"/wiki/", "_", "/wiki/_/mcp"},
+		{"/wiki", "_", "/wiki/_/mcp"},
+		{"/", "_", "/_/mcp"},
+		{"", "_", "/wiki/_/mcp"},
+		{"/docs/deep/", "_", "/docs/deep/_/mcp"},
+		{"/wiki/", "", "/wiki/mcp"},
+		{"/", "", "/mcp"},
+		{"/wiki/", "api", "/wiki/api/mcp"},
+		{"/wiki/", "/api/", "/wiki/api/mcp"},
 	}
 	for _, tc := range tests {
-		if got := MCPPath(tc.base); got != tc.want {
-			t.Errorf("MCPPath(%q) = %q, want %q", tc.base, got, tc.want)
+		if got := MCPPath(tc.base, tc.prefix); got != tc.want {
+			t.Errorf("MCPPath(%q, %q) = %q, want %q", tc.base, tc.prefix, got, tc.want)
 		}
+	}
+}
+
+// The prefix is one plain path segment. Surrounding slashes are a convenience,
+// not part of the value, and separators or pattern syntax are refused before
+// they reach a route.
+func TestNormalizeMCPPrefix(t *testing.T) {
+	ok := map[string]string{
+		"_":    "_",
+		"/_":   "_",
+		"_/":   "_",
+		"/_/":  "_",
+		" api": "api",
+		"api":  "api",
+		"":     "",
+		"a-b":  "a-b",
+		"a.b":  "a.b",
+		"1":    "1",
+	}
+	for in, want := range ok {
+		got, err := NormalizeMCPPrefix(in)
+		if err != nil || got != want {
+			t.Errorf("NormalizeMCPPrefix(%q) = %q, %v; want %q, nil", in, got, err, want)
+		}
+	}
+	for _, in := range []string{" ", "/", " / ", "a/b", "..", ".", "a b", "{x}", "a?b", "a#b", "é", "a+b"} {
+		if got, err := NormalizeMCPPrefix(in); err == nil {
+			t.Errorf("NormalizeMCPPrefix(%q) = %q, nil; want an error", in, got)
+		}
+	}
+}
+
+// Serve refuses an invalid prefix before it binds a listener, so a bad flag
+// cannot panic the route table.
+func TestServeRejectsAnInvalidMCPPrefix(t *testing.T) {
+	err := Serve(ServeOptions{
+		OutDir:    t.TempDir(),
+		Base:      "/wiki/",
+		Addr:      "127.0.0.1:0",
+		MCP:       http.NotFoundHandler(),
+		MCPPrefix: "a/b",
+	})
+	if err == nil || !strings.Contains(err.Error(), "mcp-prefix") {
+		t.Errorf("Serve with a bad prefix = %v, want a prefix error", err)
 	}
 }
 
 // An MCP-enabled server names the endpoint, because it is not a path a reader
 // would guess and a client has to be configured with it.
 func TestAnnounceNamesTheMCPEndpoint(t *testing.T) {
-	opts := ServeOptions{OutDir: "/tmp/out", Base: "/wiki/", MCP: http.NotFoundHandler()}
+	opts := ServeOptions{OutDir: "/tmp/out", Base: "/wiki/", MCP: http.NotFoundHandler(), MCPPrefix: "_"}
 	got := announce(opts, "127.0.0.1:8080", "127.0.0.1:8080")
 	if !strings.Contains(got, "http://127.0.0.1:8080/wiki/_/mcp") {
 		t.Errorf("banner does not name the MCP endpoint: %q", got)
 	}
 	if !strings.Contains(got, "press Ctrl-C") {
 		t.Errorf("banner lost its closing line: %q", got)
+	}
+
+	opts.MCPPrefix = ""
+	if got := announce(opts, "127.0.0.1:8080", "127.0.0.1:8080"); !strings.Contains(got, "http://127.0.0.1:8080/wiki/mcp") {
+		t.Errorf("banner does not follow an empty prefix: %q", got)
 	}
 }
 

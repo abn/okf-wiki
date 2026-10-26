@@ -46,19 +46,50 @@ func loopback(addr string) bool {
 
 // ServeOptions configures the wiki server.
 type ServeOptions struct {
-	OutDir   string       // rendered site root (contains wiki/)
-	Base     string       // URL prefix the wiki is mounted at (default "/wiki/")
-	RepoRoot string       // repository root, exposed read-only at /repo/ (optional)
-	Addr     string       // host:port, defaults to DefaultAddr
-	Open     bool         // open the default browser on startup
-	MCP      http.Handler // read-only MCP endpoint mounted under the base (optional)
+	OutDir    string       // rendered site root (contains wiki/)
+	Base      string       // URL prefix the wiki is mounted at (default "/wiki/")
+	RepoRoot  string       // repository root, exposed read-only at /repo/ (optional)
+	Addr      string       // host:port, defaults to DefaultAddr
+	Open      bool         // open the default browser on startup
+	MCP       http.Handler // read-only MCP endpoint mounted under the base (optional)
+	MCPPrefix string       // segment before mcp; empty mounts at <base>/mcp
 }
 
-// MCPPath is the URL path the MCP endpoint is served at for a given base. The
-// leading _/ segment keeps the endpoint clear of the page namespace, where a
-// generated page or asset could otherwise take its name.
-func MCPPath(base string) string {
-	return Config{Base: base}.base() + "_/mcp"
+// MCPPath is the URL path the MCP endpoint is served at: the base, the optional
+// prefix segment, then mcp. An empty prefix places it directly under the base,
+// in the page namespace.
+func MCPPath(base, prefix string) string {
+	prefix = strings.Trim(strings.TrimSpace(prefix), "/")
+	if prefix != "" {
+		prefix += "/"
+	}
+	return Config{Base: base}.base() + prefix + "mcp"
+}
+
+// NormalizeMCPPrefix accepts the segment between the base and mcp. Surrounding
+// slashes are trimmed so "_", "/_" and "_/" are the same, and an empty value
+// means no segment. Anything that is not one plain path segment is refused,
+// because the value is concatenated into a route pattern.
+func NormalizeMCPPrefix(prefix string) (string, error) {
+	trimmed := strings.TrimSpace(prefix)
+	p := strings.Trim(trimmed, "/")
+	if p == "" {
+		if prefix == "" {
+			return "", nil
+		}
+		return "", fmt.Errorf("--mcp-prefix %q is empty after trimming; use \"\" for no prefix", prefix)
+	}
+	for _, r := range p {
+		plain := r == '-' || r == '_' || r == '.' ||
+			(r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if !plain {
+			return "", fmt.Errorf("--mcp-prefix %q must be one path segment of letters, digits, dot, dash or underscore", prefix)
+		}
+	}
+	if p == "." || p == ".." {
+		return "", fmt.Errorf("--mcp-prefix %q must be one path segment of letters, digits, dot, dash or underscore", prefix)
+	}
+	return p, nil
 }
 
 // handler builds the route table. It is separate from Serve so the routes can
@@ -72,7 +103,7 @@ func handler(opts ServeOptions) http.Handler {
 	if opts.MCP != nil {
 		// An exact pattern beats the base subtree, and {$} accepts the
 		// trailing slash a client may add without opening the whole subtree.
-		path := MCPPath(opts.Base)
+		path := MCPPath(opts.Base, opts.MCPPrefix)
 		mux.Handle(path, opts.MCP)
 		mux.Handle(path+"/{$}", opts.MCP)
 	}
@@ -106,6 +137,13 @@ func Serve(opts ServeOptions) error {
 	addr := opts.Addr
 	if addr == "" {
 		addr = DefaultAddr
+	}
+	if opts.MCP != nil {
+		prefix, err := NormalizeMCPPrefix(opts.MCPPrefix)
+		if err != nil {
+			return err
+		}
+		opts.MCPPrefix = prefix
 	}
 	mux := handler(opts)
 
@@ -619,7 +657,7 @@ func announce(opts ServeOptions, addr, display string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "okf-wiki: serving %s at %s\n", opts.OutDir, wikiURL(opts, display))
 	if opts.MCP != nil {
-		fmt.Fprintf(&b, "okf-wiki: MCP at http://%s%s\n", display, MCPPath(opts.Base))
+		fmt.Fprintf(&b, "okf-wiki: MCP at http://%s%s\n", display, MCPPath(opts.Base, opts.MCPPrefix))
 	}
 	if !loopback(addr) {
 		reachable := "this wiki and any /repo/ mount"

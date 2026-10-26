@@ -105,8 +105,10 @@ flags (serve adds):
   --open           open a browser (default false; off in containers)
   --watch          re-render when the bundle or theme changes
   --watch-interval DURATION  how often --watch polls for changes (default 1s)
-  --mcp            also serve the read-only MCP endpoint at <base>/_/mcp
+  --mcp            also serve the read-only MCP endpoint under the base
                    (default false; no authentication)
+  --mcp-prefix STR path segment between the base and mcp; "" mounts at
+                   <base>/mcp (default "_")
 
 serve drains in-flight requests on SIGINT or SIGTERM before exiting, which is
 what a container stop sends. A request part way through a body is finished
@@ -117,7 +119,7 @@ environment: OKF_WIKI_CONTENT, OKF_WIKI_OUT, OKF_WIKI_BASE,
   OKF_WIKI_BRAND, OKF_WIKI_BRAND_SUB, OKF_WIKI_VERSION_TAG, OKF_WIKI_TITLE,
   OKF_WIKI_SECTIONS, OKF_WIKI_NAV_LINKS,
   OKF_WIKI_ADDR, OKF_WIKI_OPEN, OKF_WIKI_WATCH, OKF_WIKI_WATCH_INTERVAL,
-  OKF_WIKI_MULTI_SITE, OKF_WIKI_BUNDLE, OKF_WIKI_MCP
+  OKF_WIKI_MULTI_SITE, OKF_WIKI_BUNDLE, OKF_WIKI_MCP, OKF_WIKI_MCP_PREFIX
 `)
 }
 
@@ -138,9 +140,14 @@ func runServe(args []string) {
 	open := fs.Bool("open", envBool("OKF_WIKI_OPEN", false), "open a browser")
 	watch := fs.Bool("watch", envBool("OKF_WIKI_WATCH", false), "re-render when the bundle or theme changes")
 	watchInterval := fs.Duration("watch-interval", envDuration("OKF_WIKI_WATCH_INTERVAL", time.Second), "how often to poll for changes with --watch")
-	mcp := fs.Bool("mcp", envBool("OKF_WIKI_MCP", false), "serve the read-only MCP endpoint at <base>/_/mcp")
+	mcp := fs.Bool("mcp", envBool("OKF_WIKI_MCP", false), "serve the read-only MCP endpoint under the base")
+	mcpPrefix := fs.String("mcp-prefix", envAllowEmpty("OKF_WIKI_MCP_PREFIX", "_"), "path segment before mcp; empty mounts at <base>/mcp")
 	fs.Parse(reorderArgs(args, fs))
 	applyPositional(fs, cfg)
+	prefix, err := wiki.NormalizeMCPPrefix(*mcpPrefix)
+	if err != nil {
+		fatal(err)
+	}
 	if err := doRender(cfg); err != nil {
 		fatal(err)
 	}
@@ -166,11 +173,12 @@ func runServe(args []string) {
 		}
 	}
 	opts := wiki.ServeOptions{
-		OutDir:   cfg.Out,
-		Base:     cfg.Base,
-		RepoRoot: absRepo,
-		Addr:     *addr,
-		Open:     *open,
+		OutDir:    cfg.Out,
+		Base:      cfg.Base,
+		RepoRoot:  absRepo,
+		Addr:      *addr,
+		Open:      *open,
+		MCPPrefix: prefix,
 	}
 	if *mcp {
 		s, err := newLocalMCPServer(cfg.Out, cfg.Base)
@@ -311,6 +319,15 @@ func applyPositional(fs *flag.FlagSet, cfg *wiki.Config) {
 
 func env(key, def string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return def
+}
+
+// envAllowEmpty is env without the non-empty rule: here a variable set to ""
+// is a value, because an empty MCP prefix is a real choice.
+func envAllowEmpty(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
 	return def
