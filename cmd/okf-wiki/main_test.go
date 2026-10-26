@@ -201,6 +201,33 @@ func TestEnvDuration(t *testing.T) {
 	}
 }
 
+// envAllowEmpty is the one environment read where an empty value is data: an
+// empty MCP prefix means "no segment", so it must not fall back to the default.
+func TestEnvAllowEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		set  bool
+		val  string
+		want string
+	}{
+		{name: "unset uses the default", set: false, want: "_"},
+		{name: "empty is a value", set: true, val: "", want: ""},
+		{name: "a value is taken", set: true, val: "api", want: "api"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.set {
+				t.Setenv("OKF_WIKI_MCP_PREFIX", tc.val)
+			} else {
+				os.Unsetenv("OKF_WIKI_MCP_PREFIX")
+			}
+			if got := envAllowEmpty("OKF_WIKI_MCP_PREFIX", "_"); got != tc.want {
+				t.Errorf("envAllowEmpty = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // --lang is bound in bindCommon with the other flags, so its default, its
 // environment variable and its precedence over that variable are the CLI's
 // contract. The rendered page carries the value, which the wiki package's own

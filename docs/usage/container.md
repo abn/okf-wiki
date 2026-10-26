@@ -41,9 +41,10 @@ output.
 
 Add `-e OKF_WIKI_MCP=true` to serve the read-only MCP endpoint from the same
 port, at `http://127.0.0.1:8080/wiki/_/mcp`. Point an MCP client at that URL; no
-second container port and no proxy route are needed. Like the wiki, it has no
-authentication, so the image's `0.0.0.0` bind publishes it wherever the port is
-published. See [MCP server](mcp.md).
+second container port and no proxy route are needed. Add
+`-e OKF_WIKI_MCP_PREFIX=""` to mount it at `/wiki/mcp` instead. Like the wiki,
+it has no authentication, so the image's `0.0.0.0` bind publishes it wherever
+the port is published. See [MCP server](mcp.md).
 
 ## Mounting a theme
 

@@ -27,4 +27,6 @@ services:
       # OKF_WIKI_BUNDLE: "true"
       # Serve the read-only MCP endpoint at /wiki/_/mcp on the same port.
       # OKF_WIKI_MCP: "true"
+      # Mount it at /wiki/mcp instead of /wiki/_/mcp.
+      # OKF_WIKI_MCP_PREFIX: ""
       # OKF_WIKI_THEME: /theme

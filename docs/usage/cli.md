@@ -107,15 +107,22 @@ file.
 ```bash
 okf-wiki serve --content ./docs --mcp
 # MCP endpoint: http://127.0.0.1:8080/wiki/_/mcp
+
+# skip the _ segment and mount at /wiki/mcp
+okf-wiki serve --content ./docs --mcp --mcp-prefix ""
 ```
 
 The `_/` segment keeps the endpoint outside the page namespace, so a page or an
 asset named `mcp` cannot shadow it, and one proxy rule for the base publishes
-both the wiki and the endpoint. While it is on, `<base>/_/` is reserved for
-server endpoints. It reads the render `serve` just produced, and reloads before
-each tool call, so it follows `--watch`. Like the wiki, it has no authentication
-and binds loopback by default. `OKF_WIKI_MCP=true` is the container equivalent.
-See [MCP server](mcp.md).
+both the wiki and the endpoint. With the default prefix, `<base>/_/` is
+reserved for server endpoints. Set `--mcp-prefix ""` to mount at `<base>/mcp`
+instead, or name a single segment of letters, digits, dot, dash or underscore,
+such as `api`, for `<base>/api/mcp`. The endpoint path wins over a section at
+the same URL, so a prefix can shadow a section directory of that name. It reads
+the render `serve` just produced, and reloads before each tool call, so it
+follows `--watch`. Like the wiki, it has no authentication and binds loopback by
+default. `OKF_WIKI_MCP=true` is the container equivalent. See
+[MCP server](mcp.md).
 
 ## Multi-site trees
 
