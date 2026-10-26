@@ -46,11 +46,19 @@ func loopback(addr string) bool {
 
 // ServeOptions configures the wiki server.
 type ServeOptions struct {
-	OutDir   string // rendered site root (contains wiki/)
-	Base     string // URL prefix the wiki is mounted at (default "/wiki/")
-	RepoRoot string // repository root, exposed read-only at /repo/ (optional)
-	Addr     string // host:port, defaults to DefaultAddr
-	Open     bool   // open the default browser on startup
+	OutDir   string       // rendered site root (contains wiki/)
+	Base     string       // URL prefix the wiki is mounted at (default "/wiki/")
+	RepoRoot string       // repository root, exposed read-only at /repo/ (optional)
+	Addr     string       // host:port, defaults to DefaultAddr
+	Open     bool         // open the default browser on startup
+	MCP      http.Handler // read-only MCP endpoint mounted under the base (optional)
+}
+
+// MCPPath is the URL path the MCP endpoint is served at for a given base. The
+// leading _/ segment keeps the endpoint clear of the page namespace, where a
+// generated page or asset could otherwise take its name.
+func MCPPath(base string) string {
+	return Config{Base: base}.base() + "_/mcp"
 }
 
 // handler builds the route table. It is separate from Serve so the routes can
@@ -61,6 +69,13 @@ func handler(opts ServeOptions) http.Handler {
 	mux := http.NewServeMux()
 	site := noCache(gzipResponses(etag(opts.OutDir)(indexDirect(http.FileServer(http.Dir(opts.OutDir)), opts.OutDir))))
 	mux.Handle(base, site)
+	if opts.MCP != nil {
+		// An exact pattern beats the base subtree, and {$} accepts the
+		// trailing slash a client may add without opening the whole subtree.
+		path := MCPPath(opts.Base)
+		mux.Handle(path, opts.MCP)
+		mux.Handle(path+"/{$}", opts.MCP)
+	}
 	// A base of "/" is the whole site, so there is no prefix to redirect and
 	// nothing left for a catch-all: TrimSuffix would give "", which ServeMux
 	// rejects as a pattern, and "/" is already taken by the site above.
@@ -603,9 +618,16 @@ func wikiURL(opts ServeOptions, display string) string {
 func announce(opts ServeOptions, addr, display string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "okf-wiki: serving %s at %s\n", opts.OutDir, wikiURL(opts, display))
+	if opts.MCP != nil {
+		fmt.Fprintf(&b, "okf-wiki: MCP at http://%s%s\n", display, MCPPath(opts.Base))
+	}
 	if !loopback(addr) {
-		fmt.Fprintf(&b, "okf-wiki: %s is not loopback, so this wiki and any /repo/ "+
-			"mount are reachable from other machines; it has no authentication\n", addr)
+		reachable := "this wiki and any /repo/ mount"
+		if opts.MCP != nil {
+			reachable = "this wiki, any /repo/ mount and the MCP endpoint"
+		}
+		fmt.Fprintf(&b, "okf-wiki: %s is not loopback, so %s are reachable from "+
+			"other machines; it has no authentication\n", addr, reachable)
 	}
 	b.WriteString("okf-wiki: press Ctrl-C to stop\n")
 	return b.String()

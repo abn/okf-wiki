@@ -36,6 +36,26 @@ type rpcRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
+type rpcInitializeParams struct {
+	ProtocolVersion string `json:"protocolVersion"`
+}
+
+// mcpProtocols are the protocol versions this server answers, newest first.
+// The tool surface is the same across them; the version only decides which
+// revision of the surrounding rules a client applies.
+var mcpProtocols = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
+
+// negotiateProtocol echoes a version the client asked for when this server
+// knows it, and otherwise answers with the newest one it supports.
+func negotiateProtocol(requested string) string {
+	for _, v := range mcpProtocols {
+		if requested == v {
+			return v
+		}
+	}
+	return mcpProtocols[0]
+}
+
 type rpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -88,6 +108,16 @@ func newMCPServer(specs []mcpSource, ttl time.Duration) (*mcpServer, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// newLocalMCPServer builds the MCP server for one rendered output. serve uses
+// it to mount the endpoint on the wiki listener rather than a second port.
+func newLocalMCPServer(out, base string) (*mcpServer, error) {
+	specs, ttl, err := buildMCPSources(out, base, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return newMCPServer(specs, ttl)
 }
 
 // refresh reloads the rendered files before each tool call. A long-running
@@ -148,7 +178,7 @@ func (s *mcpServer) loadSources() error {
 func (s *mcpServer) serveHTTP(addr string) error {
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           s.httpHandler(),
+		Handler:           s.standaloneHandler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       20 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -157,14 +187,27 @@ func (s *mcpServer) serveHTTP(addr string) error {
 	return server.ListenAndServe()
 }
 
-func (s *mcpServer) httpHandler() http.Handler {
+// standaloneHandler is the route table of `mcp --http`: one endpoint at /mcp.
+// It is separate from serveHTTP so the mount can be exercised without a port.
+func (s *mcpServer) standaloneHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/mcp", func(w http.ResponseWriter, req *http.Request) {
+	mux.Handle("/mcp", s.httpHandler())
+	mux.Handle("/mcp/{$}", s.httpHandler())
+	return mux
+}
+
+// httpHandler is the endpoint itself. It is path-agnostic so the standalone
+// server can mount it at /mcp and serve can mount it under the wiki base.
+func (s *mcpServer) httpHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		// The wiki listener has no read timeout, so a body drip could otherwise
+		// hold this handler open. Size is bounded separately by MaxBytesReader.
+		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(20 * time.Second))
 		if ct := req.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
 			http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -184,7 +227,6 @@ func (s *mcpServer) httpHandler() http.Handler {
 			return
 		}
 	})
-	return mux
 }
 
 // serve reads one JSON-RPC message per line, as the MCP stdio transport does,
@@ -228,9 +270,9 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 	}
 	switch req.Method {
 	case "initialize":
-		// The server implements the core tool surface, which is compatible with
-		// this protocol version. It does not echo an unknown requested version.
-		protocol := "2024-11-05"
+		var params rpcInitializeParams
+		_ = json.Unmarshal(req.Params, &params)
+		protocol := negotiateProtocol(params.ProtocolVersion)
 		return &rpcResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,

@@ -246,6 +246,11 @@ private deployments use their existing proxy, Tailscale or OIDC boundary.
 `/mcp`. TLS and authentication belong at the edge. The HTTP listener is
 stateless apart from the source cache.
 
+`okf-wiki serve --mcp` mounts the same handler on the wiki's listener under the
+render base, at `<base>/_/mcp`, so one process and one port publish the pages
+and the agent surface. The mounted endpoint reads the local render and reloads
+before each tool call. Both HTTP shapes are read-only and unauthenticated.
+
 ## Multi-site and offline
 
 In a tree the aggregate `pages.json` has namespaced IDs such as

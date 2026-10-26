@@ -28,10 +28,7 @@ func testMCPServer(t *testing.T) *mcpServer {
 		t.Fatal(err)
 	}
 	siteDir := filepath.Join(out, "wiki")
-	read := func(name string) ([]byte, error) {
-		return os.ReadFile(filepath.Join(siteDir, name))
-	}
-	s, err := newMCPServer([]mcpSource{{name: "local", base: "/wiki/", basePath: "/wiki/", read: read}}, 0)
+	s, err := newLocalMCPServer(out, "/wiki/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,27 +234,68 @@ func TestMCPMalformedOptionalState(t *testing.T) {
 	}
 }
 
+// A client gets the protocol version it asked for when the server knows it, and
+// the newest supported one otherwise. The tool surface does not change, but the
+// answer decides which transport rules the client applies.
+func TestMCPProtocolNegotiation(t *testing.T) {
+	s := testMCPServer(t)
+	tests := []struct {
+		requested string
+		want      string
+	}{
+		{"2025-06-18", "2025-06-18"},
+		{"2025-03-26", "2025-03-26"},
+		{"2024-11-05", "2024-11-05"},
+		{"1999-01-01", mcpProtocols[0]},
+		{"", mcpProtocols[0]},
+	}
+	for _, tc := range tests {
+		line := []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"` + tc.requested + `"}}`)
+		resp := s.handle(line)
+		if resp == nil || resp.Error != nil {
+			t.Fatalf("initialize(%q) = %+v", tc.requested, resp)
+		}
+		got := resp.Result.(map[string]any)["protocolVersion"]
+		if got != tc.want {
+			t.Errorf("initialize(%q) protocol = %v, want %q", tc.requested, got, tc.want)
+		}
+	}
+}
+
 // TestMCPHTTPHandler covers the transport wrapper around the same JSON-RPC
-// handler used by stdio.
+// handler used by stdio. The handler is path-agnostic so serve can mount it
+// under the wiki base; this test pins the standalone mount at /mcp.
 func TestMCPHTTPHandler(t *testing.T) {
 	s := testMCPServer(t)
-	server := httptest.NewServer(s.httpHandler())
+	server := httptest.NewServer(s.standaloneHandler())
 	defer server.Close()
-	body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
-	resp, err := http.Post(server.URL+"/mcp", "application/json", body)
+	for _, path := range []string{"/mcp", "/mcp/"} {
+		body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+		resp, err := http.Post(server.URL+path, "application/json", body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			t.Fatalf("POST %s status = %d", path, resp.StatusCode)
+		}
+		var envelope rpcResponse
+		err = json.NewDecoder(resp.Body).Decode(&envelope)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Result == nil {
+			t.Errorf("POST %s response = %+v", path, envelope)
+		}
+	}
+	resp, err := http.Post(server.URL+"/other", "application/json", strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-	var envelope rpcResponse
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		t.Fatal(err)
-	}
-	if envelope.Result == nil {
-		t.Errorf("response = %+v", envelope)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("POST /other status = %d, want 404", resp.StatusCode)
 	}
 	resp, err = http.Get(server.URL + "/mcp")
 	if err != nil {

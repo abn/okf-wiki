@@ -17,6 +17,9 @@ okf-wiki render --content ./docs --out ./public --bundle
 # render then serve until interrupted
 okf-wiki serve --content ./docs --out .scratch/wiki --addr 127.0.0.1:8080 --open
 
+# the same server, also exposing the read-only MCP endpoint at /wiki/_/mcp
+okf-wiki serve --content ./docs --out .scratch/wiki --mcp
+
 # search a rendered site
 okf-wiki search "graph" --out .scratch/wiki --base /wiki/ --json
 
@@ -95,6 +98,24 @@ second. See [`reference/configuration.md`](../reference/configuration.md).
 The render is swapped into place rather than written over the output, so a page
 loaded while a change re-renders never sees a half-written site or a missing
 file.
+
+## MCP beside the wiki
+
+`serve --mcp` mounts the read-only MCP server on the wiki's own listener, at
+`<base>/_/mcp`:
+
+```bash
+okf-wiki serve --content ./docs --mcp
+# MCP endpoint: http://127.0.0.1:8080/wiki/_/mcp
+```
+
+The `_/` segment keeps the endpoint outside the page namespace, so a page or an
+asset named `mcp` cannot shadow it, and one proxy rule for the base publishes
+both the wiki and the endpoint. While it is on, `<base>/_/` is reserved for
+server endpoints. It reads the render `serve` just produced, and reloads before
+each tool call, so it follows `--watch`. Like the wiki, it has no authentication
+and binds loopback by default. `OKF_WIKI_MCP=true` is the container equivalent.
+See [MCP server](mcp.md).
 
 ## Multi-site trees
 
@@ -193,9 +214,10 @@ holds in your checkout, which may be ahead of or behind what is published.
 
 `search` reads a rendered site rather than the source bundle. `mcp` reads either
 a rendered output or one or more published wiki base URLs, so it can act as a
-standalone federator. See [MCP server](mcp.md) for local, remote and federated
-examples, and [the reference](../reference/agent-access.md) for the result
-contract and tool schemas.
+standalone federator, while `serve --mcp` reads the render it just produced on
+the wiki's own listener. See [MCP server](mcp.md) for local, remote, federated
+and alongside-serve examples, and [the reference](../reference/agent-access.md)
+for the result contract and tool schemas.
 
 `--out` receives `index.html`, a redirect to the wiki, and the wiki itself at
 the base path: `out/wiki/` by default, and `out/docs/deep/` for

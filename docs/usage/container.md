@@ -39,6 +39,12 @@ Add `-e OKF_WIKI_BUNDLE=true` to offer the whole source bundle as a download. It
 is off by default, because the archive is a second copy of the content in the
 output.
 
+Add `-e OKF_WIKI_MCP=true` to serve the read-only MCP endpoint from the same
+port, at `http://127.0.0.1:8080/wiki/_/mcp`. Point an MCP client at that URL; no
+second container port and no proxy route are needed. Like the wiki, it has no
+authentication, so the image's `0.0.0.0` bind publishes it wherever the port is
+published. See [MCP server](mcp.md).
+
 ## Mounting a theme
 
 A theme is a read-only bind mount and one environment variable. No rebuild, and

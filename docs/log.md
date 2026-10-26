@@ -5,6 +5,17 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-26
 
+* **Feature**: `serve --mcp` mounts the read-only MCP server on the wiki's own
+  listener, at `<base>/_/mcp` (`/wiki/_/mcp` by default), so one process and one
+  port publish the pages and the agent surface. It uses the local render and
+  reloads before each tool call, so it follows `--watch`. The `_/` segment keeps
+  the endpoint outside the page namespace. `OKF_WIKI_MCP=true` is the container
+  equivalent, and the startup banner names the URL. The standalone
+  `okf-wiki mcp --http` remains for federation and a separate network boundary.
+  `usage/mcp.md`, `usage/cli.md`, `usage/container.md`,
+  `reference/configuration.md`, `reference/agent-access.md`, `compose.yaml` and
+  `README.md` record it.
+
 * **Fix**: Heading permalinks cover subheadings. Every level from two to six
   grows the `#` link on hover, not only the level-two sections, and every level
   takes the scroll margin that lands a deep-link jump below the sticky bars.
