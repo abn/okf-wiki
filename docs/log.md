@@ -5,6 +5,17 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-26
 
+* **Feature**: Every wiki of a multi-site tree writes its own `llms.txt`,
+  `pages.json`, `changes.json` and `health.json` at its base, so a client can be
+  pointed at one wiki and read its pages without loading the tree. The tree base
+  keeps the aggregate `pages.json` and its `llms.txt` becomes a router: one line
+  per wiki with a page count and a link to that wiki's file, a few kilobytes
+  where the whole-tree listing grew with every page. A per-wiki `changes.json`
+  diffs against that wiki's previous render, and a per-wiki `health.json` names
+  its own pages. A reserved filename in any wiki's bundle now fails the tree
+  render, not only a file at the root, and the message names the directory.
+  `reference/agent-access.md`,
+  `usage/agent-access.md`, `usage/multi-site.md` and `usage/mcp.md` record it.
 * **Feature**: `serve --mcp` mounts the read-only MCP server on the wiki's own
   listener, at `<base>/_/mcp` (`/wiki/_/mcp` by default), so one process and one
   port publish the pages and the agent surface. It uses the local render and
