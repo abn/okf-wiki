@@ -25,4 +25,6 @@ services:
       OKF_WIKI_TITLE: Wiki
       # Offer the whole source bundle as okf-bundle.zip. Off unless asked for.
       # OKF_WIKI_BUNDLE: "true"
+      # Serve the read-only MCP endpoint at /wiki/_/mcp on the same port.
+      # OKF_WIKI_MCP: "true"
       # OKF_WIKI_THEME: /theme

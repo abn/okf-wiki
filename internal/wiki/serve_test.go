@@ -282,8 +282,101 @@ func waitForHealth(t *testing.T, addr string) {
 	t.Fatal("the server did not become healthy")
 }
 
+// The MCP endpoint is mounted inside the wiki base, and its exact route beats
+// the file server. The _/ segment keeps the endpoint out of the page namespace,
+// so a rendered page or asset named mcp cannot shadow it.
+func TestServeMountsMCPUnderTheBase(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "wiki"))
+	mustWrite(t, filepath.Join(dir, "wiki", "index.html"), "HOME")
+	mustWrite(t, filepath.Join(dir, "wiki", "mcp.html"), "A PAGE CALLED MCP")
+
+	mcp := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		_, _ = w.Write([]byte("MCP"))
+	})
+
+	tests := []struct {
+		name   string
+		opts   ServeOptions
+		method string
+		path   string
+		code   int
+		body   string
+	}{
+		{"base with trailing slash", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp", http.StatusOK, "MCP"},
+		{"trailing slash on the endpoint", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp/", http.StatusOK, "MCP"},
+		{"base is the site root", ServeOptions{OutDir: dir, Base: "/", MCP: mcp}, "POST", "/_/mcp", http.StatusOK, "MCP"},
+		{"the endpoint stays POST only", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/_/mcp", http.StatusMethodNotAllowed, ""},
+		{"a page named mcp still renders", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/mcp.html", http.StatusOK, "A PAGE CALLED MCP"},
+		{"the wiki home still renders", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "GET", "/wiki/", http.StatusOK, "HOME"},
+		{"a deeper path under the endpoint is not the endpoint", ServeOptions{OutDir: dir, Base: "/wiki/", MCP: mcp}, "POST", "/wiki/_/mcp/extra", http.StatusNotFound, ""},
+		{"no endpoint without the handler", ServeOptions{OutDir: dir, Base: "/wiki/"}, "POST", "/wiki/_/mcp", http.StatusNotFound, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			w := httptest.NewRecorder()
+			handler(tc.opts).ServeHTTP(w, req)
+			if w.Code != tc.code {
+				t.Fatalf("%s %s = %d, want %d", tc.method, tc.path, w.Code, tc.code)
+			}
+			if tc.body != "" {
+				if got := w.Body.String(); got != tc.body {
+					t.Errorf("%s %s body = %q, want %q", tc.method, tc.path, got, tc.body)
+				}
+			}
+		})
+	}
+}
+
+// The endpoint follows --base, and an empty base takes the default.
+func TestMCPPath(t *testing.T) {
+	tests := []struct {
+		base string
+		want string
+	}{
+		{"/wiki/", "/wiki/_/mcp"},
+		{"/wiki", "/wiki/_/mcp"},
+		{"/", "/_/mcp"},
+		{"", "/wiki/_/mcp"},
+		{"/docs/deep/", "/docs/deep/_/mcp"},
+	}
+	for _, tc := range tests {
+		if got := MCPPath(tc.base); got != tc.want {
+			t.Errorf("MCPPath(%q) = %q, want %q", tc.base, got, tc.want)
+		}
+	}
+}
+
+// An MCP-enabled server names the endpoint, because it is not a path a reader
+// would guess and a client has to be configured with it.
+func TestAnnounceNamesTheMCPEndpoint(t *testing.T) {
+	opts := ServeOptions{OutDir: "/tmp/out", Base: "/wiki/", MCP: http.NotFoundHandler()}
+	got := announce(opts, "127.0.0.1:8080", "127.0.0.1:8080")
+	if !strings.Contains(got, "http://127.0.0.1:8080/wiki/_/mcp") {
+		t.Errorf("banner does not name the MCP endpoint: %q", got)
+	}
+	if !strings.Contains(got, "press Ctrl-C") {
+		t.Errorf("banner lost its closing line: %q", got)
+	}
+}
+
+// A non-loopback bind exposes the MCP endpoint too, so the warning says so.
+func TestAnnounceWarnsThatMCPIsExposed(t *testing.T) {
+	opts := ServeOptions{OutDir: "/tmp/out", Base: "/wiki/", MCP: http.NotFoundHandler()}
+	got := announce(opts, "0.0.0.0:8080", "localhost:8080")
+	if !strings.Contains(got, "MCP endpoint") || !strings.Contains(got, "no authentication") {
+		t.Errorf("warning does not cover the MCP endpoint: %q", got)
+	}
+}
+
 // The default bind is loopback. A wiki has no authentication, so the default
-// must not put the bundle and any /repo/ mount on the network.
+// must not put the bundle, any /repo/ mount or an MCP endpoint on the network.
 func TestServeDefaultAddrIsLoopback(t *testing.T) {
 	if got := DefaultAddr; !loopback(got) {
 		t.Errorf("DefaultAddr = %q, want a loopback address", got)

@@ -1,16 +1,61 @@
 ---
 type: Guide
 title: MCP server
-description: Run the read-only MCP server locally or as a federator over published wiki base URLs, with stdio, HTTP, bearer and federation examples.
+description: Run the read-only MCP server on the wiki's own listener, or standalone over stdio or HTTP, with bearer and federation examples.
 tags: [usage, mcp, agents]
 ---
 
 # MCP server
 
-`okf-wiki mcp` is a standalone, read-only MCP server. It reads the published
-agent surface described in the [agent access guide](agent-access.md), not the
-content directory. It can run beside `serve`, in a container, or anywhere that
-can reach a published wiki.
+okf-wiki exposes a read-only MCP server in two shapes. `okf-wiki serve --mcp`
+adds the endpoint to the wiki's own listener, which is the one-port setup for a
+local wiki and for anything behind a reverse proxy. `okf-wiki mcp` is the
+standalone command: it reads the published agent surface described in the
+[agent access guide](agent-access.md), not the content directory, and can run
+over stdio or its own HTTP port, locally or as a federator over published wikis.
+
+Both shapes expose the same tools and the same result contract.
+
+## Alongside the wiki
+
+Add `--mcp` to `serve`:
+
+```bash
+okf-wiki serve --content ./docs --mcp
+```
+
+The endpoint is `http://127.0.0.1:8080/wiki/_/mcp`, under the render `--base`.
+It shares the wiki's listener, its shutdown path and its render output, so
+there is no second port to publish and no second process to supervise.
+
+The `_/` segment is deliberate. The endpoint lives under the base, beside the
+wiki, but outside the page namespace, so an ordinary page, section or theme
+asset named `mcp` cannot shadow it. While `--mcp` is on, `<base>/_/` is reserved
+for server endpoints, not content. With the default base the URL is
+`/wiki/_/mcp`; `--base /docs/` gives `/docs/_/mcp`, and `--base /` gives
+`/_/mcp`.
+
+Point a client at that URL:
+
+```json
+{
+  "mcpServers": {
+    "okf-wiki": {
+      "url": "http://127.0.0.1:8080/wiki/_/mcp"
+    }
+  }
+}
+```
+
+The source is the local render. It reloads before each tool call, so a
+re-render appears without restarting the server, including a re-render from
+`serve --watch`. A read that fails keeps the last good snapshot and retries
+after 30 seconds rather than failing the call.
+
+The endpoint has no authentication and no TLS, like the wiki beside it. It binds
+loopback by default, and the startup banner names the URL. Publishing it means
+choosing `--addr` and putting the wiki behind a proxy at the edge. In the
+container, `OKF_WIKI_MCP=true` is the same as the flag.
 
 ## Quick start: a local render
 
@@ -118,12 +163,18 @@ in `errors` and still returns results from the others.
 
 ## Remote MCP over HTTP
 
-Serve the same JSON-RPC handler over HTTP at `/mcp`:
+The standalone command can serve the same JSON-RPC handler over HTTP on its own
+port at `/mcp`:
 
 ```bash
 okf-wiki mcp --http 127.0.0.1:8090 \
   --source docs=https://docs.example.com/wiki/
 ```
+
+Use this shape when one MCP process should federate several wikis, or when the
+MCP listener needs a different network boundary from the wiki. For a single
+local wiki, `serve --mcp` above is the shorter path: one process, one port and
+the endpoint under the wiki base.
 
 The HTTP listener has no built-in TLS or authentication. For a public
 deployment, put it behind a rate-limiting proxy or CDN. For a private
@@ -212,6 +263,7 @@ hash changed.
 | `read_page` fails but search works | `pages.json` or the Markdown source is missing at the source. |
 | `changes` or `health` is unavailable | The source has no such file, or it is from another render. Re-render and retry. |
 | A remote change is not visible | Remote sources refresh at most every 30 seconds. Local sources reload on each tool call. |
+| The `serve --mcp` URL returns 404 | `--mcp` is set (or `OKF_WIKI_MCP=true`), and the path is `<base>/_/mcp`, not `<base>/mcp`. |
 | HTTP client cannot connect | Use stdio for a local client, or point the client at the `/mcp` URL behind the proxy. |
 
 ## See also
