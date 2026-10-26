@@ -112,8 +112,9 @@ func TestAgentManifestOffline(t *testing.T) {
 	}
 }
 
-// TestAgentManifestMultiSite covers the one tree-level manifest: page IDs are
-// namespaced and each page names the wiki it came from.
+// TestAgentManifestMultiSite covers the per-wiki agent surface of a tree and the
+// aggregate that sits beside it: each wiki writes its own page table and page
+// list with unprefixed IDs, and the tree base routes to them.
 func TestAgentManifestMultiSite(t *testing.T) {
 	dir := t.TempDir()
 	for _, wiki := range []string{"alpha", "beta"} {
@@ -141,15 +142,144 @@ func TestAgentManifestMultiSite(t *testing.T) {
 			t.Errorf("tree page has no site label: %+v", p)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(out, "family", "alpha", "pages.json")); !os.IsNotExist(err) {
-		t.Error("a wiki below the tree root wrote its own agent manifest")
+	for _, site := range []string{"alpha", "beta"} {
+		own := readAgentManifest(t, filepath.Join(out, "family", site, "pages.json"))
+		if len(own.Pages) != 1 || own.Pages[0].ID != "page:index" {
+			t.Errorf("%s manifest = %+v, want one unprefixed page", site, own.Pages)
+		}
+		if want := "/family/" + site + "/index.html"; own.Pages[0].URL != want {
+			t.Errorf("%s page URL = %q, want %q", site, own.Pages[0].URL, want)
+		}
+		llms, err := os.ReadFile(filepath.Join(out, "family", site, "llms.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(llms), "/family/"+site+"/index.md") {
+			t.Errorf("%s llms.txt does not link its own page:\n%s", site, llms)
+		}
+		for _, name := range []string{"changes.json", "health.json"} {
+			if _, err := os.Stat(filepath.Join(out, "family", site, name)); err != nil {
+				t.Errorf("%s is missing %s: %v", site, name, err)
+			}
+		}
 	}
 	llms, err := os.ReadFile(filepath.Join(out, "family", "llms.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(llms), "/family/alpha/index.md") || !strings.Contains(string(llms), "/family/beta/index.md") {
-		t.Errorf("tree llms.txt does not link both wikis:\n%s", llms)
+	for _, want := range []string{"(alpha/llms.txt)", "(beta/llms.txt)", "1 page"} {
+		if !strings.Contains(string(llms), want) {
+			t.Errorf("tree llms.txt is missing %q:\n%s", want, llms)
+		}
+	}
+	// The tree file is a router: it names wikis, not their pages.
+	if strings.Contains(string(llms), "index.md") {
+		t.Errorf("tree llms.txt lists pages instead of wikis:\n%s", llms)
+	}
+}
+
+// TestAgentPerSiteChanges covers changes.json for one wiki of a tree: a page
+// that moves in alpha is reported against alpha, its sibling reports nothing,
+// and the aggregate names the namespaced page.
+func TestAgentPerSiteChanges(t *testing.T) {
+	dir := t.TempDir()
+	for _, site := range []string{"alpha", "beta"} {
+		mustMkdir(t, filepath.Join(dir, site))
+		mustWrite(t, filepath.Join(dir, site, "index.md"),
+			"---\ntitle: "+site+"\n---\n# Home\n\nOne.\n")
+	}
+	out := t.TempDir()
+	render := func() {
+		t.Helper()
+		r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.RenderSites(out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	render()
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"),
+		"---\ntitle: alpha\n---\n# Home\n\nTwo.\n")
+	render()
+
+	alpha, err := LoadAgentChanges(filepath.Join(out, "family", "alpha"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(alpha.Changes) != 1 || alpha.Changes[0].ID != "page:index" || alpha.Changes[0].Kind != "changed" {
+		t.Errorf("alpha changes = %+v, want one changed page:index", alpha.Changes)
+	}
+	beta, err := LoadAgentChanges(filepath.Join(out, "family", "beta"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beta.Changes) != 0 {
+		t.Errorf("beta changes = %+v, want none", beta.Changes)
+	}
+	tree, err := LoadAgentChanges(filepath.Join(out, "family"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tree.Changes) != 1 || tree.Changes[0].ID != "alpha:page:index" {
+		t.Errorf("tree changes = %+v, want one namespaced page", tree.Changes)
+	}
+}
+
+// TestAgentNestedWikiFiles covers a wiki below a group directory: its own
+// surface lands at its path, and the router names that path.
+func TestAgentNestedWikiFiles(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "group", "gamma"))
+	mustWrite(t, filepath.Join(dir, "group", "gamma", "index.md"), "---\ntitle: Gamma\n---\n# Gamma\n")
+	out := t.TempDir()
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+	site := filepath.Join(out, "family", "group", "gamma")
+	for _, name := range []string{"llms.txt", "pages.json", "changes.json", "health.json"} {
+		if _, err := os.Stat(filepath.Join(site, name)); err != nil {
+			t.Errorf("the nested wiki is missing %s: %v", name, err)
+		}
+	}
+	m := readAgentManifest(t, filepath.Join(site, "pages.json"))
+	if len(m.Pages) != 1 || m.Pages[0].URL != "/family/group/gamma/index.html" {
+		t.Errorf("nested wiki manifest = %+v", m.Pages)
+	}
+	llms, err := os.ReadFile(filepath.Join(site, "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(llms), "(/family/group/gamma/index.md)") {
+		t.Errorf("nested wiki llms.txt does not link its own page:\n%s", llms)
+	}
+	tree, err := os.ReadFile(filepath.Join(out, "family", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(tree), "(group/gamma/llms.txt)") {
+		t.Errorf("tree router does not name the nested wiki's path:\n%s", tree)
+	}
+}
+
+// TestAgentCollisionInTree covers the reserved paths in a wiki of a tree: the
+// per-wiki surface must not overwrite a bundle's own file either.
+func TestAgentCollisionInTree(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "alpha"))
+	mustWrite(t, filepath.Join(dir, "alpha", "index.md"), "# Alpha\n")
+	mustWrite(t, filepath.Join(dir, "alpha", "llms.txt"), "owned by the bundle\n")
+	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RenderSites(t.TempDir()); err == nil || !strings.Contains(err.Error(), "llms.txt") {
+		t.Errorf("render error = %v, want a collision naming llms.txt", err)
 	}
 }
 
@@ -185,15 +315,23 @@ func TestAgentLLMSEscapesDestinations(t *testing.T) {
 	}
 }
 
-// TestAgentLLMSKeepsDuplicateSiteTitlesApart keys site headings by the stable
-// path, so two wikis with the same display title still get their own group.
-func TestAgentLLMSKeepsDuplicateSiteTitlesApart(t *testing.T) {
-	llms := agentLLMS("Tree", "", []AgentPage{
-		{Title: "A", Site: "Docs", SiteKey: "a", Section: "One", MarkdownURL: "/a/index.md"},
-		{Title: "B", Site: "Docs", SiteKey: "b", Section: "Two", MarkdownURL: "/b/index.md"},
+// TestAgentTreeLLMSRoutesToEachWiki covers the tree router: one line per wiki,
+// a link to that wiki's own file, and the page count.
+func TestAgentTreeLLMSRoutesToEachWiki(t *testing.T) {
+	llms := agentTreeLLMS("Tree", "All the wikis.", []agentSiteLink{
+		{Rel: "alpha", Title: "Alpha", Description: "The alpha wiki.", Pages: 1},
+		{Rel: "my group/beta", Title: "Beta", Pages: 3},
 	})
-	if strings.Count(llms, "## Docs") != 2 {
-		t.Errorf("duplicate site titles were merged:\n%s", llms)
+	for _, want := range []string{
+		"# Tree",
+		"> All the wikis.",
+		"## Wikis",
+		"- [Alpha](alpha/llms.txt): The alpha wiki. (1 page)",
+		"- [Beta](my%20group/beta/llms.txt): 3 pages",
+	} {
+		if !strings.Contains(llms, want) {
+			t.Errorf("tree llms.txt is missing %q:\n%s", want, llms)
+		}
 	}
 }
 
@@ -244,5 +382,18 @@ func TestAgentManifestOfflineTree(t *testing.T) {
 		if !strings.HasSuffix(p.MarkdownURL, ".md") || strings.HasPrefix(p.MarkdownURL, "/") {
 			t.Errorf("offline tree Markdown URL = %q", p.MarkdownURL)
 		}
+	}
+	// A wiki's own pair is resolved against the wiki directory, where a client
+	// fetched it, not against the render root the aggregate uses.
+	own := readAgentManifest(t, filepath.Join(out, "family", "alpha", "pages.json"))
+	if len(own.Pages) != 1 || own.Pages[0].MarkdownURL != "./index.md" || own.Pages[0].URL != "./index.html" {
+		t.Errorf("offline per-wiki links = %+v, want links from the wiki base", own.Pages)
+	}
+	llms, err := os.ReadFile(filepath.Join(out, "family", "alpha", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(llms), "](./index.md)") {
+		t.Errorf("offline per-wiki llms.txt is not relative to its own base:\n%s", llms)
 	}
 }

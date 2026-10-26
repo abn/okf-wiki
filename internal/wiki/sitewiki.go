@@ -112,9 +112,21 @@ type Renderer struct {
 	// aggregatedPages collects the agent manifest of a tree render, with each
 	// wiki's page IDs namespaced by its path.
 	aggregatedPages []AgentPage
+	// treeSites names every wiki a tree render published, in render order, for
+	// the tree-base llms.txt router.
+	treeSites []agentSiteLink
 	// previousPages is the manifest already in the output directory before this
 	// render. It feeds changes.json; a first render has no previous pages.
 	previousPages []AgentPage
+	// previousSitePages is the same manifest for each wiki of a tree, keyed by
+	// its path, so a per-wiki changes.json compares against that wiki.
+	previousSitePages map[string][]AgentPage
+	// pendingHealth holds a wiki's health report until every wiki of the tree has
+	// rendered, when a broken cross-wiki link is finally known. Only a wiki below
+	// the tree root sets it; RenderSites writes the file.
+	pendingHealth *siteHealth
+	// siteHealths collects those reports in render order.
+	siteHealths []siteHealth
 	// treeWikis is the set of wiki paths in a tree render. Cross-wiki links
 	// resolve against it after each wiki has loaded.
 	treeWikis map[string]bool
@@ -378,21 +390,30 @@ func (r *Renderer) renderInto(out, site string) error {
 		return err
 	}
 
-	// A wiki below a tree root leaves the agent surface to the tree base, where
-	// one manifest spans every wiki. A single bundle and a root wiki write it
-	// here.
+	// Every wiki publishes the agent surface at its own base, so a client can be
+	// pointed at one wiki of a tree. The tree base also writes an aggregate page
+	// table and a router to these files.
+	title := r.siteTitle
+	if title == "" {
+		title = r.cfg.Brand.Title
+	}
+	pages := r.agentPagesAt(r.agentURLBase())
+	r.crossEdges, r.crossBroken = r.crossWikiLinks(r.treeWikis)
+	if err := writeAgentFiles(site, title, r.siteDescription, r.generatedAt, pages); err != nil {
+		return err
+	}
+	if err := writeAgentChanges(site, r.previousPages, pages, r.generatedAt); err != nil {
+		return err
+	}
+	// A wiki of a tree waits for the tree-wide pass: a link into a sibling is
+	// only known to be broken once the sibling has rendered. A single bundle and
+	// a root wiki have nothing above them.
 	if !r.nested || r.siteRel == "" {
-		title := r.siteTitle
-		if title == "" {
-			title = r.cfg.Brand.Title
-		}
-		pages := r.AgentPages()
-		if err := writeAgentFiles(site, title, r.siteDescription, r.generatedAt, pages); err != nil {
+		if err := writeAgentHealth(site, pages, r.BuildGraph(), r.generatedAt, r.crossBroken...); err != nil {
 			return err
 		}
-		if err := writeAgentState(site, r.previousPages, pages, r.BuildGraph(), r.generatedAt); err != nil {
-			return err
-		}
+	} else {
+		r.pendingHealth = &siteHealth{rel: r.siteRel, dir: site, pages: pages, graph: r.BuildGraph()}
 	}
 
 	// The view is one page at the render root: the bundle base for a single
