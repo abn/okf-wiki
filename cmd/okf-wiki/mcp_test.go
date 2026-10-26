@@ -191,6 +191,73 @@ func TestMCPReadAndContext(t *testing.T) {
 	}
 }
 
+// TestMCPPerWikiSource covers a source pointed at one wiki of a tree. The
+// wiki's own pages.json is what makes read_page, changes and health answer;
+// the aggregate at the tree base never did for a single wiki.
+func TestMCPPerWikiSource(t *testing.T) {
+	dir := t.TempDir()
+	for _, site := range []string{"alpha", "beta"} {
+		if err := writeTestPage(filepath.Join(dir, site, "index.md"),
+			"# "+site+"\n\n## Install\n\nThe "+site+" install guide.\n"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r, err := wiki.New(wiki.Config{Content: dir, Base: "/family/", Brand: wiki.Brand{Name: "t"}, MultiSite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if _, err := r.RenderSites(out); err != nil {
+		t.Fatal(err)
+	}
+	siteDir := filepath.Join(out, "family", "alpha")
+	read := func(name string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(siteDir, name))
+	}
+	s, err := newMCPServer([]mcpSource{{name: "alpha", base: "/family/alpha/", basePath: "/family/alpha/", read: read}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	call := func(t *testing.T, line string) (map[string]any, string) {
+		t.Helper()
+		resp := s.handle([]byte(line))
+		if resp == nil || resp.Error != nil {
+			t.Fatalf("response = %+v", resp)
+		}
+		result := resp.Result.(map[string]any)
+		content := result["content"].([]any)[0].(map[string]any)["text"].(string)
+		return result, content
+	}
+
+	_, content := call(t, `{"jsonrpc":"2.0","id":40,"method":"tools/call","params":{"name":"search_wiki","arguments":{"query":"install","limit":1}}}`)
+	var search wiki.SearchResponse
+	if err := json.Unmarshal([]byte(content), &search); err != nil {
+		t.Fatal(err)
+	}
+	if len(search.Results) == 0 || search.Results[0].PageID != "page:index" {
+		t.Fatalf("a per-wiki source returned no pageId: %s", content)
+	}
+
+	for _, tc := range []struct {
+		name string
+		line string
+		want string
+	}{
+		{"read_page", `{"jsonrpc":"2.0","id":41,"method":"tools/call","params":{"name":"read_page","arguments":{"pageId":"page:index","maxTokens":100}}}`, "alpha install guide"},
+		{"changes", `{"jsonrpc":"2.0","id":42,"method":"tools/call","params":{"name":"changes","arguments":{}}}`, `"changes":[`},
+		{"health", `{"jsonrpc":"2.0","id":43,"method":"tools/call","params":{"name":"health","arguments":{}}}`, `"brokenLinks":[]`},
+	} {
+		result, content := call(t, tc.line)
+		if result["isError"] == true {
+			t.Errorf("%s failed on a per-wiki source: %s", tc.name, content)
+		}
+		if !strings.Contains(content, tc.want) {
+			t.Errorf("%s content = %s", tc.name, content)
+		}
+	}
+}
+
 // TestMCPOptionalState keeps search and reads working on an output that predates
 // changes.json and health.json, while those tools fail clearly.
 func TestMCPOptionalState(t *testing.T) {

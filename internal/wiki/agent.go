@@ -25,9 +25,10 @@ type AgentManifest struct {
 	Pages       []AgentPage `json:"pages"`
 }
 
-// AgentPage is one content page in the manifest. URL and MarkdownURL are the
-// rendered page and its source, relative to the manifest's own base. ID is the
-// same page node ID the graph uses, namespaced in a tree aggregate.
+// AgentPage is one content page in the manifest. URL and MarkdownURL locate the
+// rendered page and its source under the manifest's base, absolute online and
+// relative offline. ID is the same page node ID the graph uses, namespaced only
+// in a tree's aggregate.
 type AgentPage struct {
 	ID          string         `json:"id"`
 	Title       string         `json:"title"`
@@ -61,10 +62,26 @@ func contentHash(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// AgentPages returns the content pages of one bundle in render order. Synthetic
-// pages such as tag listings and the graph view have no Markdown source, so
-// they are not part of the agent manifest.
+// AgentPages returns the content pages of one bundle in render order, with links
+// in the form a page of this render uses. Synthetic pages such as tag listings
+// and the graph view have no Markdown source, so they are not part of the agent
+// manifest.
 func (r *Renderer) AgentPages() []AgentPage {
+	return r.agentPagesAt(r.urlBase())
+}
+
+// agentURLBase is the base the manifest's own links hang off. Online it is the
+// wiki's public base, the same as its pages. Offline it is the manifest's own
+// directory, because a client resolves a relative link against the file it
+// fetched, not against the render root the pages use.
+func (r *Renderer) agentURLBase() string {
+	if r.cfg.Offline {
+		return "./"
+	}
+	return r.cfg.base()
+}
+
+func (r *Renderer) agentPagesAt(base string) []AgentPage {
 	pages := []AgentPage{}
 	for _, s := range r.sections {
 		for _, p := range s.Pages {
@@ -75,8 +92,8 @@ func (r *Renderer) AgentPages() []AgentPage {
 				ID:          pageNodeID(p.Slug),
 				Title:       pageTitle(p),
 				Description: p.Description,
-				URL:         r.urlBase() + p.Slug + ".html",
-				MarkdownURL: r.urlBase() + p.Slug + ".md",
+				URL:         base + p.Slug + ".html",
+				MarkdownURL: base + p.Slug + ".md",
 				Section:     sectionHeading(s),
 				Type:        p.Type,
 				Status:      p.Status,
@@ -123,41 +140,20 @@ func agentJSON(pages []AgentPage, generatedAt string) ([]byte, error) {
 	})
 }
 
-// agentLLMS returns llms.txt for a bundle or tree. It is a discovery document:
-// one link per page to the Markdown source, grouped by site and section, with
+// agentLLMS returns llms.txt for a bundle or one wiki. It is a discovery
+// document: one link per page to the Markdown source, grouped by section, with
 // the page's description where one exists. It deliberately carries no page
 // text, so an agent can choose a page before paying for its content.
 func agentLLMS(title, description string, pages []AgentPage) string {
-	if strings.TrimSpace(title) == "" {
-		title = "Wiki"
-	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\n", oneLine(title))
-	if description = oneLine(description); description != "" {
-		fmt.Fprintf(&b, "> %s\n\n", description)
-	}
+	writeAgentHeader(&b, title, description)
 	b.WriteString("Machine-readable page list: [pages.json](pages.json).\n\n")
 
-	lastSiteKey := "\x00"
 	lastSection := "\x00"
 	for _, p := range pages {
-		siteKey := p.SiteKey
-		if siteKey == "" {
-			siteKey = p.Site
-		}
-		if p.Site != "" && siteKey != lastSiteKey {
-			ensureBlankLine(&b)
-			fmt.Fprintf(&b, "## %s\n\n", oneLine(p.Site))
-			lastSiteKey = siteKey
-			lastSection = "\x00"
-		}
 		if p.Section != lastSection {
-			level := "##"
-			if p.Site != "" {
-				level = "###"
-			}
 			ensureBlankLine(&b)
-			fmt.Fprintf(&b, "%s %s\n\n", level, oneLine(p.Section))
+			fmt.Fprintf(&b, "## %s\n\n", oneLine(p.Section))
 			lastSection = p.Section
 		}
 		line := fmt.Sprintf("- [%s](%s)", escapeLinkText(p.Title), escapeLinkDestination(p.MarkdownURL))
@@ -170,28 +166,88 @@ func agentLLMS(title, description string, pages []AgentPage) string {
 	return b.String()
 }
 
-// writeAgentFiles writes pages.json and llms.txt into one site directory.
+// writeAgentHeader writes the H1 and summary blockquote every llms.txt starts
+// with.
+func writeAgentHeader(b *strings.Builder, title, description string) {
+	if strings.TrimSpace(title) == "" {
+		title = "Wiki"
+	}
+	fmt.Fprintf(b, "# %s\n\n", oneLine(title))
+	if description = oneLine(description); description != "" {
+		fmt.Fprintf(b, "> %s\n\n", description)
+	}
+}
+
+// writeAgentFiles writes pages.json and llms.txt into one wiki directory. Every
+// wiki of a tree writes its own, so a client can be pointed at one wiki.
 func writeAgentFiles(dir, title, description, generatedAt string, pages []AgentPage) error {
+	if err := writeAgentManifest(dir, generatedAt, pages); err != nil {
+		return err
+	}
+	return writeAgentLLMS(dir, agentLLMS(title, description, pages))
+}
+
+// writeAgentManifest writes pages.json: the page table without page text.
+func writeAgentManifest(dir, generatedAt string, pages []AgentPage) error {
 	manifest, err := agentJSON(pages, generatedAt)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "pages.json"), manifest, 0o644); err != nil {
-		return err
-	}
-	llms := agentLLMS(title, description, pages)
-	return os.WriteFile(filepath.Join(dir, "llms.txt"), []byte(llms), 0o644)
+	return os.WriteFile(filepath.Join(dir, "pages.json"), manifest, 0o644)
 }
 
-// writeTreeAgentFiles writes the tree's one agent manifest and discovery file
-// at the tree base, after every wiki has rendered.
+// writeAgentLLMS writes one llms.txt.
+func writeAgentLLMS(dir, body string) error {
+	return os.WriteFile(filepath.Join(dir, "llms.txt"), []byte(body), 0o644)
+}
+
+// agentSiteLink is one rendered wiki of a tree, as the tree-base llms.txt names
+// it.
+type agentSiteLink struct {
+	Rel         string
+	Title       string
+	Description string
+	Pages       int
+}
+
+// agentTreeLLMS returns the tree-base llms.txt. It is a router: each line links
+// to one wiki's own llms.txt, so an agent reads the page list of the wiki it
+// needs rather than every page in the tree. The aggregate pages.json stays
+// beside it for a client that wants the whole table at once.
+func agentTreeLLMS(title, description string, sites []agentSiteLink) string {
+	var b strings.Builder
+	writeAgentHeader(&b, title, description)
+	b.WriteString("Each line links to one wiki's llms.txt, which lists that wiki's pages. The tree's full page table is [pages.json](pages.json).\n\n")
+	if len(sites) == 0 {
+		return b.String()
+	}
+	b.WriteString("## Wikis\n\n")
+	for _, s := range sites {
+		count := fmt.Sprintf("%d pages", s.Pages)
+		if s.Pages == 1 {
+			count = "1 page"
+		}
+		note := count
+		if desc := oneLine(s.Description); desc != "" {
+			note = desc + " (" + count + ")"
+		}
+		fmt.Fprintf(&b, "- [%s](%s): %s\n", escapeLinkText(s.Title), escapeLinkDestination(s.Rel+"/llms.txt"), note)
+	}
+	return b.String()
+}
+
+// writeTreeAgentFiles writes the tree's aggregate page table and a router to
+// each wiki's own agent files at the tree base, after every wiki has rendered.
 func (r *Renderer) writeTreeAgentFiles(out string, root *siteNode) error {
 	title, description := r.siteMeta(root)
 	dir := r.cfg.sitePath(out)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := writeAgentFiles(dir, title, description, r.generatedAt, r.aggregatedPages); err != nil {
+	if err := writeAgentManifest(dir, r.generatedAt, r.aggregatedPages); err != nil {
+		return err
+	}
+	if err := writeAgentLLMS(dir, agentTreeLLMS(title, description, r.treeSites)); err != nil {
 		return err
 	}
 	return writeAgentState(dir, r.previousPages, r.aggregatedPages, r.aggregatedGraph, r.generatedAt, r.crossBroken...)
@@ -203,7 +259,7 @@ func (r *Renderer) writeTreeAgentFiles(out string, root *siteNode) error {
 func agentCollision(dir string) error {
 	for _, name := range []string{"llms.txt", "pages.json", "changes.json", "health.json"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
-			return fmt.Errorf("the agent surface needs %s, which is already occupied; rename that file", name)
+			return fmt.Errorf("the agent surface needs %s in %s, which is already occupied; rename that file", name, dir)
 		}
 	}
 	return nil

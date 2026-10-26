@@ -408,24 +408,26 @@ func mergeGraph(dst, src *GraphIndex, site, key string) {
 	dst.Edges = append(dst.Edges, src.Edges...)
 }
 
-// CrossWikiEdges returns the link edges from this wiki to pages in sibling
-// wikis, already named with aggregate IDs. The tree keeps these separate from
-// the wiki's own graph, because a per-wiki catalogue must not name a node that
-// it does not contain. Callers add the edges after every wiki has rendered, so
-// a target in a skipped wiki is dropped rather than becoming a dead edge.
-func (r *Renderer) CrossWikiEdges(wikis map[string]bool) []GraphEdge {
+// crossWikiLinks returns the link edges from this wiki to pages in sibling
+// wikis, already named with aggregate IDs, and the links into a path that no
+// wiki owns. A link to a missing page of a wiki that does exist is caught later,
+// by appendCrossWikiEdges, once every wiki has rendered. The tree keeps the
+// edges separate from the wiki's own graph, because a per-wiki catalogue must
+// not name a node that it does not contain. A broken link names its source with
+// the wiki's own page ID; the tree adds the namespace when it aggregates.
+func (r *Renderer) crossWikiLinks(wikis map[string]bool) ([]GraphEdge, []HealthLink) {
 	if !r.nested || r.siteRel == "" {
-		return nil
+		return nil, nil
 	}
 	var edges []GraphEdge
+	var broken []HealthLink
 	seen := make(map[string]bool)
 	for _, s := range r.sections {
 		for _, p := range s.Pages {
 			from := r.siteRel + ":" + pageNodeID(p.Slug)
 			for _, l := range p.links {
 				if l.BrokenCross != "" {
-					from := r.siteRel + ":" + pageNodeID(p.Slug)
-					r.crossBroken = append(r.crossBroken, HealthLink{From: from, To: l.BrokenCross, Text: l.Text})
+					broken = append(broken, HealthLink{From: pageNodeID(p.Slug), To: l.BrokenCross, Text: l.Text})
 					continue
 				}
 				if l.Cross == "" {
@@ -454,7 +456,7 @@ func (r *Renderer) CrossWikiEdges(wikis map[string]bool) []GraphEdge {
 			}
 		}
 	}
-	return edges
+	return edges, broken
 }
 
 // splitTreeTarget names the wiki that owns a tree-relative page path and the

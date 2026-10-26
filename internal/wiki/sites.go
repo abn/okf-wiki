@@ -88,19 +88,31 @@ func scanSites(dir, rel string, seen map[string]bool) (*siteNode, error) {
 	return n, nil
 }
 
+// eachWiki calls fn for every wiki below n. The root itself is skipped: it is
+// the tree base, not one of the wikis under it.
+func eachWiki(n *siteNode, fn func(*siteNode) error) error {
+	if n.wiki {
+		if n.rel == "" {
+			return nil
+		}
+		return fn(n)
+	}
+	for _, c := range n.children {
+		if err := eachWiki(c, fn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // collectWikiKeys records every wiki path below a tree root. The root itself
 // is left out: a root wiki has no aggregate, so it cannot carry cross-wiki
 // edges.
 func collectWikiKeys(n *siteNode, keys map[string]bool) {
-	if n.wiki {
-		if n.rel != "" {
-			keys[n.rel] = true
-		}
-		return
-	}
-	for _, c := range n.children {
-		collectWikiKeys(c, keys)
-	}
+	_ = eachWiki(n, func(w *siteNode) error {
+		keys[w.rel] = true
+		return nil
+	})
 }
 
 // siteBase puts a wiki or group's path under the configured base. The base
@@ -141,6 +153,11 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 		return 0, err
 	}
 	r.previousPages = previous
+	previousSites, err := readPreviousSitePages(r.cfg.sitePath(out), root)
+	if err != nil {
+		return 0, err
+	}
+	r.previousSitePages = previousSites
 	if root.wiki {
 		if err := graphCollision(root.abs); err != nil {
 			return 0, err
@@ -172,6 +189,9 @@ func (r *Renderer) RenderSites(out string) (int, error) {
 				return err
 			}
 			r.appendCrossWikiEdges()
+			if err := r.writeSiteHealth(); err != nil {
+				return err
+			}
 			if err := r.writeAggregateGraph(tmp); err != nil {
 				return err
 			}
@@ -218,6 +238,58 @@ func (r *Renderer) renderSites(root string, n *siteNode, trail []treeCrumb) (int
 	return total, nil
 }
 
+// readPreviousSitePages reads the manifest each wiki published in the previous
+// render, keyed by its path under the tree root. A per-wiki changes.json has to
+// compare against that wiki, not against the whole tree. The root wiki is
+// skipped: its baseline is the manifest at the tree base, which RenderSites
+// already read.
+func readPreviousSitePages(siteDir string, n *siteNode) (map[string][]AgentPage, error) {
+	out := map[string][]AgentPage{}
+	err := eachWiki(n, func(w *siteNode) error {
+		pages, err := readAgentPages(filepath.Join(siteDir, w.rel))
+		if err != nil {
+			return err
+		}
+		out[w.rel] = pages
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// siteHealth is one wiki of a tree waiting for the tree-wide pass. Its report
+// names the wiki's own pages, so a broken link across wikis has to lose the
+// tree namespace before it is written.
+type siteHealth struct {
+	rel   string
+	dir   string
+	pages []AgentPage
+	graph GraphIndex
+}
+
+// writeSiteHealth writes each wiki's health report now that every wiki has
+// rendered. A relative link into a sibling is not broken while the sibling's
+// pages exist, and that is only known here.
+func (r *Renderer) writeSiteHealth() error {
+	for _, s := range r.siteHealths {
+		prefix := s.rel + ":"
+		extra := make([]HealthLink, 0, len(r.crossBroken))
+		for _, b := range r.crossBroken {
+			if !strings.HasPrefix(b.From, prefix) {
+				continue
+			}
+			b.From = strings.TrimPrefix(b.From, prefix)
+			extra = append(extra, b)
+		}
+		if err := writeAgentHealth(s.dir, s.pages, s.graph, r.generatedAt, extra...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // renderSite renders one wiki of the tree. It shares the resolved theme with the
 // tree renderer, and its own base is the tree base plus its path, so its links
 // and assets sit under it. root is the tree root being written into.
@@ -231,6 +303,10 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 	cfg.Content = n.abs
 	cfg.Base = siteBase(r.cfg.base(), n.rel)
 	title, description := r.siteMeta(n)
+	previous := r.previousPages
+	if n.rel != "" {
+		previous = r.previousSitePages[n.rel]
+	}
 	sub := &Renderer{
 		md:           r.md,
 		cfg:          cfg,
@@ -249,7 +325,10 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		siteTitle:       title,
 		siteDescription: description,
 		siteTrail:       trail,
-		previousPages:   r.previousPages,
+		previousPages:   previous,
+	}
+	if err := agentCollision(cfg.Content); err != nil {
+		return 0, err
 	}
 	if cfg.Bundle {
 		if err := bundleCollision(cfg.Content); err != nil {
@@ -289,7 +368,13 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		mergeSearchIndex(&r.aggregated, &index)
 		graph := sub.BuildGraph()
 		mergeGraph(&r.aggregatedGraph, &graph, title, n.rel)
-		r.crossEdges = append(r.crossEdges, sub.CrossWikiEdges(r.treeWikis)...)
+		r.crossEdges = append(r.crossEdges, sub.crossEdges...)
+		// A per-wiki health report names its own pages, so only the link source
+		// takes the tree namespace here. The target stays a tree-relative path:
+		// it is not a page of this wiki.
+		for i := range sub.crossBroken {
+			sub.crossBroken[i].From = n.rel + ":" + sub.crossBroken[i].From
+		}
 		r.crossBroken = append(r.crossBroken, sub.crossBroken...)
 		pages := sub.AgentPages()
 		for i := range pages {
@@ -298,6 +383,10 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 			pages[i].SiteKey = n.rel
 		}
 		r.aggregatedPages = append(r.aggregatedPages, pages...)
+		r.treeSites = append(r.treeSites, agentSiteLink{Rel: n.rel, Title: title, Description: description, Pages: len(pages)})
+		if sub.pendingHealth != nil {
+			r.siteHealths = append(r.siteHealths, *sub.pendingHealth)
+		}
 	}
 	return 1, nil
 }

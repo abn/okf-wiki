@@ -580,6 +580,24 @@ func TestMultiSiteCrossWikiLinks(t *testing.T) {
 				}
 			}
 
+			// The wiki's own health report carries the broken links into a
+			// sibling, with the source named by this wiki's page ID.
+			ownHealth, err := LoadGraphHealth(filepath.Join(out, "family", "alpha"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(ownHealth.BrokenLinks) != 2 {
+				t.Errorf("alpha broken links = %+v, want both failing targets", ownHealth.BrokenLinks)
+			}
+			if !hasBroken(ownHealth.BrokenLinks, "beta:page:missing") || !hasBroken(ownHealth.BrokenLinks, "nowhere/page") {
+				t.Errorf("alpha broken links = %+v", ownHealth.BrokenLinks)
+			}
+			for _, link := range ownHealth.BrokenLinks {
+				if link.From != "page:index" {
+					t.Errorf("alpha broken link source = %q, want the wiki's own ID", link.From)
+				}
+			}
+
 			page, err := os.ReadFile(filepath.Join(out, "family", "alpha", "index.html"))
 			if err != nil {
 				t.Fatal(err)

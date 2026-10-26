@@ -301,17 +301,27 @@ func linkCycles(ids []string, adj map[string][]string) [][]string {
 }
 
 func writeAgentState(dir string, previous, current []AgentPage, graph GraphIndex, generatedAt string, extraBroken ...HealthLink) error {
-	changes := buildAgentChanges(previous, current, generatedAt)
-	health := buildGraphHealth(graph, current, generatedAt, extraBroken...)
-	changeJSON, err := json.Marshal(changes)
+	if err := writeAgentChanges(dir, previous, current, generatedAt); err != nil {
+		return err
+	}
+	return writeAgentHealth(dir, current, graph, generatedAt, extraBroken...)
+}
+
+// writeAgentChanges writes changes.json: the difference between the previous and
+// the current page table.
+func writeAgentChanges(dir string, previous, current []AgentPage, generatedAt string) error {
+	changeJSON, err := json.Marshal(buildAgentChanges(previous, current, generatedAt))
 	if err != nil {
 		return err
 	}
-	healthJSON, err := json.Marshal(health)
+	return os.WriteFile(filepath.Join(dir, "changes.json"), changeJSON, 0o644)
+}
+
+// writeAgentHealth writes health.json: the structural report an agent reads
+// before trusting a wiki.
+func writeAgentHealth(dir string, current []AgentPage, graph GraphIndex, generatedAt string, extraBroken ...HealthLink) error {
+	healthJSON, err := json.Marshal(buildGraphHealth(graph, current, generatedAt, extraBroken...))
 	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "changes.json"), changeJSON, 0o644); err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "health.json"), healthJSON, 0o644)
