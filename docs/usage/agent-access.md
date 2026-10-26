@@ -24,8 +24,9 @@ serve them over MCP.
 | `changes.json` | Pages added, changed or removed in the latest render. |
 | `health.json` | Broken links, orphans, tag-only pages, cycles, stale pages and hubs. |
 
-`llms.txt` and `pages.json` are written at the render root. A tree writes one
-aggregate pair at its base. Inline or offline renders keep the same files.
+`llms.txt` and `pages.json` are written at every wiki's base. A tree also
+writes an aggregate `pages.json` and a router `llms.txt` at its base. Inline or
+offline renders keep the same files.
 
 ## Choose a page
 
@@ -82,13 +83,15 @@ reference](../reference/agent-access.md).
 
 ## Multi-site and offline
 
-In a tree, `pages.json` and `llms.txt` are aggregates at the tree base. Page IDs
-carry the wiki path, for example `alpha:page:index`. A single bundle writes the
-same files at its own base.
+In a tree, each wiki writes its own pair at its base, with plain page IDs. The
+tree base adds an aggregate `pages.json` whose IDs carry the wiki path, for
+example `alpha:page:index`, and an `llms.txt` that links to each wiki's file. A
+single bundle writes the same files at its own base.
 
-Offline renders use URLs relative to the render root and embed the search and
-graph data as scripts. The Markdown sources remain beside the pages, so an
-offline folder is still readable by an agent.
+Offline renders use relative URLs: a page's links resolve against the render
+root, and a wiki's own agent files resolve against that wiki's directory. The
+search and graph data are embedded as scripts. The Markdown sources remain
+beside the pages, so an offline folder is still readable by an agent.
 
 ## See also
 

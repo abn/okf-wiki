@@ -15,16 +15,16 @@ point at the Markdown source that is already copied beside each page. Neither
 file contains page text, so an agent can choose what to read before paying for
 the content.
 
-A single bundle writes both files at its base. A multi-site tree writes one
-aggregate pair at the tree base. A wiki below the tree root does not write its
-own pair, because the aggregate spans every wiki. A root wiki is a tree of one
-and writes the pair at its own base.
+Every wiki writes the pair at its own base, so a client can be pointed at one
+wiki of a tree. A tree also writes an aggregate `pages.json` at its base, and an
+`llms.txt` that routes to each wiki's own file. A root wiki writes its pair at
+the tree base, where it covers everything under it.
 
 ## llms.txt
 
 `llms.txt` is a Markdown discovery document. It starts with the wiki title and
-description, links to `pages.json`, and then groups one line per page by site
-and section:
+description, links to `pages.json`, and then groups one line per page by
+section:
 
 ```markdown
 # Wiki
@@ -40,13 +40,34 @@ Machine-readable page list: [pages.json](pages.json).
 ```
 
 Each link points at the page's Markdown source, not its HTML. The description
-comes from the page's frontmatter and is omitted when empty. In a tree, a `##`
-heading names each wiki and the section headings move down one level.
+comes from the page's frontmatter and is omitted when empty.
+
+In a tree, each wiki gets this file at its own base, listing only that wiki's
+pages. The tree base holds a router instead of every page, so an agent reads the
+page list of the one wiki it needs:
+
+```markdown
+# Wiki
+
+> Wikis published here.
+
+Each line links to one wiki's llms.txt, which lists that wiki's pages. The tree's full page table is [pages.json](pages.json).
+
+## Wikis
+
+- [Alpha](alpha/llms.txt): The alpha wiki. (27 pages)
+- [Beta](beta/llms.txt): The beta wiki. (12 pages)
+```
+
+The router names each wiki's page count so a client can see the size of a wiki
+before fetching it. The tree-base `pages.json` stays the whole table, for a
+client that wants to filter across every wiki.
 
 ## pages.json
 
 `pages.json` is the machine-readable page table. It has a schema version, the
-render date, and one entry per content page:
+render date, and one entry per content page. Each wiki of a tree writes its own
+table with plain page IDs, and the aggregate at the tree base holds all of them:
 
 ```json
 {
@@ -93,11 +114,13 @@ to re-read a page without comparing the whole text.
 
 ## Token use
 
-A manifest entry is a few hundred bytes. The whole current documentation
-manifest is a few tens of kilobytes, while the HTML pages together are over a
-megabyte and the Markdown sources are a few hundred kilobytes. An agent should
-read `llms.txt` or `pages.json` first, choose one page, and fetch that page's
-Markdown source. It should not fetch the HTML for discovery.
+A manifest entry is a few hundred bytes, so a wiki's manifest stays far smaller
+than the pages it describes: the current documentation manifest is a few tens of
+kilobytes. An agent should read the `llms.txt` or `pages.json` of the wiki it
+needs, choose one page, and fetch that page's Markdown source. It should not
+fetch the HTML for discovery. In a tree, start at the router and then at that
+one wiki's files: the aggregate `pages.json` is every page at once and is rarely
+the right first fetch.
 
 ## Search from a terminal
 
@@ -225,8 +248,9 @@ prints a warning.
 When more than one source is configured, page IDs are namespaced as
 `<source>:<id>`, and search results carry a `source` field. Pass `source` to
 the page, graph, change and health tools and `sources` to search and
-`context_for`. `neighbors` and `path` stay inside one source. A source that is
-already a multi-site aggregate is one source, not one source per wiki.
+`context_for`. `neighbors` and `path` stay inside one source. A tree can be one
+source at its base, which is the aggregate, or one source per wiki at that
+wiki's base; the aggregate is not split automatically.
 
 Remote sources are refreshed at most every 30 seconds. Local `--out` sources
 reload before each tool call. A source that fails to load stops startup with
@@ -254,13 +278,17 @@ HTTP shapes are read-only and unauthenticated.
 
 ## Multi-site and offline
 
-In a tree the aggregate `pages.json` has namespaced IDs such as
-`alpha:page:index` and carries `site` and `siteKey`. Links in both files follow
-the render's URL mode: absolute paths online, and paths relative to the render
-root for an offline folder.
+In a tree each wiki has its own `pages.json` with plain IDs such as
+`page:index`, and its own `llms.txt`, `changes.json` and `health.json`. The
+aggregate `pages.json` at the tree base has namespaced IDs such as
+`alpha:page:index` and carries `site` and `siteKey`. These agent files follow
+the render's URL mode: absolute paths online, and paths relative to the file
+that carries them for an offline folder, so a wiki's own pair resolves against
+that wiki's directory. The per-wiki search and graph catalogues stay relative to
+the render root, because the browser fetches them from there.
 
 The generated files reserve `llms.txt`, `pages.json`, `changes.json` and
-`health.json` at the render root. With `--bundle`, every wiki also reserves
+`health.json` at every wiki's base. With `--bundle`, every wiki also reserves
 `okf-bundle.zip` at its own base. A bundle that already contains one of those
 names fails the render and names the collision rather than overwriting the
 reader's file.

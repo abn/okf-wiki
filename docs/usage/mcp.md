@@ -89,7 +89,9 @@ okf-wiki render --content ./docs --out ./public --base /wiki/
 ```
 
 The local source reloads before each tool call, so a re-render is visible
-without restarting the MCP process.
+without restarting the MCP process. A local source reads one render base; in a
+multi-site tree that is the tree root. The per-wiki files are there to read one
+wiki, not to split an offline folder into separate sources.
 
 Start with `list_sources` or `context_for`. A typical tool sequence is:
 
@@ -157,7 +159,9 @@ When more than one source is configured:
 - `read_page`, `read_section`, `neighbors`, `path`, `changes` and `health` take
   a `source`.
 - `neighbors` and `path` stay inside one source.
-- A multi-site aggregate is one source, not one source per wiki.
+- A tree can be one source at its base, which is the aggregate, or one source
+  per wiki at that wiki's base. A per-wiki source reads that wiki's own
+  `pages.json`, `changes.json` and `health.json`, which every render writes.
 - `list_sources` shows each base, render ID and available state files.
 
 A federated search example:

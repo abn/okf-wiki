@@ -165,6 +165,17 @@ with its own catalogue. See [Graph view](graph.md). An offline render
 scripts, one embedded tree graph, and a classic Mermaid bundle where a wiki has
 diagrams.
 
+## The agent surface
+
+Each wiki writes its own `llms.txt`, `pages.json`, `changes.json` and
+`health.json` at its base, beside its search and graph catalogues, so a client
+can be pointed at one wiki. The tree base keeps the aggregate `pages.json` and
+writes an `llms.txt` that links to each wiki's file with its page count, rather
+than listing every page in the tree. A per-wiki `changes.json` compares against
+that wiki's previous render; the aggregate at the base compares against the
+tree's. A root that is itself a wiki writes its own pair at the base, where it
+covers everything below it. See [Agent access](../reference/agent-access.md).
+
 ## What it is not
 
 Tags do not cross between wikis, and each tag page belongs to its own wiki. A
