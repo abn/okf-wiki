@@ -137,8 +137,9 @@ type Renderer struct {
 	// rendered, so the health report can name a real dead link.
 	crossBroken []HealthLink
 	// backlinks indexes recorded page links by target slug for the Connections
-	// panel. It is built once, after the pages are loaded.
-	backlinks      map[string][]backlinkRef
+	// panel, grouped by the page they came from. It is built once, after the
+	// pages are loaded.
+	backlinks      map[string][]backlinkSource
 	backlinksReady bool
 	// treeBase, siteRel, siteTitle and siteTrail describe a page's place in a
 	// multi-site tree. treeBase is the tree index's URL prefix, empty for a

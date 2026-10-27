@@ -233,6 +233,32 @@ func TestGraphListViewContract(t *testing.T) {
 	}
 }
 
+// TestGraphNeighbourCountContract pins the per-neighbour link count. The button
+// list groups by page, so the count is the only place a repeated link shows.
+func TestGraphNeighbourCountContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js, css string
+	for _, f := range th.files {
+		switch f.Path {
+		case "graph.js":
+			js = string(f.Data)
+		case "wiki.css":
+			css = string(f.Data)
+		}
+	}
+	for _, want := range []string{"graph-neighbour-count", "countText(entry.links", "linksIn", "linksOut"} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	if !strings.Contains(css, ".graph-neighbour-count") {
+		t.Error("wiki.css has no neighbour link count style")
+	}
+}
+
 // TestGraphDeterministicLayoutContract pins the seeded layout: the client has
 // no ambient randomness, and a catalogue produces the same positions again.
 func TestGraphDeterministicLayoutContract(t *testing.T) {

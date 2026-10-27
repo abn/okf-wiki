@@ -700,17 +700,40 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-semibold);
 }
 .connections-list { list-style: none; margin: 0; padding: 0; }
-.connections-list li {
-  display: flex; flex-wrap: wrap; align-items: baseline;
-  gap: var(--space-1) var(--space-3);
+/* One row per source page. A page that links several times carries the places
+   beneath the row, indented behind a rule, so the source stays the unit a
+   reader scans while every heading remains reachable. */
+.connections-source {
   padding: var(--space-2) 0;
   border-top: 1px solid var(--color-line);
 }
-.connections-list li:first-child { border-top: 0; }
+.connections-source:first-child { border-top: 0; }
+.connections-row {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
 .connections-list a { font-family: var(--font-ui); font-weight: var(--fw-medium); }
 .connections-section { color: var(--color-text-faint); font-size: var(--text-sm); }
+.connections-count {
+  color: var(--color-text-faint); font-size: var(--text-xs);
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
+}
 .connections-heading { color: var(--color-text-faint); font-size: var(--text-sm); }
 .connections-quote { color: var(--color-text-muted); font-size: var(--text-sm); }
+.connections-places {
+  list-style: none; margin: var(--space-2) 0 var(--space-1);
+  padding: 0 0 0 var(--space-4);
+  border-left: 1px solid var(--color-line);
+}
+.connections-places li {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: 2px 0;
+}
+.connections-place {
+  color: var(--color-text-faint); font-size: var(--text-sm); font-weight: var(--fw-medium);
+}
+.connections-place:hover { color: var(--color-accent-text); }
 .connections-empty { color: var(--color-text-muted); }
 
 /* ------------------------------------------------------------ site catalog
@@ -1614,6 +1637,13 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
   background: var(--color-surface-sunken); border: 1px solid var(--color-line);
   border-radius: var(--radius-pill); padding: 4px var(--space-3); cursor: pointer;
+}
+/* A neighbour is one page, so the pill carries the page name and, when that
+   page links here more than once, how many links it contributes. */
+.graph-neighbour { display: inline-flex; align-items: baseline; gap: var(--space-2); }
+.graph-neighbour-count {
+  color: var(--color-text-faint); font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 .graph-neighbour:hover, .graph-clear:hover, .graph-more:hover {
   color: var(--color-heading); border-color: var(--color-accent-ring);

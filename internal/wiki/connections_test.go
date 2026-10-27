@@ -31,10 +31,19 @@ tags: [guide]
 
 [About](../about.md)
 `)
+	mustWrite(t, filepath.Join(dir, "guide", "notes.md"), `---
+title: Aardvark
+---
+# Aardvark
+
+[Topic](topic.md)
+`)
 	mustWrite(t, filepath.Join(dir, "about.md"), `---
 title: About
 ---
 # About
+
+[Topic](guide/topic.md)
 
 ## First
 
@@ -42,7 +51,25 @@ title: About
 
 ## Second
 
+[Topic](guide/topic.md) and [the topic](guide/topic.md) again
+`)
+	mustWrite(t, filepath.Join(dir, "extra.md"), `---
+title: Extra
+---
+# Extra
+
+## Details
+
 [Topic](guide/topic.md)
+`)
+	mustWrite(t, filepath.Join(dir, "single.md"), `---
+title: Single
+---
+# Single
+
+## Only
+
+[Topic](guide/topic.md) and [again](guide/topic.md)
 `)
 	mustWrite(t, filepath.Join(dir, "orphan.md"), `---
 title: Orphan
@@ -59,6 +86,21 @@ func readPage(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// connectionsList slices a rendered page down to the Connections list, whatever
+// nested lists it carries.
+func connectionsList(t *testing.T, page string) string {
+	t.Helper()
+	start := strings.Index(page, `<ul class="connections-list">`)
+	if start < 0 {
+		t.Fatal("the page has no connections list")
+	}
+	end := strings.Index(page[start:], `</section>`)
+	if end < 0 {
+		t.Fatal("the connections list is not closed")
+	}
+	return page[start : start+end]
 }
 
 // TestConnectionsAndBacklinks covers the static panel: a page lists the pages
@@ -85,47 +127,68 @@ func TestConnectionsAndBacklinks(t *testing.T) {
 			t.Errorf("topic page is missing %q", want)
 		}
 	}
-	start := strings.Index(topic, `<ul class="connections-list">`)
-	end := -1
-	if start >= 0 {
-		if n := strings.Index(topic[start:], `</ul>`); n >= 0 {
-			end = start + n
-		}
+	list := connectionsList(t, topic)
+	if n := strings.Count(list, `<li class="connections-source">`); n != 5 {
+		t.Errorf("topic source count = %d, want 5: %s", n, list)
 	}
-	if start < 0 || end < 0 {
-		t.Fatal("the topic page has no connections list")
+	// About links four times across three headings but must read as one source,
+	// with those headings nested under it.
+	if n := strings.Count(list, `class="connections-quote"`); n != 9 {
+		t.Errorf("topic quote count = %d, want 9: %s", n, list)
 	}
-	list := topic[start:end]
-	if strings.Count(list, "<li>") != 3 {
-		t.Errorf("topic backlink count = %d, want 3: %s", strings.Count(list, "<li>"), list)
+	if n := strings.Count(list, `class="connections-count"`); n != 1 {
+		t.Errorf("topic count badge appears %d times, want 1: %s", n, list)
+	}
+	if n := strings.Count(list, `class="connections-places"`); n != 1 {
+		t.Errorf("topic nested place lists = %d, want 1: %s", n, list)
 	}
 	for _, want := range []string{
-		`href="/wiki/index.html"`,
 		`>Home</a>`,
-		`>About</a>`,
+		`href="/wiki/index.html"`,
+		`class="connections-source-title" href="/wiki/about.html">About</a>`,
+		`class="connections-count">4 links in 3 places</span>`,
+		`class="connections-place" href="/wiki/about.html">Top of page</a>`,
+		`class="connections-place" href="/wiki/about.html#first">First</a>`,
+		`class="connections-place" href="/wiki/about.html#second">Second</a>`,
+		`class="connections-source-title" href="/wiki/extra.html#details">Extra</a>`,
+		`class="connections-heading">Details</span>`,
 		`&ldquo;Topic&rdquo;`,
-		`class="connections-heading">First</span>`,
-		`class="connections-heading">Second</span>`,
-		`href="/wiki/about.html#first"`,
-		`href="/wiki/about.html#second"`,
+		`&ldquo;the topic&rdquo;`,
 	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("topic connections list is missing %q", want)
 		}
 	}
+	// A page that links twice from one heading needs no count and no nested
+	// list, and keeps both texts on its single row.
+	singleAt := strings.Index(list, `class="connections-source-title" href="/wiki/single.html#only">Single</a>`)
+	if singleAt < 0 {
+		t.Fatalf("the topic connections list has no Single source: %s", list)
+	}
+	single := list[singleAt:]
+	rowEnd := strings.Index(single, `</div>`)
+	if rowEnd < 0 {
+		t.Fatalf("Single's row is not closed: %s", single)
+	}
+	single = single[:rowEnd]
+	if n := strings.Count(single, `class="connections-quote"`); n != 2 {
+		t.Errorf("Single carries %d quotes, want 2: %s", n, single)
+	}
+	first := strings.Index(list, "Top of page")
+	second := strings.Index(list, "#first")
+	third := strings.Index(list, "#second")
+	if first < 0 || second < 0 || third < 0 || !(first < second && second < third) {
+		t.Errorf("About's places are not in document order: %s", list)
+	}
+	// Sections follow the sidebar, so a guide page sorts after the root pages
+	// even when its title comes first alphabetically.
+	aardvark := strings.Index(list, `class="connections-source-title" href="/wiki/guide/notes.html">Aardvark</a>`)
+	if aardvark < 0 || aardvark < singleAt {
+		t.Errorf("the guide source is not after the root sources: %s", list)
+	}
 
 	home := readPage(t, filepath.Join(out, "wiki", "index.html"))
-	start = strings.Index(home, `<ul class="connections-list">`)
-	end = -1
-	if start >= 0 {
-		if n := strings.Index(home[start:], `</ul>`); n >= 0 {
-			end = start + n
-		}
-	}
-	if start < 0 || end < 0 {
-		t.Fatal("Home has no connections list")
-	}
-	if !strings.Contains(home[start:end], `href="/wiki/guide/topic.html"`) {
+	if !strings.Contains(connectionsList(t, home), `href="/wiki/guide/topic.html"`) {
 		t.Error("Home has no backlink to Topic")
 	}
 	if strings.Contains(home, "No pages link here yet.") {
