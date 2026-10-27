@@ -128,8 +128,15 @@
 
   function ariaLabel(n) {
     var what = n.kind === 'tag' ? 'tag' : n.stub ? 'missing page' : 'page';
-    var links = n.degree === 1 ? '1 connection' : n.degree + ' connections';
-    return n.title + ', ' + what + ', ' + links;
+    var links = 0;
+    (state.adj[n.id] || []).forEach(function (link) {
+      if (link.kind === 'link') links += 1;
+    });
+    return n.title + ', ' + what + ', ' + countText(links, 'link', 'links');
+  }
+
+  function countText(count, one, many) {
+    return count + ' ' + (count === 1 ? one : many);
   }
 
   // The graph builder slugifies tags with the same alphabet as page slugs: a
@@ -322,7 +329,7 @@
       var kind = document.createElement('span');
       kind.textContent = listKind(n);
       var counts = document.createElement('span');
-      counts.textContent = links.incoming + ' in / ' + links.outgoing + ' out';
+      counts.textContent = links.linksIn + ' in / ' + links.linksOut + ' out';
       meta.appendChild(kind);
       meta.appendChild(counts);
       if (n.tags.length) {
@@ -739,8 +746,8 @@
     state.adj = Object.create(null);
     state.nodes.forEach(function (n) { state.adj[n.id] = []; });
     state.edges.forEach(function (e) {
-      state.adj[e.from.id].push({ node: e.to, dir: 'out' });
-      state.adj[e.to.id].push({ node: e.from, dir: 'in' });
+      state.adj[e.from.id].push({ node: e.to, dir: 'out', kind: e.kind });
+      state.adj[e.to.id].push({ node: e.from, dir: 'in', kind: e.kind });
     });
     fillPathOptions();
   }
@@ -2083,25 +2090,30 @@
     return dirs.out ? 'linked from this page' : 'links to this page';
   }
 
+  // One entry per neighbouring page or tag hub, plus the link totals the panel
+  // reports. A tag edge is a relation but not a link, so the counts and the
+  // per-neighbour badge read link edges only.
   function connections(n) {
     var links = state.adj[n.id] || [];
     var merged = Object.create(null);
     var list = [];
-    var incoming = 0;
-    var outgoing = 0;
+    var linksIn = 0;
+    var linksOut = 0;
     links.forEach(function (link) {
-      if (link.dir === 'in') incoming += 1;
-      else outgoing += 1;
       var entry = merged[link.node.id];
       if (!entry) {
-        entry = { node: link.node, dirs: Object.create(null) };
+        entry = { node: link.node, dirs: Object.create(null), links: 0 };
         merged[link.node.id] = entry;
         list.push(entry);
       }
       entry.dirs[link.dir] = true;
+      if (link.kind !== 'link') return;
+      entry.links += 1;
+      if (link.dir === 'in') linksIn += 1;
+      else linksOut += 1;
     });
     list.sort(function (a, b) { return a.node.title.localeCompare(b.node.title); });
-    return { list: list, incoming: incoming, outgoing: outgoing };
+    return { list: list, linksIn: linksIn, linksOut: linksOut };
   }
 
   function select(n, withView, hops, restoring) {
@@ -2128,7 +2140,10 @@
     var links = connections(n);
     var meta = document.createElement('p');
     meta.className = 'graph-details-meta';
-    var bits = [links.incoming + ' incoming', links.outgoing + ' outgoing'];
+    var bits = [
+      countText(links.linksIn, 'link', 'links') + ' in',
+      countText(links.linksOut, 'link', 'links') + ' out'
+    ];
     if (n.site) bits.push(n.site);
     meta.textContent = bits.join(' / ');
     details.appendChild(meta);
@@ -2148,7 +2163,7 @@
     if (links.list.length) {
       var caption = document.createElement('p');
       caption.className = 'graph-details-kind';
-      caption.textContent = links.list.length === 1 ? '1 connection' : links.list.length + ' connections';
+      caption.textContent = countText(links.list.length, 'connection', 'connections');
       details.appendChild(caption);
 
       var list = document.createElement('ul');
@@ -2160,7 +2175,15 @@
         button.type = 'button';
         button.className = 'graph-neighbour';
         button.textContent = entry.node.title;
-        button.setAttribute('aria-label', entry.node.title + ', ' + directionLabel(entry.dirs));
+        var label = entry.node.title + ', ' + directionLabel(entry.dirs);
+        if (entry.links > 1) {
+          var count = document.createElement('span');
+          count.className = 'graph-neighbour-count';
+          count.textContent = countText(entry.links, 'link', 'links');
+          button.appendChild(count);
+          label += ', ' + countText(entry.links, 'link', 'links');
+        }
+        button.setAttribute('aria-label', label);
         button.addEventListener('click', function () { select(entry.node, true); });
         item.appendChild(button);
         list.appendChild(item);

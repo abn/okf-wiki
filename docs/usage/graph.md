@@ -55,15 +55,19 @@ accent colour and labelled `cross-wiki` in the list.
   shortest undirected link path between the two pages and fades everything else.
   **Clear path** returns to the unfiltered view. The path is a local view state,
   not a URL parameter.
-- Select a node for its kind, section, tags, and incoming and outgoing counts.
-  The rest of the drawing fades to that node's neighbourhood: two hops for a
-  page (one when that set is very large), one for a tag. When the neighbourhood
-  fits, the view frames it.
-- The panel lists the node's connections as buttons, forty at a time with the
-  rest behind one more click. Select one to move to that node, or use **Open
+- Select a node for its kind, section, tags, and incoming and outgoing link
+  counts. The rest of the drawing fades to that node's neighbourhood: two hops
+  for a page (one when that set is very large), one for a tag. When the
+  neighbourhood fits, the view frames it.
+- The panel lists the node's connections as buttons, one per neighbour, forty
+  at a time with the rest behind one more click. A page that contributes more
+  than one link edge says how many, so the link totals and the button list
+  agree. The catalogue records one link edge per anchor in the source page, so
+  two links under one heading count once there while the Connections panel
+  counts every distinct link. Select one to move to that node, or use **Open
   page**, **Open tag page**, or **Clear selection**. Escape also clears the
-  focus. With the keyboard, tab to the graph, use the arrow keys
-  to move between nodes, and press Enter for the details.
+  focus. With the keyboard, tab to the graph, use the arrow keys to move between
+  nodes, and press Enter for the details.
 - Drag a node to move it. Scroll to zoom, drag the background to pan, and
   select **Fit view** or double-click the background to fit the graph again.
   An edge whose endpoints are both outside the view is not drawn, and an
@@ -83,9 +87,9 @@ view settings; they are not part of the shared URL state.
 
 At wide widths a **List view** sits beside the drawing. At narrow widths it
 follows the drawing instead. It lists the nodes and edges that match the
-current Filter, Show, Tags, Sections and focus, with connection counts on each
-node, and the link text and heading anchor on link edges. The counts in the
-status line stay in step with the drawing.
+current Filter, Show, Tags, Sections and focus, with incoming and outgoing link
+counts on each node, and the link text and heading anchor on link edges. The
+counts in the status line stay in step with the drawing.
 
 Select a node in the list to select it in the drawing, open its details and
 focus its neighbourhood. The list marks the current node. Node rows are normal
@@ -121,10 +125,15 @@ states around it.
 ## Local graph and backlinks
 
 Every content page has a **Connections** panel near the foot. It lists the
-pages that link to the current one, with the source page, its section, the
-heading the link sits under, and the text of the link. A page with no incoming
-links says so, which is useful for finding orphans. The panel is static HTML;
-it works with JavaScript off.
+pages that link to the current one, once per page, with the source page and the
+section it belongs to. Each entry quotes the text of every link that page makes
+to this one. A page that links from more than one place carries a count of its
+links, with the number of places when the two differ, and one nested row per
+place. A nested row names the heading its links sit under, or **Top of page**
+above the first heading, and opens the source there. Links under one heading
+share a row. Pages follow the sidebar's section order, then title, and links
+follow document order. A page with no incoming links says so, which is useful
+for finding orphans. The panel is static HTML; it works with JavaScript off.
 
 The same panel has a **Local graph** link. It opens the graph focused on the
 current page and its direct neighbours. The URL names the node and depth, for
