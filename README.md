@@ -1,103 +1,176 @@
-# okf-wiki
+<p align="center">
+  <img src=".github/assets/readme/brand-mark.svg" width="64" height="64" alt="">
+</p>
 
-Render an Open Knowledge Format (OKF v0.2) bundle as a branded, searchable
-static wiki, and serve it. Ships as a single static binary and as a container
-that auto-detects a mounted content directory.
+<h1 align="center">okf-wiki</h1>
 
-## Quick start
+<p align="center">
+  <strong>Your docs, rendered as a wiki.</strong><br>
+  A static, searchable, themeable site from a folder of Markdown.<br>
+  One binary or one container, with no build pipeline per project.
+</p>
 
-```bash
-# Binary
-make run                      # render ./docs and serve on http://127.0.0.1:8080/wiki/
+<p align="center">
+  <a href="https://github.com/abn/okf-wiki/actions/workflows/ci.yml"><img src="https://github.com/abn/okf-wiki/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://abn.github.io/okf-wiki/"><img src="https://img.shields.io/badge/docs-abn.github.io%2Fokf--wiki-2ea44f" alt="Docs"></a>
+  <a href="https://deepwiki.com/abn/okf-wiki"><img src="https://img.shields.io/badge/Ask-DeepWiki-6E56CF" alt="Ask DeepWiki"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/abn/okf-wiki" alt="Go version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/abn/okf-wiki" alt="License"></a>
+  <a href="https://github.com/abn/okf-wiki/pkgs/container/okf-wiki"><img src="https://img.shields.io/badge/ghcr.io-abn%2Fokf--wiki-2496ED?logo=podman&amp;logoColor=white" alt="Container image"></a>
+</p>
 
-# Container: mount any OKF bundle, no container path needed
-podman run --rm --network=host -v "$(pwd)/docs:ro,Z" ghcr.io/abn/okf-wiki:latest
-```
+<p align="center">
+  <a href="https://abn.github.io/okf-wiki/"><strong>Open the live wiki</strong></a>
+  ·
+  <a href="https://abn.github.io/okf-wiki/overview.html">Documentation</a>
+  ·
+  <a href="#quick-start">Quick start</a>
+</p>
 
-The `:Z` relabels the bind mount so an SELinux host lets the container read it.
+<img src=".github/assets/readme/hero-light.png" alt="The okf-wiki default theme: a docs page with sidebar navigation, an on-page table of contents, and a rendered Mermaid diagram">
 
-## What you get
+## What it is
 
-- Sidebar navigation, on-page table of contents, breadcrumbs.
-- GitHub alert callouts, syntax-highlighted code, Mermaid diagrams (ELK layout)
-  with a full-screen pan/zoom lightbox.
-- Full-text search over a build-time index, opened with `Cmd/Ctrl-K` or `/`.
-- A structural graph with section clusters, semantic zoom, search-to-graph,
-  path finding and cross-wiki edges.
-- An agent surface: `llms.txt`, `pages.json`, Markdown sources, and a read-only
-  MCP server for search, reading, graph navigation, changes and health.
-- A light/dark theme, skinnable at runtime by mounting a theme directory.
-- The whole source bundle as one download, with `--bundle`.
-- A container that renders diagrams with no network access.
+okf-wiki is for teams that keep docs in Git and want them browsable,
+searchable, and shareable without adopting a docs platform or a per-project
+build pipeline. It reads an OKF v0.2 bundle, writes a static site, and serves
+it. No editor, no database, no auth; the Markdown stays the source of truth.
 
-## Use from an agent
+## Highlights
 
-Render the docs, then point an MCP client at the output or at a published wiki:
+- **Search without a service.** `Cmd/Ctrl-K` over a build-time index, grouped
+  by section, or by wiki in a multi-site tree.
+- **Diagrams without a network.** Mermaid with ELK layout, a pan/zoom
+  lightbox, and a runtime bundled into the image.
+- **A navigable graph.** Section clusters, semantic zoom, path finding, and
+  search-to-graph.
+- **Agent-ready.** `llms.txt`, `pages.json`, Markdown sources, and a read-only
+  MCP server.
+- **Themes at runtime.** Light and dark, re-skinned by mounting a directory,
+  with no rebuild.
+- **Deploy where you already are.** One static binary, one container, a GitHub
+  Action, or an offline folder.
 
-```bash
-okf-wiki render --content ./docs --out ./public --base /wiki/
+## Search
 
-# local stdio MCP
-okf-wiki mcp --out ./public --base /wiki/
+Full-text search runs over an index built at render time, so there is no
+search service to run. Results are grouped by section, keyboard-first, and can
+jump straight to the graph.
 
-# the same endpoint on the wiki's own port, at /wiki/_/mcp
-okf-wiki serve --content ./docs --mcp
+![Search results grouped by section, with the query "mermaid"](.github/assets/readme/search.png)
 
-# the same, without the _ segment: /wiki/mcp
-okf-wiki serve --content ./docs --mcp --mcp-prefix ""
+## Graph
 
-# one or more published wikis
-okf-wiki mcp --source docs=https://docs.example.com/wiki/
-```
+The graph is built from the same bundle: pages and tags as nodes, links and
+tags as edges. It supports section clusters, semantic zoom, path finding
+between two pages, and search-to-graph.
 
-The server exposes read-only search, page and section reads, budgeted context
-packs, neighbours and paths, changes and graph health. `--source` is repeatable
-and each source can use a bearer token from an environment variable. A thin
-HTTP endpoint is available with `--http`, with TLS and authentication handled
-by a proxy, and `serve --mcp` mounts the same handler under the wiki base so one
-port serves both. `--mcp-prefix ""` drops the default `_/` segment and mounts it
-at `<base>/mcp`.
+![The knowledge graph with section clusters and page labels](.github/assets/readme/graph.png)
 
-See [docs/usage/mcp.md](docs/usage/mcp.md) for MCP client configuration,
-federation examples and troubleshooting, [docs/usage/agent-access.md](docs/usage/agent-access.md)
-for the discovery and citation surface, and
-[docs/reference/agent-access.md](docs/reference/agent-access.md) for the result
-contract.
-
-## Theming
+## Themes
 
 The default theme is embedded in the binary. `--theme DIR` (or
-`OKF_WIKI_THEME`) layers a directory over it, so re-skinning is a bind mount and
-an environment variable rather than a rebuild:
+`OKF_WIKI_THEME`) layers a directory over it, so re-skinning is a bind mount
+and an environment variable rather than a rebuild.
+
+<p align="center">
+  <img src=".github/assets/readme/theme-light.png" width="49%" alt="The callouts page in the light theme">
+  <img src=".github/assets/readme/theme-dark.png" width="49%" alt="The callouts page in the dark theme">
+</p>
 
 ```bash
 podman run --rm -p 8080:8080 \
-  -v "$(pwd)/docs:/content:ro" \
-  -v "$(pwd)/themes/acme:/theme:ro,Z" \
+  -v "$PWD/docs:/content:ro" \
+  -v "$PWD/themes/acme:/theme:ro" \
   -e OKF_WIKI_THEME=/theme \
   ghcr.io/abn/okf-wiki:latest
 ```
 
-A theme restates only what it changes. See
-[docs/reference/themes.md](docs/reference/themes.md).
+A theme restates only what it changes. Add `,Z` to both mounts on an SELinux
+host. See [docs/reference/themes.md](docs/reference/themes.md).
+
+## Multi-site trees
+
+One tree can hold many wikis, with search across the whole tree and a header
+that belongs to the deployment rather than the wiki you happen to be in.
+
+![Search results grouped under a heading per wiki](docs/usage/assets/multi-site-search.png)
+
+See [the multi-site tour](docs/usage/multi-site-tour.md) for the index, the
+breadcrumb, and the phone layout.
+
+## Quick start
+
+Container, with no Go toolchain and no build step:
+
+```bash
+git clone --depth 1 https://github.com/abn/okf-wiki.git
+cd okf-wiki
+podman run --rm -p 8080:8080 -v "$PWD/docs:/content:ro" ghcr.io/abn/okf-wiki:latest
+# open http://127.0.0.1:8080/wiki/
+```
+
+The same command works with `docker`. On an SELinux host, append `,Z` to the
+mount: `-v "$PWD/docs:/content:ro,Z"`. Replace `$PWD/docs` with any OKF bundle.
+
+Binary, if you have Go 1.25 or newer:
+
+```bash
+go install github.com/abn/okf-wiki/cmd/okf-wiki@latest
+okf-wiki serve --content ./docs
+# okf-wiki: serving .scratch/wiki at http://127.0.0.1:8080/wiki/
+```
+
+`go install` puts the binary in `$(go env GOPATH)/bin`. The example serves
+`./docs` from a checkout; point `--content` at any OKF bundle. `make run` does
+the same from a checkout and opens the browser.
+
+## Use from an agent
+
+The wiki publishes `llms.txt`, `pages.json`, and the Markdown sources, and it
+can serve a read-only MCP endpoint for search, page and section reads, budgeted
+context packs, graph navigation, changes, and health:
+
+```bash
+okf-wiki serve --content ./docs --mcp
+# endpoint: http://127.0.0.1:8080/wiki/_/mcp
+```
+
+The standalone `okf-wiki mcp` command reads a published wiki and can federate
+several sources over stdio or HTTP:
+
+```bash
+okf-wiki mcp --source docs=https://docs.example.com/wiki/
+```
+
+See [docs/usage/mcp.md](docs/usage/mcp.md) for client configuration and
+federation, [docs/usage/agent-access.md](docs/usage/agent-access.md) for the
+discovery and citation surface, and
+[docs/reference/agent-access.md](docs/reference/agent-access.md) for the result
+contract.
 
 ## GitHub Actions
 
 ```yaml
-- uses: abn/okf-wiki/action@v1
+- uses: abn/okf-wiki/action@main
   with:
     content: docs
     deploy: true    # omit to build only
 ```
 
 The base path comes from the repository name, so a project site publishes under
-`/<repo>` unconfigured. See
-[docs/usage/github-action.md](docs/usage/github-action.md).
+`/<repo>` unconfigured. `@main` tracks the branch until a stable `v1` tag is
+published. See [docs/usage/github-action.md](docs/usage/github-action.md).
 
 ## Documentation
 
-The project wiki lives in [`docs/`](docs/index.md) and is rendered by this tool.
-Read it at `make run`, or start with [docs/index.md](docs/index.md).
+- Live wiki: <https://abn.github.io/okf-wiki/>
+- Source bundle: [`docs/`](docs/index.md), rendered by this tool
+- DeepWiki: <https://deepwiki.com/abn/okf-wiki>
+- Command line, container, offline folder, multi-site, graph, and MCP:
+  [docs/usage/index.md](docs/usage/index.md)
+- Every flag and environment variable:
+  [docs/reference/configuration.md](docs/reference/configuration.md)
 
 ## Development
 
@@ -105,6 +178,7 @@ Read it at `make run`, or start with [docs/index.md](docs/index.md).
 make check        # format, vet, test
 make render       # render docs/ to .scratch/wiki
 make vendor       # build the offline mermaid bundle (needs node)
+make screenshots  # capture the README images (needs Playwright and Chrome)
 make container/build
 ```
 
@@ -117,5 +191,5 @@ MIT. See [LICENSE](LICENSE).
 
 Third-party components ship with their own licenses, which are recorded in
 [THIRD-PARTY.md](THIRD-PARTY.md): the self-hosted fonts under the SIL Open Font
-License, and the bundled diagram runtime, which is mostly MIT. A theme may bundle
-its own faces, and then that theme's license applies to them.
+License, and the bundled diagram runtime, which is mostly MIT. A theme may
+bundle its own faces, and then that theme's license applies to them.

@@ -11,12 +11,15 @@ The `okf-wiki` action renders an OKF bundle in a workflow and, optionally,
 publishes it to GitHub Pages. It runs the published image, so a consumer needs
 neither a Go toolchain nor a diagram bundle build.
 
+The examples use `@main` until a stable `v1` tag is published. Pin the tag once
+it exists.
+
 ## Render only
 
 ```yaml
 - uses: actions/checkout@v7
 
-- uses: abn/okf-wiki/action@v1
+- uses: abn/okf-wiki/action@main
   with:
     content: docs
 ```
@@ -61,7 +64,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - id: deploy
-        uses: abn/okf-wiki/action@v1
+        uses: abn/okf-wiki/action@main
         with:
           content: docs
           deploy: true
