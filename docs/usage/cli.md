@@ -204,11 +204,12 @@ happened to be, so it prints something like
 apart can get different binaries. It is a moving target, not a release. For
 anything reproducible, pin a commit or build from a checkout you chose.
 
-A related consequence: `okf-wiki version` prints a constant compiled into the
-binary, not a version derived from git. It reads `0.1.0`, it is not kept in step
-with anything, and the build passes no `-X` ldflag to override it. Treat it as a
-label rather than a version, and read the pseudo-version Go resolved for the
-provenance of a `go install` build.
+A related consequence: `okf-wiki version` prints the `Version` constant compiled
+into the binary, not a version derived from git. Release Please bumps that
+constant in each release pull request, so a tagged build agrees with its tag; a
+build from an untagged commit prints the last released version, not that commit.
+The build passes no `-X` ldflag, so there is nothing else to override, and the
+pseudo-version Go resolved is the provenance of a `go install` build.
 
 ## Reading these docs
 

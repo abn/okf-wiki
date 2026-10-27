@@ -279,7 +279,7 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			Result: map[string]any{
 				"protocolVersion": protocol,
 				"capabilities":    map[string]any{"tools": map[string]any{}},
-				"serverInfo":      map[string]any{"name": "okf-wiki", "version": version},
+				"serverInfo":      map[string]any{"name": "okf-wiki", "version": Version},
 			},
 		}
 	case "ping":

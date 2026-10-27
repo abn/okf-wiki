@@ -5,6 +5,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-28
 
+* **Release**: Release Please manages the version from Conventional Commits. It
+  opens a release pull request that bumps `Version` in `cmd/okf-wiki/main.go` and
+  adds the changelog; merging it tags `vX.Y.Z`, dispatches the image publish at
+  that tag, and runs the SemVer checker, which points the action's `vX` and
+  `vX.Y` refs at the newest patch. `contribution/index.md` and
+  `usage/github-action.md` record it.
 * **Docs**: The contribution guide records `make screenshots`, the capture
   script, and its Playwright and Chromium requirement. The GitHub Action
   examples use `@main` until a stable `v1` tag is published. The README front

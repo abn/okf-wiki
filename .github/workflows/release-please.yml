@@ -1,0 +1,62 @@
+name: Release Please
+
+# Versioning and releases. Release Please creates the release pull request and
+# the release with the workflow GITHUB_TOKEN, and a tag or release created that
+# way starts no workflow. The follow-up work is therefore done here rather than
+# left to triggers that would never fire: the semver check is called directly,
+# and the image publish is dispatched at the new tag.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release pull request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  semver:
+    name: Floating action tags
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/semver.yml
+
+  publish:
+    name: Publish the release image
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      # A tag pushed by release-please starts no workflow, so the tag trigger in
+      # publish.yml would not carry the release. A dispatch does, and its ref is
+      # the tag, so publish.yml tags the image with the version.
+      - name: Dispatch the image publish at the new tag
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh workflow run publish.yml --ref "$TAG"

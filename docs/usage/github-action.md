@@ -11,8 +11,9 @@ The `okf-wiki` action renders an OKF bundle in a workflow and, optionally,
 publishes it to GitHub Pages. It runs the published image, so a consumer needs
 neither a Go toolchain nor a diagram bundle build.
 
-The examples use `@main` until a stable `v1` tag is published. Pin the tag once
-it exists.
+The examples use `@main` until the first release. After that, pin `@v1.0.0` for
+an immutable release, or use `@v1.0` and `@v1`, which float to the newest patch
+and are repointed on every release.
 
 ## Render only
 

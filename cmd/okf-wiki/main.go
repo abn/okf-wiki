@@ -23,7 +23,9 @@ import (
 	"github.com/abn/okf-wiki/internal/wiki"
 )
 
-const version = "0.1.0"
+// Version is the binary's release. Release Please bumps this constant in the
+// release pull request, so keep the form `const Version = "x.y.z"`.
+const Version = "0.1.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -42,7 +44,7 @@ func main() {
 	case "mcp":
 		runMCP(os.Args[2:])
 	case "version", "-v", "--version":
-		fmt.Printf("okf-wiki %s\n", version)
+		fmt.Printf("okf-wiki %s\n", Version)
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -53,7 +55,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `okf-wiki `+version+` - render and serve an OKF wiki
+	fmt.Fprint(os.Stderr, `okf-wiki `+Version+` - render and serve an OKF wiki
 
 usage:
   okf-wiki serve  [CONTENT [OUT]] [flags]   render, then serve until interrupted
