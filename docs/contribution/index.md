@@ -90,6 +90,44 @@ Registry and image name are set by the `IMAGE_NAME` repository variable
 registry is derived from it. Publishing uses the workflow `GITHUB_TOKEN`, so no
 extra secrets are required.
 
+## Releases
+
+Releases are driven by Conventional Commits and
+[Release Please](https://github.com/googleapis/release-please).
+
+`release-please.yml` runs on every push to `main`, works out the next version
+from the commits since the last tag, and opens or updates a release pull
+request. That pull request bumps the `Version` constant in
+`cmd/okf-wiki/main.go` and adds the changelog entry. Merging it is the release:
+Release Please creates the `vX.Y.Z` tag and the GitHub release, starting at
+`1.0.0` for the first one.
+
+The release pull request and the release are both made with the workflow
+`GITHUB_TOKEN`, and events from that token start no other workflows. The release
+job therefore runs the follow-up work itself:
+
+- It calls `semver.yml`, which runs
+  [`actions-semver-checker`](https://github.com/jessehouwing/actions-semver-checker)
+  with auto-fix. The checker keeps the references the action is consumed
+  through correct: `vX` and `vX.Y` point at the newest patch release, every
+  `vX.Y.Z` tag has a published release, and the newest release is marked latest.
+  Marketplace checks are off, because `action.yml` lives under `action/` and the
+  repository is not a Marketplace listing. The same file runs on a published
+  release and on manual dispatch, so a tag pushed or released by other means is
+  repaired too.
+- It dispatches `publish.yml` at the new tag, which publishes
+  `ghcr.io/abn/okf-wiki:vX.Y.Z`. The tag trigger in `publish.yml` still covers a
+  tag pushed by hand.
+
+A release pull request is opened by the GitHub Actions app, so its
+`pull_request` runs are created in `action_required`: nothing executes until
+someone chooses "Approve and run", and every force push Release Please makes to
+the branch needs approving again. A run still waiting when the branch is deleted
+at merge can end as a failure with no jobs, which is noise rather than a red
+build. Approve the latest run when you want CI on the release pull request, or
+merge it without checks: it holds the version bump and the changelog, and the
+commits it gathers were already verified on `main`.
+
 ## Dependency updates
 
 Dependabot (`.github/dependabot.yml`) opens grouped updates once a month for Go

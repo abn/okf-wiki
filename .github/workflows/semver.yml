@@ -1,0 +1,43 @@
+name: SemVer
+
+# Keeps the references the action is consumed through in step with its
+# releases: `vX` and `vX.Y` float to the newest patch, every `vX.Y.Z` tag has a
+# published release, and the newest release is marked latest.
+#
+# A release created by release-please is published with the workflow
+# GITHUB_TOKEN, whose events start no workflows, so release-please.yml calls
+# this file directly. The release trigger covers a release published by hand,
+# and the dispatch is for a repair on its own. The concurrency group keeps the
+# two paths from fixing tags at the same time.
+
+on:
+  workflow_call:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semver
+  cancel-in-progress: false
+
+jobs:
+  tags:
+    name: Check the version tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repair the version tags and releases
+        uses: jessehouwing/actions-semver-checker@v2
+        with:
+          token: ${{ github.token }}
+          auto-fix: true
+          check-minor-version: error
+          check-releases: error
+          check-release-immutability: error
+          # The action's action.yml lives under action/, not at the repository
+          # root, so this repository is not a Marketplace listing.
+          check-marketplace: none
