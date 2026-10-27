@@ -24,7 +24,7 @@ BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE)
 export GOCACHE ?= $(CURDIR)/.scratch/gocache
 
 .PHONY: setup vendor build test vet fmt lint check run render render-themed firefox \
-        container/build container/run container/shell clean help
+        screenshots container/build container/run container/shell clean help
 
 ##@ Bootstrap
 
@@ -62,6 +62,11 @@ firefox: ## Render $(CONTENT) offline and run the Firefox smoke test (needs Fire
 	@$(MAKE) --no-print-directory vendor
 	go run ./cmd/okf-wiki render --content $(CONTENT) --out .scratch/offline --offline $(BRANDING)
 	python3 scripts/check-offline-firefox.py .scratch/offline/wiki
+
+# The README images are regenerated from the same bundle the site uses, so a
+# change to the theme or the renderer shows up in the next capture.
+screenshots: vendor ## Capture the README screenshots (needs Playwright and Chrome)
+	python3 scripts/capture-readme-screenshots.py
 
 ##@ Build & Quality
 

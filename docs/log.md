@@ -3,6 +3,13 @@
 This file tracks changes to the documentation bundle itself: pages added,
 deprecated, or restructured. It is deliberately separate from software releases.
 
+## 2026-10-28
+
+* **Docs**: The contribution guide records `make screenshots`, the capture
+  script, and its Playwright and Chromium requirement. The GitHub Action
+  examples use `@main` until a stable `v1` tag is published. The README front
+  page now leads with the live wiki, badges, and screenshots.
+
 ## 2026-10-27
 
 * **Feature**: A page's Connections panel groups links by source page. A page

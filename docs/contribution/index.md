@@ -21,6 +21,7 @@ changes, update the relevant page and add an entry to `docs/log.md`.
   or the container image.
 - Python 3 and Selenium, with Firefox, only to run `make firefox` or the CI
   Firefox smoke test.
+- Playwright and a Chromium build, only to run `make screenshots`.
 
 ## Offline browser check
 
@@ -29,12 +30,21 @@ and runs `scripts/check-offline-firefox.py` against it. It needs Firefox and
 Selenium; Selenium Manager fetches a matching geckodriver. CI runs the same
 target.
 
+## README screenshots
+
+`make screenshots` renders `docs/`, serves it on a loopback port, and writes the
+images under `.github/assets/readme/` with
+`scripts/capture-readme-screenshots.py`. It needs Playwright and a Chromium
+build, or a system Chrome passed with `--chrome`. The images are ordinary PNGs
+and are reduced to a palette when ImageMagick is available. Re-run the target
+after a theme or rendering change so the front page does not show an old build.
+
 ## Layout
 
 - `cmd/okf-wiki`: the CLI.
 - `internal/wiki`: renderer, config, detection, server, and embedded assets.
 - `mermaid`: the pinned mermaid and ELK bundle build.
-- `scripts`: browser smoke tests.
+- `scripts`: browser smoke tests and the README capture script.
 - `Containerfile`: the multi-stage image build.
 
 ## Local hooks
