@@ -44,6 +44,22 @@ positional arguments, in that order, and they may be mixed with flags in any
 order. A flag or an environment variable still wins: a positional argument fills
 in only what was not stated explicitly.
 
+## Title warnings
+
+A title names the page in the sidebar, the graph, a search result, and the
+breadcrumb, so a render warns on stderr when one is longer than 80 characters or
+carries a line break:
+
+```text
+okf-wiki: warning: page logs/2026/08/11-entry has a 396-character title; keep it to 80 or fewer and put the summary in description
+```
+
+A bundle with many of them gets the first ten and a count, and the render still
+succeeds. Shorten the title and move the rest into `description`. The graph view
+draws a shortened label, but the sidebar, the browser tab, and a search result
+carry the title as written. Under `serve --watch`, a re-render prints the
+warnings again, so shortening a title clears them as you work.
+
 ## Theming and placement
 
 ```bash

@@ -359,6 +359,7 @@ func (r *Renderer) renderSite(root string, n *siteNode, trail []treeCrumb) (int,
 		r.skipped = append(r.skipped, SkippedSite{Rel: n.rel, Err: err})
 		return 0, nil
 	}
+	r.titleWarnings = append(r.titleWarnings, sub.TitleWarnings()...)
 	// The wiki rendered, so its pages and entries merge into the tree's
 	// aggregate index, labelled with the wiki they came from. renderSites
 	// visits the wikis in sorted rel order, and this preserves that order. A

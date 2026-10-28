@@ -10,6 +10,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
   which imports the theme's tokens and fonts and shows the committed brand mark.
   The cards live under `.github/assets/social/`, and the contribution guide and
   README record the target and its Chrome requirement.
+* **Render**: The command warns on stderr when a page title is longer than 80
+  characters or carries a line break, names the first ten and counts the rest,
+  and still succeeds. The title names the page in the sidebar, the graph, the
+  browser tab, and a search result, so `usage/cli.md` and `usage/graph.md` send
+  the fix to the bundle: shorten the title and move the summary into
+  `description`.
 * **Graph**: A section name wider than its cell is shortened at a word boundary
   instead of compressed to fit, and is measured again once the webfont swaps
   in. `usage/graph.md` records the rule.
