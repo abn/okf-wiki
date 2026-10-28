@@ -10,6 +10,12 @@ deprecated, or restructured. It is deliberately separate from software releases.
   which imports the theme's tokens and fonts and shows the committed brand mark.
   The cards live under `.github/assets/social/`, and the contribution guide and
   README record the target and its Chrome requirement.
+* **Graph**: A node draws a short label instead of its whole title. The
+  catalogue carries `label` when a title needs shortening, and the view uses it
+  for the canvas name, the list row, the details heading, the status line, the
+  connection buttons, and the path picker, while the full title stays on hover,
+  in the details panel, and on the page. `reference/graph.md` and
+  `usage/graph.md` record the field and the rule.
 * **Docs**: The rendered wiki labels the `adr/` section "Decisions". The title
   comes from `--sections`, set in the Makefile and the Pages workflow; the
   directory and its URLs are unchanged.
