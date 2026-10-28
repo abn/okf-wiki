@@ -16,8 +16,8 @@ serves it, as a binary or a container. The design lives in
 - Prose reads as human-written. No em-dashes, no marketing filler, no comments
   that restate the code. Full comment rules in
   [`.agents/rules/comments.md`](.agents/rules/comments.md).
-- A behaviour change moves the docs with it: update the relevant page and add a
-  line to [`docs/log.md`](docs/log.md).
+- A behaviour change moves the docs with it: update the relevant page and add an
+  entry page under `docs/logs/` (see [`docs/log.md`](docs/log.md)).
 - The `docs/` bundle is the single source of truth. Never hand-edit rendered
   output (`.scratch/`, `wiki/`); regenerate it.
 

@@ -12,7 +12,14 @@
 
 The `docs/` bundle is the project wiki and is public. It must never contain
 hostnames, absolute home paths, tokens, or internal identifiers. When behaviour
-changes, update the relevant page and add an entry to `docs/log.md`.
+changes, update the relevant page and add an entry page under `docs/logs/YYYY/MM/`.
+
+The entry pages are the change log; `docs/log.md` explains the model and lists no
+entries. Copy the most recent entry for its frontmatter, give it a short title under
+80 characters, name the page for the day and the change, and link the pages the
+change touched from its body. A new month also needs an `index.md` whose heading
+names it, for example `# November`, so the rail and the month page carry the name
+rather than the directory number.
 
 ## Environment
 
