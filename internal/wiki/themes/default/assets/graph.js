@@ -139,6 +139,12 @@
     return count + ' ' + (count === 1 ? one : many);
   }
 
+  // A catalogue can hold thousands of nodes, and a grouped number reads at a
+  // glance where five digits run together.
+  function formatCount(count) {
+    return String(count).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
   // The graph builder slugifies tags with the same alphabet as page slugs: a
   // lower-case word, with spaces, hyphens and underscores folded to hyphens.
   // The URL carries the slug so a tag with two spellings still has one filter.
@@ -290,20 +296,20 @@
     if (listStatus) {
       var parts = [];
       if (nodes.length !== allNodes.length) {
-        parts.push(nodes.length + ' of ' + allNodes.length + ' nodes');
+        parts.push(formatCount(nodes.length) + ' of ' + formatCount(allNodes.length) + ' nodes');
       } else {
-        parts.push(allNodes.length + (allNodes.length === 1 ? ' node' : ' nodes'));
+        parts.push(formatCount(allNodes.length) + (allNodes.length === 1 ? ' node' : ' nodes'));
       }
       if (edges.length !== allEdges.length) {
-        parts.push(edges.length + ' of ' + allEdges.length + ' edges');
+        parts.push(formatCount(edges.length) + ' of ' + formatCount(allEdges.length) + ' edges');
       } else {
-        parts.push(allEdges.length + (allEdges.length === 1 ? ' edge' : ' edges'));
+        parts.push(formatCount(allEdges.length) + (allEdges.length === 1 ? ' edge' : ' edges'));
       }
       var capped = nodes.length !== allNodes.length || edges.length !== allEdges.length;
       listStatus.textContent = (capped ? 'Showing ' : '') + parts.join(', ') + '.';
     }
-    if (listNodesTitle) listNodesTitle.textContent = 'Nodes (' + allNodes.length + ')';
-    if (listEdgesTitle) listEdgesTitle.textContent = 'Edges (' + allEdges.length + ')';
+    if (listNodesTitle) listNodesTitle.textContent = 'Nodes (' + formatCount(allNodes.length) + ')';
+    if (listEdgesTitle) listEdgesTitle.textContent = 'Edges (' + formatCount(allEdges.length) + ')';
 
     listNodes.textContent = '';
     if (!allNodes.length) {
@@ -1737,9 +1743,12 @@
     var total = state.nodes.length;
     var shown = 0;
     state.nodes.forEach(function (n) { if (n.matched) shown += 1; });
-    var text = 'Showing ' + shown + ' of ' + total + (total === 1 ? ' node' : ' nodes') + '.';
+    var noun = total === 1 ? 'node' : 'nodes';
+    var text = shown === total
+      ? formatCount(total) + ' ' + noun + '.'
+      : 'Showing ' + formatCount(shown) + ' of ' + formatCount(total) + ' ' + noun + '.';
     if (state.focus && state.selected) {
-      text += ' Focused on ' + state.selected.short + ': ' + state.focusCount +
+      text += ' Focused on ' + state.selected.short + ': ' + formatCount(state.focusCount) +
         (state.focusCount === 1 ? ' node' : ' nodes') + ' within ' +
         state.focusHops + (state.focusHops === 1 ? ' hop' : ' hops') + '. Press Escape to clear.';
     } else if (state.focusMissing) {

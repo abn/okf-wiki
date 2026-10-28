@@ -684,3 +684,31 @@ func TestGraphViewShortLabelContract(t *testing.T) {
 		}
 	}
 }
+
+// TestGraphViewCountsContract pins the status line's count copy: the total is
+// not repeated as a fraction when nothing narrows the view, and a count of
+// thousands is grouped.
+func TestGraphViewCountsContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function formatCount",
+		"shown === total",
+		"formatCount(state.focusCount)",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
