@@ -31,17 +31,19 @@ flowchart LR
    itself correctly. A directory inside a section is not a section of its own:
    its pages belong to the section above and keep the path in their slug, so
    `guide/setup/install.md` in a `guide` section is served at
-   `/wiki/guide/setup/install.html`. The sidebar follows one level of that
-   structure: pages that share a first sub-directory under their section are
-   grouped under a nested disclosure named from that sub-directory, and its
-   `index.md` becomes the group's own heading link. Deeper paths collapse into
-   their top group, so the rail stays flat while the tree it shows is two deep.
-   A group's pages are the rail's third level: they hang off a hairline rule
-   rather than a deeper indent, and a page whose title repeats its group heading
-   drops the shared prefix, so the row fits one line at any rail width. A
-   section opens one of its groups at a time, so a rail of many groups stays
-   short. `nav` in a page's frontmatter overrides the label the rail shows, for
-   a body title too long for the rail.
+   `/wiki/guide/setup/install.html`. The sidebar follows that structure: pages
+   that share a directory are grouped under a disclosure named from it, and its
+   `index.md` becomes the group's own heading link. A directory inside a group
+   nests the same way, so a page under `logs/2026/10/` reads as Logs, then 2026,
+   then October, then the page. Groups follow directory order, not the order
+   their pages happen to sort, so a month stays put when an entry title changes.
+   Each level opens one group at a time, so a nested rail of many groups stays
+   short. A group's pages hang off a hairline rule rather than a deeper indent,
+   and a page whose title repeats its group heading drops the shared prefix, so
+   the row fits one line at any rail width. A section with no `index.md` is plain
+   text rather than a link, in the rail and in the breadcrumb. `nav` in a page's
+   frontmatter overrides the label the rail shows, for a body title too long for
+   the rail.
    Markdown is collected at any depth. Files
    and directories whose name begins with a dot are skipped, so a bundle that is
    also a working tree does not render its own `.git`.

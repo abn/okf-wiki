@@ -313,11 +313,10 @@ details.side-sec:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   font-weight: var(--fw-semibold);
 }
 
-/* A sub-directory of a section, one level deep: a disclosure inside the
-   section's list, so a bundle two directories deep reads as its folders rather
-   than as a flat run of pages. Quieter than a section: a smaller summary at
-   medium weight and no extra indent on the summary itself, so it stays aligned
-   with its siblings. */
+/* A sub-directory of a section: a disclosure inside the list that holds it, so
+   a bundle of any depth reads as its folders rather than as a flat run of
+   pages. Quieter than a section: a smaller summary at medium weight and no
+   extra indent on the summary itself, so it stays aligned with its siblings. */
 .side details.side-sub { margin: 1px 0; }
 details.side-sub summary.side-subsum {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
@@ -341,8 +340,8 @@ details.side-sub summary.side-subsum:hover { background: var(--color-accent-soft
 .side-subsum a.active { color: var(--color-accent-text); }
 details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 /* The group's pages hang off a hairline rule rather than a deep indent, so the
-   third level reads as the group's leaves at any rail width: the rule sits under
-   the group's text and the leaves carry one weight below it. */
+   leaves read as the group's pages at any depth: the rule sits under the
+   group's text and the leaves carry one weight below it. */
 .side details.side-sub > ul {
   margin: var(--space-1) 0 0 var(--space-3);
   padding-left: 0;
