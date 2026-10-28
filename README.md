@@ -184,6 +184,7 @@ make check        # format, vet, test
 make render       # render docs/ to .scratch/wiki
 make vendor       # build the offline mermaid bundle (needs node)
 make screenshots  # capture the README images (needs Playwright and Chrome)
+make social-card  # render the GitHub social preview cards (needs Chrome)
 make container/build
 ```
 

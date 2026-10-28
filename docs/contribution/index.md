@@ -21,7 +21,9 @@ changes, update the relevant page and add an entry to `docs/log.md`.
   or the container image.
 - Python 3 and Selenium, with Firefox, only to run `make firefox` or the CI
   Firefox smoke test.
-- Playwright and a Chromium build, only to run `make screenshots`.
+- Playwright, with a Chromium build, only to run `make screenshots`.
+- Chrome or Chromium, only to run `make social-card`. `--chrome` or `CHROME`
+  points at one outside the PATH.
 
 ## Offline browser check
 
@@ -39,12 +41,22 @@ build, or a system Chrome passed with `--chrome`. The images are ordinary PNGs
 and are reduced to a palette when ImageMagick is available. Re-run the target
 after a theme or rendering change so the front page does not show an old build.
 
+## Social preview cards
+
+`make social-card` renders `scripts/social-card/card.html` at 1280x640 and
+writes the light and dark cards under `.github/assets/social/` with
+`scripts/capture-social-card.py`. It needs Chrome or Chromium. The page imports
+the theme's `tokens.css` and `fonts.css` and shows the committed brand mark, so
+a palette, font or mark change reaches the cards on the next render. GitHub
+takes one image in the repository settings, and the pair keeps both grounds
+ready.
+
 ## Layout
 
 - `cmd/okf-wiki`: the CLI.
 - `internal/wiki`: renderer, config, detection, server, and embedded assets.
 - `mermaid`: the pinned mermaid and ELK bundle build.
-- `scripts`: browser smoke tests and the README capture script.
+- `scripts`: browser smoke tests and the image capture scripts.
 - `Containerfile`: the multi-stage image build.
 
 ## Local hooks
