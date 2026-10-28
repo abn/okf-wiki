@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -288,6 +291,52 @@ func TestBindCommonBundle(t *testing.T) {
 			}
 			if cfg.Bundle != tc.want {
 				t.Errorf("Bundle = %v, want %v", cfg.Bundle, tc.want)
+			}
+		})
+	}
+}
+
+// TestReportTitleWarnings covers the render's warning output: the first pages
+// are named in a stable order, the rest are counted, and the count reads as a
+// plural or a singular.
+func TestReportTitleWarnings(t *testing.T) {
+	tests := []struct {
+		name  string
+		long  int
+		count string
+	}{
+		{"counts the remainder", titleWarningShown + 2, "2 more pages have a title that cannot work as a name"},
+		{"counts one page in the singular", titleWarningShown + 1, "1 more page has a title that cannot work as a name"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			must := func(name, body string) {
+				t.Helper()
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			must("index.md", "---\ntitle: Home\n---\n# Home\n")
+			for i := 0; i < tc.long; i++ {
+				must(fmt.Sprintf("long%d.md", i), "---\ntitle: "+strings.Repeat("x", 81)+"\n---\n# Long\n")
+			}
+			r, err := wiki.New(wiki.Config{Content: dir, Base: "/", Brand: wiki.Brand{Name: "t"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out strings.Builder
+			reportTitleWarnings(&out, r)
+
+			lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+			if len(lines) != titleWarningShown+1 {
+				t.Fatalf("report has %d lines, want %d:\n%s", len(lines), titleWarningShown+1, out.String())
+			}
+			if !strings.Contains(lines[0], "okf-wiki: warning: page long0 has a 81-character title; keep it to 80 or fewer") {
+				t.Errorf("first line = %q, want the first page named with what to do", lines[0])
+			}
+			if want := "okf-wiki: warning: " + tc.count; lines[len(lines)-1] != want {
+				t.Errorf("last line = %q, want %q", lines[len(lines)-1], want)
 			}
 		})
 	}

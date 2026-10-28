@@ -90,6 +90,9 @@ type Renderer struct {
 	// assembled from linked checkouts is exactly where a stale link lands, and
 	// taking every wiki down for one is worse than publishing the rest.
 	skipped []SkippedSite
+	// titleWarnings holds the pages whose title cannot work as a name. A tree
+	// gathers one list from its wikis as they render.
+	titleWarnings []TitleWarning
 	// nested marks a renderer for one wiki inside a multi-site tree. It shares
 	// the tree's theme, and it does not write the root redirect, which would
 	// otherwise point the whole tree at whichever wiki rendered last.
@@ -528,6 +531,7 @@ func (r *Renderer) load(root string) error {
 			r.sections = append(r.sections, sec)
 		}
 	}
+	r.checkTitles()
 	return nil
 }
 

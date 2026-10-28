@@ -61,7 +61,10 @@ accent colour and labelled `cross-wiki` in the list.
   sentence or clause, so a node stays a name on the canvas, in the list, in the
   details heading, in the status line, in a connection button, and in the path
   picker. The full title stays on hover, under **Full title** in the details
-  panel, and on the page itself.
+  panel, and on the page itself. A render warns on stderr when a title is
+  longer than 80 characters or carries a line break; the fix belongs in the
+  bundle, where shortening the title and moving the summary into `description`
+  keeps the sidebar, the tab title, and search results readable too.
 - **Path between pages** opens a From and To picker. **Find path** highlights the
   shortest undirected link path between the two pages and fades everything else.
   **Clear path** returns to the unfiltered view. The path is a local view state,

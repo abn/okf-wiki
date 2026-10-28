@@ -15,8 +15,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -195,8 +197,9 @@ func runServe(args []string) {
 }
 
 // reRender renders the configured bundle again into its output directory. It is
-// the reload path, so it stays quiet on success: the next request shows the
-// result, and Watch reports a failure.
+// the reload path, so it does not print the render summary: the next request
+// shows the result, and Watch reports a failure. Warnings are printed on every
+// reload, because the reload is where an author sees them while editing.
 func reRender(cfg wiki.Config) error {
 	r, err := wiki.New(cfg)
 	if err != nil {
@@ -205,9 +208,14 @@ func reRender(cfg wiki.Config) error {
 	if cfg.MultiSite {
 		_, err := r.RenderSites(cfg.Out)
 		reportSkipped(r)
+		reportTitleWarnings(os.Stderr, r)
 		return err
 	}
-	return r.RenderAll(cfg.Out)
+	if err := r.RenderAll(cfg.Out); err != nil {
+		return err
+	}
+	reportTitleWarnings(os.Stderr, r)
+	return nil
 }
 
 // reportSkipped names each wiki a tree render left out and why. A skipped wiki
@@ -216,6 +224,36 @@ func reRender(cfg wiki.Config) error {
 func reportSkipped(r *wiki.Renderer) {
 	for _, s := range r.SkippedSites() {
 		fmt.Fprintf(os.Stderr, "okf-wiki: skipped %s: %v\n", s.Rel, s.Err)
+	}
+}
+
+// titleWarningShown is how many long titles a render names before it counts the
+// rest. A bundle can carry a thousand of them, and the point is the pattern,
+// not a list.
+const titleWarningShown = 10
+
+// reportTitleWarnings names the pages whose title cannot work as a name. It
+// writes to stderr and leaves the exit status alone: the render succeeded, and
+// the fix belongs to the bundle rather than to the build.
+func reportTitleWarnings(w io.Writer, r *wiki.Renderer) {
+	warnings := append([]wiki.TitleWarning(nil), r.TitleWarnings()...)
+	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Page < warnings[j].Page })
+	for i, warning := range warnings {
+		if i == titleWarningShown {
+			more := len(warnings) - titleWarningShown
+			if more == 1 {
+				fmt.Fprintln(w, "okf-wiki: warning: 1 more page has a title that cannot work as a name")
+			} else {
+				fmt.Fprintf(w, "okf-wiki: warning: %d more pages have a title that cannot work as a name\n", more)
+			}
+			return
+		}
+		if warning.LineBreak {
+			fmt.Fprintf(w, "okf-wiki: warning: page %s has a line break in its title; keep it to one line and put the rest in description\n", warning.Page)
+			continue
+		}
+		fmt.Fprintf(w, "okf-wiki: warning: page %s has a %d-character title; keep it to %d or fewer and put the summary in description\n",
+			warning.Page, warning.Length, wiki.TitleWarningMax)
 	}
 }
 
@@ -280,6 +318,7 @@ func doRender(cfg *wiki.Config) error {
 		fmt.Printf("okf-wiki: rendered %d wikis from %s -> %s\n", wikis, cfg.Content, site)
 		fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)
 		reportSkipped(r)
+		reportTitleWarnings(os.Stderr, r)
 		return nil
 	}
 	if err := r.RenderAll(cfg.Out); err != nil {
@@ -291,6 +330,7 @@ func doRender(cfg *wiki.Config) error {
 	}
 	fmt.Printf("okf-wiki: rendered %d pages from %s -> %s\n", total, cfg.Content, site)
 	fmt.Printf("okf-wiki: theme %s %s (%s), base %s\n", theme.Name, theme.Version, theme.Source, cfg.Base)
+	reportTitleWarnings(os.Stderr, r)
 	return nil
 }
 
