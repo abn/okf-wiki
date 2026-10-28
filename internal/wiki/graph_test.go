@@ -722,3 +722,109 @@ func hasBroken(links []HealthLink, to string) bool {
 	}
 	return false
 }
+
+// TestDisplayLabel covers the short form a graph node is drawn with: a page
+// title is a name, but a bundle may carry a summary there, and the view has
+// one line per name.
+func TestDisplayLabel(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{"short title", "Install", "Install"},
+		{"blank title", "  ", ""},
+		{"whitespace folds", "Graph\n\tview", "Graph view"},
+		{"list marker", "- Added storage tiering", "Added storage tiering"},
+		{"document path", "docs/architecture/ugos-pro-nas.md: Documented UGOS Pro management boundaries, ACL mechanics via /usr/bin/ugacltool, and Samba share configurations.", "Documented UGOS Pro management boundaries, ACL mechanics via\u2026"},
+		{"list item with a path", "- docs/x.md: Added tiering and retention.", "Added tiering and retention."},
+		{"sentence inside the limit", "Researched and selected a stack. Then wrote it up at length for the record.", "Researched and selected a stack."},
+		{"short first sentence", "Fixed it. Then wrote up a much longer explanation that runs well past the limit.", "Fixed it."},
+		{"sentence ends on a number", "Upgraded to 8. Then wrote the rest of the migration notes out in full detail here", "Upgraded to 8."},
+		{"long clause cuts on a word", "Added storage tiering and ten-year retention, folding in the central observability proposal", "Added storage tiering and ten-year retention, folding in the\u2026"},
+		{"long word cuts at the limit", strings.Repeat("\u00fc", 70), strings.Repeat("\u00fc", labelMax-1) + "\u2026"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := displayLabel(tc.title); got != tc.want {
+				t.Errorf("displayLabel(%q) = %q, want %q", tc.title, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDisplayLabelKeepsAbbreviations covers the full stops that do not end a
+// sentence. Cutting at one leaves a dangling abbreviation or half a bracket,
+// which is a worse name than the clause cut the label falls back to.
+func TestDisplayLabelKeepsAbbreviations(t *testing.T) {
+	titles := []string{
+		"Configured quotas i.e. limits on storage for the year ahead and beyond all plans",
+		"Migrated to the new NAS (e.g. UGREEN) and documented the whole cutover in detail",
+		"Reviewed the ADR (No. 4) titled watch rerenders the whole tree and rewrote parts",
+		"Dr. Smith rewrote the whole deployment pipeline and documented every step in detail",
+		"See docs i.e. the ones written last year by the previous owner and never updated",
+	}
+	for _, title := range titles {
+		got := displayLabel(title)
+		if n := len([]rune(got)); n > labelMax {
+			t.Errorf("displayLabel(%q) = %q, %d runes, want at most %d", title, got, n, labelMax)
+		}
+		for _, dangling := range []string{"i.e.", "e.g.", "No.", "Dr."} {
+			if strings.HasSuffix(got, dangling) {
+				t.Errorf("displayLabel(%q) = %q, cut at %q", title, got, dangling)
+			}
+		}
+	}
+}
+
+// TestGraphLabelIsOptional covers the catalogue's label field: a short title
+// needs no second name, so the JSON carries none.
+func TestGraphLabelIsOptional(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	long := "Documented UGOS Pro management boundaries, ACL mechanics via /usr/bin/ugacltool, and Samba share configurations for the household"
+	mustWrite(t, filepath.Join(dir, "long.md"), "---\ntitle: "+long+"\n---\n# Entry\n")
+	r := newGraphRenderer(t, dir)
+	g := r.BuildGraph()
+
+	node, ok := graphNode(g, "page:long")
+	if !ok {
+		t.Fatalf("graph has no node for the long title: %+v", g.Nodes)
+	}
+	if node.Title != long {
+		t.Errorf("title = %q, want the written title", node.Title)
+	}
+	if node.Label == "" || node.Label == long {
+		t.Errorf("label = %q, want a short form of the title", node.Label)
+	}
+	home, ok := graphNode(g, "page:index")
+	if !ok {
+		t.Fatalf("graph has no node for the home page: %+v", g.Nodes)
+	}
+	if home.Label != "" {
+		t.Errorf("short title gained a label %q", home.Label)
+	}
+
+	raw, err := r.GraphJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Nodes []map[string]any `json:"nodes"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	labels := map[string]string{}
+	for _, n := range doc.Nodes {
+		if label, ok := n["label"].(string); ok {
+			labels[n["id"].(string)] = label
+		}
+	}
+	if label, ok := labels["page:index"]; ok {
+		t.Errorf("graph.json writes a label %q for a title that already fits", label)
+	}
+	if want := displayLabel(long); labels["page:long"] != want {
+		t.Errorf("graph.json label = %q, want %q", labels["page:long"], want)
+	}
+}

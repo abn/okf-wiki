@@ -51,6 +51,13 @@ accent colour and labelled `cross-wiki` in the list.
   in, or as soon as a filter or focus asks for them. A small graph that already
   fits at a readable scale can show page names immediately. Names keep their
   screen size at every zoom. Hover a node or select it to reveal its own name.
+- **Long titles**. A title can be longer than a name, because a log entry or a
+  generated page may carry its summary there. The view draws the catalogue's
+  `label`, which the render keeps to about 64 characters from the first
+  sentence or clause, so a node stays a name on the canvas, in the list, in the
+  details heading, in the status line, in a connection button, and in the path
+  picker. The full title stays on hover, under **Full title** in the details
+  panel, and on the page itself.
 - **Path between pages** opens a From and To picker. **Find path** highlights the
   shortest undirected link path between the two pages and fades everything else.
   **Clear path** returns to the unfiltered view. The path is a local view state,

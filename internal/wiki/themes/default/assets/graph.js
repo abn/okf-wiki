@@ -132,7 +132,7 @@
     (state.adj[n.id] || []).forEach(function (link) {
       if (link.kind === 'link') links += 1;
     });
-    return n.title + ', ' + what + ', ' + countText(links, 'link', 'links');
+    return n.short + ', ' + what + ', ' + countText(links, 'link', 'links');
   }
 
   function countText(count, one, many) {
@@ -264,6 +264,8 @@
     allNodes.sort(function (a, b) {
       var byKind = listRank(a) - listRank(b);
       if (byKind) return byKind;
+      var byName = a.short.localeCompare(b.short);
+      if (byName) return byName;
       var byTitle = a.title.localeCompare(b.title);
       return byTitle || a.id.localeCompare(b.id);
     });
@@ -271,9 +273,9 @@
       return listVisible(edge.from) && listVisible(edge.to);
     }).slice();
     allEdges.sort(function (a, b) {
-      var byFrom = a.from.title.localeCompare(b.from.title);
+      var byFrom = a.from.short.localeCompare(b.from.short);
       if (byFrom) return byFrom;
-      var byTo = a.to.title.localeCompare(b.to.title);
+      var byTo = a.to.short.localeCompare(b.to.short);
       if (byTo) return byTo;
       return a.kind.localeCompare(b.kind);
     });
@@ -315,8 +317,9 @@
       button.type = 'button';
       button.className = 'graph-list-node';
       button.setAttribute('data-id', n.id);
-      button.setAttribute('aria-label', 'Select ' + n.title + ', ' + listKind(n));
-      button.textContent = n.title;
+      button.setAttribute('aria-label', 'Select ' + n.short + ', ' + listKind(n));
+      button.textContent = n.short;
+      if (n.short !== n.title) button.title = n.title;
       if (state.selected === n) {
         item.classList.add('is-selected');
         button.setAttribute('aria-current', 'true');
@@ -374,13 +377,15 @@
       if (cross) item.classList.add('is-cross-site');
       var from = document.createElement('span');
       from.className = 'graph-list-edge-node';
-      from.textContent = edge.from.title;
+      from.textContent = edge.from.short;
+      if (edge.from.short !== edge.from.title) from.title = edge.from.title;
       var action = document.createElement('span');
       action.className = 'graph-list-edge-action';
       action.textContent = edge.kind === 'tag' ? 'tagged' : 'links to';
       var to = document.createElement('span');
       to.className = 'graph-list-edge-node';
-      to.textContent = edge.to.title;
+      to.textContent = edge.to.short;
+      if (edge.to.short !== edge.to.title) to.title = edge.to.title;
       var type = document.createElement('span');
       type.className = 'graph-list-edge-kind';
       type.textContent = cross ? 'cross-wiki' : edge.kind;
@@ -650,6 +655,7 @@
       return {
         id: String(n.id || ''),
         title: String(n.title || n.id || ''),
+        short: String(n.label || n.title || n.id || ''),
         url: n.url ? String(n.url) : '',
         kind: n.kind === 'tag' ? 'tag' : 'page',
         section: n.section ? String(n.section) : '',
@@ -775,8 +781,8 @@
     var pages = state.nodes.filter(function (n) {
       return n.kind === 'page' && !n.stub;
     }).sort(function (a, b) {
-      var as = (a.site || '') + '\x00' + (a.section || '') + '\x00' + a.title;
-      var bs = (b.site || '') + '\x00' + (b.section || '') + '\x00' + b.title;
+      var as = (a.site || '') + '\x00' + (a.section || '') + '\x00' + a.short;
+      var bs = (b.site || '') + '\x00' + (b.section || '') + '\x00' + b.short;
       return as.localeCompare(bs);
     });
     var fromValue = pathFrom.value;
@@ -786,7 +792,7 @@
     pages.forEach(function (n) {
       var option = document.createElement('option');
       option.value = n.id;
-      option.textContent = n.title + (n.site ? ' (' + n.site + ')' : '');
+      option.textContent = n.short + (n.site ? ' (' + n.site + ')' : '');
       pathFrom.appendChild(option);
       pathTo.appendChild(option.cloneNode(true));
     });
@@ -868,16 +874,16 @@
     var path = shortestPath(from.id, to.id);
     if (!path) {
       clearPath(false);
-      pathStatus.textContent = 'No link path between ' + from.title + ' and ' + to.title + '.';
+      pathStatus.textContent = 'No link path between ' + from.short + ' and ' + to.short + '.';
       return;
     }
     state.path = path;
     applyPath();
-    var route = path.nodes.map(function (n) { return n.title; }).join(' -> ');
+    var route = path.nodes.map(function (n) { return n.short; }).join(' -> ');
     pathStatus.textContent = path.edges.length === 0
-      ? 'Same page: ' + from.title + '.'
+      ? 'Same page: ' + from.short + '.'
       : 'Path: ' + path.edges.length + (path.edges.length === 1 ? ' step' : ' steps') +
-        ' between ' + from.title + ' and ' + to.title + '. Route: ' + route + '.';
+        ' between ' + from.short + ' and ' + to.short + '. Route: ' + route + '.';
   }
 
   function updateTagKindOption() {
@@ -1390,6 +1396,11 @@
       var g = document.createElementNS(NS, 'g');
       g.setAttribute('class', 'graph-node-group ' + n.kind + (n.stub ? ' stub' : ''));
       g.setAttribute('data-id', n.id);
+      if (n.short !== n.title) {
+        var full = document.createElementNS(NS, 'title');
+        full.textContent = n.title;
+        g.appendChild(full);
+      }
 
       var r = nodeRadius(n);
       var circle = document.createElementNS(NS, 'circle');
@@ -1435,7 +1446,7 @@
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('aria-hidden', 'true');
       label.setAttribute('y', String(-r - 5));
-      label.textContent = labelText(n.title);
+      label.textContent = labelText(n.short);
       g.appendChild(label);
       n.label = label;
 
@@ -1728,7 +1739,7 @@
     state.nodes.forEach(function (n) { if (n.matched) shown += 1; });
     var text = 'Showing ' + shown + ' of ' + total + (total === 1 ? ' node' : ' nodes') + '.';
     if (state.focus && state.selected) {
-      text += ' Focused on ' + state.selected.title + ': ' + state.focusCount +
+      text += ' Focused on ' + state.selected.short + ': ' + state.focusCount +
         (state.focusCount === 1 ? ' node' : ' nodes') + ' within ' +
         state.focusHops + (state.focusHops === 1 ? ' hop' : ' hops') + '. Press Escape to clear.';
     } else if (state.focusMissing) {
@@ -2112,7 +2123,7 @@
       if (link.dir === 'in') linksIn += 1;
       else linksOut += 1;
     });
-    list.sort(function (a, b) { return a.node.title.localeCompare(b.node.title); });
+    list.sort(function (a, b) { return a.node.short.localeCompare(b.node.short); });
     return { list: list, linksIn: linksIn, linksOut: linksOut };
   }
 
@@ -2134,8 +2145,24 @@
 
     var title = document.createElement('h2');
     title.tabIndex = -1;
-    title.textContent = n.title;
+    title.textContent = n.short;
+    if (n.short !== n.title) title.title = n.title;
     details.appendChild(title);
+
+    // Hover is not the only way to the full title: the catalogue keeps it, and
+    // a reader who cannot use a tooltip, or who is on a touch screen, opens it
+    // here.
+    if (n.short !== n.title) {
+      var full = document.createElement('details');
+      full.className = 'graph-details-full';
+      var summary = document.createElement('summary');
+      summary.textContent = 'Full title';
+      var text = document.createElement('p');
+      text.textContent = n.title;
+      full.appendChild(summary);
+      full.appendChild(text);
+      details.appendChild(full);
+    }
 
     var links = connections(n);
     var meta = document.createElement('p');
@@ -2174,8 +2201,9 @@
         var button = document.createElement('button');
         button.type = 'button';
         button.className = 'graph-neighbour';
-        button.textContent = entry.node.title;
-        var label = entry.node.title + ', ' + directionLabel(entry.dirs);
+        button.textContent = entry.node.short;
+        if (entry.node.short !== entry.node.title) button.title = entry.node.title;
+        var label = entry.node.short + ', ' + directionLabel(entry.dirs);
         if (entry.links > 1) {
           var count = document.createElement('span');
           count.className = 'graph-neighbour-count';

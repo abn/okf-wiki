@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // graphVersion is the schema version of graph.json. A reader checks it before
@@ -40,6 +41,114 @@ func pageTitle(p Page) string {
 	return p.Slug
 }
 
+// labelMax is how much of a title a one-line name gets. The graph draws it on a
+// canvas label, a list row, a details heading, and a neighbour button, and
+// beyond this it stops naming a node and starts reading as a paragraph.
+const labelMax = 64
+
+// graphLabel is the optional short form of a node title. It is empty when the
+// title already fits, so a catalogue carries a label only where it says
+// something the title does not.
+func graphLabel(title string) string {
+	if label := displayLabel(title); label != title {
+		return label
+	}
+	return ""
+}
+
+// displayLabel shortens a title into a name. A long title is usually a
+// summary: it opens with a list marker, a document path, or a sentence longer
+// than the line, and the reader needs the first clause rather than the whole
+// paragraph. The full title stays in the catalogue for search, the details
+// panel, and the page itself.
+func displayLabel(title string) string {
+	s := strings.Join(strings.Fields(title), " ")
+	if s == "" {
+		return ""
+	}
+	// A title written as a Markdown list item keeps its bullet, which names
+	// nothing once the marker is the first thing on the line.
+	for _, marker := range []string{"- ", "* ", "+ "} {
+		if strings.HasPrefix(s, marker) {
+			s = strings.TrimSpace(strings.TrimPrefix(s, marker))
+			break
+		}
+	}
+	// An entry written as "path/to/page.md: what happened" leads with a file
+	// path. The sentence after it is the name a reader recognises, so the
+	// path is dropped when it is one word rather than a sentence of its own.
+	if i := strings.Index(s, ".md: "); i > 0 && !strings.ContainsAny(s[:i], " \t") {
+		s = s[i+len(".md: "):]
+	}
+	runes := []rune(s)
+	if len(runes) <= labelMax {
+		return s
+	}
+	// A sentence that ends inside the limit is already a name; cutting it
+	// further would only lose the end of a thought.
+	for i := 0; i < labelMax; i++ {
+		if sentenceEnd(runes, i) {
+			return string(runes[:i+1])
+		}
+	}
+	cut := labelMax - 1
+	for cut > 0 && runes[cut-1] != ' ' {
+		cut--
+	}
+	if cut == 0 {
+		cut = labelMax - 1
+	}
+	return strings.TrimRight(string(runes[:cut]), " \t,;:.-") + "\u2026"
+}
+
+// sentenceEnd reports whether runes[i] closes a sentence a label can end on.
+// A full stop is not enough on its own: "e.g.", "Dr." and "No." are full stops
+// in the middle of a name, and a bracket left open means the sentence runs on.
+func sentenceEnd(runes []rune, i int) bool {
+	if runes[i] != '.' && runes[i] != '!' && runes[i] != '?' {
+		return false
+	}
+	if i+2 >= len(runes) || runes[i+1] != ' ' || !unicode.IsUpper(runes[i+2]) {
+		return false
+	}
+	start := i
+	for start > 0 && !unicode.IsSpace(runes[start-1]) {
+		start--
+	}
+	if abbreviation(runes[start:i]) {
+		return false
+	}
+	depth := 0
+	for _, r := range runes[:i+1] {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+	}
+	return depth == 0
+}
+
+// abbreviation reports whether the word before a full stop is a shortened word
+// rather than the end of a sentence. A token that carries a dot ("i.e.") or a
+// one-letter initial is one, and so is the short set that starts a name.
+func abbreviation(word []rune) bool {
+	if strings.Contains(string(word), ".") {
+		return true
+	}
+	// A single letter is an initial ("J."); a single digit ends a sentence
+	// ("Upgraded to 8.").
+	if len(word) == 0 || (len(word) == 1 && !unicode.IsDigit(word[0])) {
+		return true
+	}
+	switch string(word) {
+	case "Dr", "Mr", "Mrs", "Ms", "No", "vs", "etc", "St", "Jr", "Sr", "cf", "al":
+		return true
+	}
+	return false
+}
+
 // sectionHeading is a section's display title, with the fallback the
 // navigation uses for the section that holds root-level pages.
 func sectionHeading(s Section) string {
@@ -55,8 +164,12 @@ func sectionHeading(s Section) string {
 // that an in-bundle link names and the bundle does not contain: it has no URL
 // and exists so the broken link is in the catalogue.
 type GraphNode struct {
-	ID        string   `json:"id"`
+	ID string `json:"id"`
+	// Title is the page title as written. Label is the short form the view
+	// draws where a name has to fit on a line, and is left out when the title
+	// already fits, so a reader that knows only Title still has a name.
 	Title     string   `json:"title"`
+	Label     string   `json:"label,omitempty"`
 	URL       string   `json:"url,omitempty"`
 	Kind      string   `json:"kind"` // "page" or "tag"
 	Section   string   `json:"section,omitempty"`
@@ -111,9 +224,11 @@ func (r *Renderer) BuildGraph() GraphIndex {
 		for _, p := range s.Pages {
 			id := pageNodeID(p.Slug)
 			byID[id] = len(g.Nodes)
+			title := pageTitle(p)
 			g.Nodes = append(g.Nodes, GraphNode{
 				ID:        id,
-				Title:     pageTitle(p),
+				Title:     title,
+				Label:     graphLabel(title),
 				URL:       r.urlBase() + p.Slug + ".html",
 				Kind:      "page",
 				Section:   sectionHeading(s),
@@ -159,9 +274,11 @@ func (r *Renderer) BuildGraph() GraphIndex {
 				id := "tag:" + slug
 				if _, ok := byID[id]; !ok {
 					byID[id] = len(g.Nodes)
+					title := "#" + name
 					g.Nodes = append(g.Nodes, GraphNode{
 						ID:    id,
-						Title: "#" + name,
+						Title: title,
+						Label: graphLabel(title),
 						URL:   r.urlBase() + "tags/" + slug + ".html",
 						Kind:  "tag",
 					})
@@ -208,7 +325,7 @@ func addStubNode(g *GraphIndex, byID map[string]int, slug string) int {
 	}
 	id := pageNodeID(slug)
 	byID[id] = len(g.Nodes)
-	g.Nodes = append(g.Nodes, GraphNode{ID: id, Title: title, Kind: "page", Stub: true})
+	g.Nodes = append(g.Nodes, GraphNode{ID: id, Title: title, Label: graphLabel(title), Kind: "page", Stub: true})
 	return len(g.Nodes) - 1
 }
 

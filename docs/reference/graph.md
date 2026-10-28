@@ -36,6 +36,7 @@ readable wiki still gets an empty catalogue rather than a missing file.
 | :--- | :--- |
 | `id` | `page:` plus the page slug, or `tag:` plus the tag slug. An aggregate puts `<siteKey>:` in front of it. |
 | `title` | the page title, or `#` plus the tag's first spelling |
+| `label` | a shortened title for the view, present only when it differs from `title`; a reader that does not know the field falls back to `title` |
 | `url` | the rendered page, absent on a stub |
 | `kind` | `page` or `tag` |
 | `section` | the section title, on pages |

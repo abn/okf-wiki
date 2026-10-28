@@ -642,3 +642,45 @@ func TestMultiSiteRootWikiGraphPage(t *testing.T) {
 		}
 	})
 }
+
+// TestGraphViewShortLabelContract pins the client's use of the catalogue label:
+// every text surface draws the short form, and the full title stays available
+// on hover. The rendered view is checked in a browser; this catches a rename or
+// a surface that goes back to the raw title.
+func TestGraphViewShortLabelContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js, css string
+	for _, f := range th.files {
+		switch f.Path {
+		case "graph.js":
+			js = string(f.Data)
+		case "wiki.css":
+			css = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"short: String(n.label || n.title",
+		"labelText(n.short)",
+		"'Select ' + n.short",
+		"state.selected.short",
+		"entry.node.short",
+		"n.short !== n.title",
+		"'Full title'",
+		"graph-details-full",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	for _, want := range []string{"-webkit-line-clamp: 2", ".graph-neighbour { display: inline-flex"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("wiki.css is missing %q", want)
+		}
+	}
+}
