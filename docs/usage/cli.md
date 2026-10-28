@@ -180,36 +180,52 @@ unit. See [Offline folder](offline.md).
 
 ## Installing it
 
-There are no tagged releases, so there is no release tarball to download and no
-`brew`, RPM or deb package. Two paths work, and neither is a versioned release.
+There are three paths: the container, a release archive, or `go install`.
 
-**The container**, which is the supported one and the reason there is nothing
-else. It is published on every push to `main`, multiarch, so the same reference
-runs on amd64 and arm64:
+**The container**, which is the supported one. It is published on every push to
+`main`, multiarch, so the same reference runs on amd64 and arm64:
 
 ```bash
 podman run --rm --network=host \
   -v "$(pwd)/docs:/content:ro,Z" ghcr.io/abn/okf-wiki:latest
 ```
 
-**`go install`**, which works, with a caveat worth knowing before you rely on it:
+**A release archive**, with no toolchain and no build step. Every release
+carries the static binary for linux, macOS and Windows on amd64 and arm64. Each
+archive holds the binary, the license, the README, the third-party notices and
+the mermaid runtime under `mermaid/`, so a bundle with diagrams renders without
+reaching for a CDN. `checksums.txt` covers all six:
+
+```bash
+curl -fsSLO https://github.com/abn/okf-wiki/releases/latest/download/okf-wiki_linux_amd64.tar.gz
+tar -xzf okf-wiki_linux_amd64.tar.gz
+cd okf-wiki_linux_amd64
+./okf-wiki serve --content /path/to/bundle
+```
+
+Run it from the extracted directory, because the default `--vendor mermaid` is
+relative to the working directory. From anywhere else, point `--vendor` at the
+archive's `mermaid/` directory.
+
+Swap `linux_amd64` for `linux_arm64`, `darwin_amd64`, `darwin_arm64`,
+`windows_amd64` or `windows_arm64`; the Windows archives are `.zip`.
+
+**`go install`**, if you have Go 1.25 or newer:
 
 ```bash
 go install github.com/abn/okf-wiki/cmd/okf-wiki@latest
 ```
 
-With no tags, `@latest` resolves to a pseudo-version pinned to whatever `main`
-happened to be, so it prints something like
-`v0.0.0-20260929163058-1f172e4994c7` and two people running that command minutes
-apart can get different binaries. It is a moving target, not a release. For
-anything reproducible, pin a commit or build from a checkout you chose.
+`@latest` resolves to the newest tag, which names a release. `@main` resolves to
+a pseudo-version pinned to whatever `main` happened to be, so it prints
+something like `v0.0.0-20260929163058-1f172e4994c7` and two people running that
+command minutes apart can get different binaries. Pin a commit or build from a
+checkout you chose when that matters.
 
-A related consequence: `okf-wiki version` prints the `Version` constant compiled
-into the binary, not a version derived from git. Release Please bumps that
-constant in each release pull request, so a tagged build agrees with its tag; a
-build from an untagged commit prints the last released version, not that commit.
-The build passes no `-X` ldflag, so there is nothing else to override, and the
-pseudo-version Go resolved is the provenance of a `go install` build.
+`okf-wiki version` prints the `Version` constant compiled into the binary, not a
+version derived from git. Release Please bumps that constant in each release
+pull request, so a tagged build and its archive agree with the tag; a build from
+an untagged commit prints the last released version, not that commit.
 
 ## Reading these docs
 

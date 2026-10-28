@@ -1,0 +1,119 @@
+name: Binaries
+
+# Static release archives. release-please.yml calls this once the release that
+# carries the tag exists; dispatch it with an older tag to fill in a release
+# that predates the workflow.
+#
+# The binary is pure Go and built with CGO off, so one Linux runner can build
+# every target. macOS runners would add cost without adding capability.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the archives to.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach the archives to.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  binaries:
+    name: Build and attach
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mermaid/package-lock.json
+
+      # The binary alone renders a bundle with a diagram only by reaching for
+      # the CDN, so the archive carries the runtime beside it.
+      - name: Build the diagram runtime
+        run: |
+          set -euo pipefail
+          make vendor
+          test -s mermaid/mermaid-bundle.min.mjs
+          test -s mermaid/mermaid-bundle.min.js
+
+      - name: Build the archives
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          version=${TAG#v}
+          test -n "$version"
+          mkdir -p dist
+
+          targets=(
+            linux/amd64 linux/arm64
+            darwin/amd64 darwin/arm64
+            windows/amd64 windows/arm64
+          )
+
+          for target in "${targets[@]}"; do
+            os=${target%/*}
+            arch=${target#*/}
+            name=okf-wiki_${os}_${arch}
+            stage=dist/$name
+
+            bin=okf-wiki
+            [ "$os" = windows ] && bin=okf-wiki.exe
+
+            mkdir -p "$stage"
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 \
+              go build -trimpath -ldflags "-s -w" -o "$stage/$bin" ./cmd/okf-wiki
+
+            # The release commit carries the version, so the native archive can
+            # prove that the tag and the binary agree.
+            if [ "$os/$arch" = linux/amd64 ]; then
+              got=$("$stage/$bin" version)
+              want="okf-wiki $version"
+              if [ "$got" != "$want" ]; then
+                printf 'binary reports %s, want %s\n' "$got" "$want" >&2
+                exit 1
+              fi
+            fi
+
+            cp LICENSE README.md THIRD-PARTY.md "$stage/"
+            mkdir -p "$stage/mermaid"
+            cp mermaid/mermaid-bundle.min.mjs mermaid/mermaid-bundle.min.js "$stage/mermaid/"
+            test -s "$stage/mermaid/mermaid-bundle.min.js"
+            test -s "$stage/mermaid/mermaid-bundle.min.mjs"
+            if [ "$os" = windows ]; then
+              (cd dist && zip -qr "$name.zip" "$name")
+            else
+              tar -C dist -czf "dist/$name.tar.gz" "$name"
+            fi
+            rm -rf "$stage"
+          done
+
+          (cd dist && sha256sum ./*.tar.gz ./*.zip > checksums.txt)
+
+      - name: Attach the archives to the release
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" dist/*.tar.gz dist/*.zip dist/checksums.txt --clobber

@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-28
 
+* **Release**: Every release attaches static binaries for linux, macOS and
+  Windows on amd64 and arm64. Each archive holds the binary, the license, the
+  README, the third-party notices and the mermaid runtime, and `checksums.txt`
+  covers the set. `usage/cli.md`, `README.md` and `contribution/index.md` record
+  it, and `adr/0005-release-binaries.md` records the decision.
 * **Release**: Release Please manages the version from Conventional Commits. It
   opens a release pull request that bumps `Version` in `cmd/okf-wiki/main.go` and
   adds the changelog; merging it tags `vX.Y.Z`, dispatches the image publish at

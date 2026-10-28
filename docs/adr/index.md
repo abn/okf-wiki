@@ -4,3 +4,4 @@
 - [0002 The action ships a container reference](0002-container-first-distribution.md)
 - [0003 Themes are runtime directories](0003-runtime-themes.md)
 - [0004 The watch re-renders the whole tree](0004-watch-rerenders-the-whole-tree.md)
+- [0005 Releases carry binary archives](0005-release-binaries.md)

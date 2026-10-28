@@ -115,6 +115,13 @@ job therefore runs the follow-up work itself:
   repository is not a Marketplace listing. The same file runs on a published
   release and on manual dispatch, so a tag pushed or released by other means is
   repaired too.
+- It calls `binaries.yml`, which builds the static binary for linux, macOS and
+  Windows on amd64 and arm64 with `CGO_ENABLED=0`, builds the mermaid runtime
+  with the same Node commands as the image, and packs each archive with the
+  binary, `LICENSE`, `README.md`, `THIRD-PARTY.md` and `mermaid/`. It writes
+  `checksums.txt` and attaches the lot to the release. The native archive is run
+  before upload and must report the tag's version. The file takes a `tag` input,
+  so a release that predates the workflow can be backfilled by dispatching it.
 - It dispatches `publish.yml` at the new tag, which publishes
   `ghcr.io/abn/okf-wiki:vX.Y.Z`. The tag trigger in `publish.yml` still covers a
   tag pushed by hand.
