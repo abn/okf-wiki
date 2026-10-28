@@ -52,7 +52,12 @@ path. The archives are the only new artifact.
   with the same `npm ci` and esbuild commands as the image.
 - A tag whose binary does not report the tag's version fails the release job
   instead of publishing a mislabelled archive.
+- The archives are attached while the release is a draft, and the draft is
+  published only after the upload is verified. Releases here are immutable, so a
+  published one accepts no new asset and a missing archive cannot be repaired
+  without a new version.
 - Archive timestamps are not normalized, so a rebuild produces different bytes
   and the checksums identify a build rather than prove it can be reproduced.
-- A release that predates the workflow is filled in by dispatching it with the
-  tag.
+- A release that predates the workflow can be filled in by dispatching it with
+  the tag, which works only while that release is still a draft. A published
+  immutable release accepts no asset.
