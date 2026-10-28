@@ -5,6 +5,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-28
 
+* **Docs**: The rendered wiki labels the `adr/` section "Decisions". The title
+  comes from `--sections`, set in the Makefile and the Pages workflow; the
+  directory and its URLs are unchanged.
 * **Release**: Every release attaches static binaries for linux, macOS and
   Windows on amd64 and arm64. Each archive holds the binary, the license, the
   README, the third-party notices and the mermaid runtime, and `checksums.txt`
