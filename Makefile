@@ -11,14 +11,19 @@ THEME   ?=
 BRAND   ?= okf-wiki
 SUB     ?= docs
 TITLE   ?= Wiki
+# SECTIONS renames or orders a directory in the sidebar without changing its
+# URL. The adr/ directory is a section id; it reads as Decisions.
+SECTIONS ?= adr:Decisions
 
 # $(THEME) is only passed when set, so an empty THEME does not become a
 # --theme "" that would resolve the wrong directory.
-THEME_FLAG = $(if $(THEME),--theme $(THEME))
+THEME_FLAG    = $(if $(THEME),--theme $(THEME))
+SECTIONS_FLAG = $(if $(SECTIONS),--sections "$(SECTIONS)")
 
 # The project's own wiki opts in to the source archive, which is off by default
 # because it puts a second copy of the bundle in the output.
-BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE) --bundle $(THEME_FLAG)
+BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE) \
+             --bundle $(THEME_FLAG) $(SECTIONS_FLAG)
 
 # Keep the Go build cache inside the workspace (sandbox-friendly).
 export GOCACHE ?= $(CURDIR)/.scratch/gocache
