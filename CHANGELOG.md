@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0](https://github.com/abn/okf-wiki/compare/v1.0.0...v1.1.0) (2026-10-28)
+
+
+### Features
+
+* **graph:** draw a short label for long titles ([6c4bc5c](https://github.com/abn/okf-wiki/commit/6c4bc5c653e3ba25e440ff5515e285b186fd7d11))
+* **graph:** report the node total once, grouped ([d57c45c](https://github.com/abn/okf-wiki/commit/d57c45c810789d9f5c66e5fc0665581e76d5c67c))
+* **graph:** shorten a section name at a word ([e88b430](https://github.com/abn/okf-wiki/commit/e88b4306939757e26f00880e98ca1e200f1de322))
+* **render:** warn on titles that cannot be names ([8988dfd](https://github.com/abn/okf-wiki/commit/8988dfddee32bb5e12901f074bf78130be127b55))
+
 ## 1.0.0 (2026-10-28)
 
 
