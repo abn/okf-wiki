@@ -1949,10 +1949,12 @@ func TestNestedContentPagesRender(t *testing.T) {
 	dir := t.TempDir()
 	mustMkdir(t, filepath.Join(dir, "guide", "setup"))
 	mustMkdir(t, filepath.Join(dir, "guide", "deep", "deeper"))
+	mustMkdir(t, filepath.Join(dir, "guide", "deep", "other"))
 	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
 		"---", "title: Home", "---", "# Home",
 		"[setup](guide/setup/install.md)",
 		"[deeper](guide/deep/deeper/x.md)",
+		"[other](guide/deep/other/y.md)",
 		"[sibling](guide/intro.md)",
 	}, "\n"))
 	mustWrite(t, filepath.Join(dir, "guide", "intro.md"), "---\ntitle: Intro\n---\n# Intro\n")
@@ -1960,6 +1962,8 @@ func TestNestedContentPagesRender(t *testing.T) {
 		"---\ntitle: Install\n---\n# Install\n\n[up](../intro.md)\n")
 	mustWrite(t, filepath.Join(dir, "guide", "deep", "deeper", "x.md"),
 		"---\ntitle: X\n---\n# X\n")
+	mustWrite(t, filepath.Join(dir, "guide", "deep", "other", "y.md"),
+		"---\ntitle: Y\n---\n# Y\n")
 
 	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
 	if err != nil {
@@ -1976,6 +1980,7 @@ func TestNestedContentPagesRender(t *testing.T) {
 		"guide/intro.html",
 		"guide/setup/install.html",
 		"guide/deep/deeper/x.html",
+		"guide/deep/other/y.html",
 	}
 	for _, rel := range want {
 		if _, err := os.Stat(filepath.Join(site, filepath.FromSlash(rel))); err != nil {
@@ -2015,8 +2020,8 @@ func TestNestedContentPagesRender(t *testing.T) {
 			guide = s
 		}
 	}
-	if len(guide.Pages) != 3 {
-		t.Errorf("guide section has %d pages, want 3", len(guide.Pages))
+	if len(guide.Pages) != 4 {
+		t.Errorf("guide section has %d pages, want 4", len(guide.Pages))
 	}
 	found := false
 	for _, p := range r.BuildSearchIndex().Pages {
@@ -2028,11 +2033,10 @@ func TestNestedContentPagesRender(t *testing.T) {
 		t.Error("the nested install page is missing from the search index")
 	}
 
-	// The sidebar respects one level of the folder structure: a sub-directory of
-	// a section nests its pages under its own disclosure rather than running them
-	// flat. guide/intro.md has no sub-directory, so it stays a loose item; the
-	// pages under guide/setup and guide/deep/deeper collapse into their top
-	// group, and the group is labelled from the directory when it has no index.
+	// The sidebar follows every level of the folder structure: a directory
+	// nests inside its parent rather than collapsing into the first group.
+	// guide/intro.md has no sub-directory, so it stays a loose item; setup is a
+	// group, and deep/deeper is a group inside deep.
 	nav := r.sidebarHTML("guide", "guide/setup/install")
 	if !strings.Contains(nav, `<details class="side-sub" name="wiki-sub-guide" open><summary class="side-subsum"><span>Setup</span>`) {
 		t.Errorf("the setup sub-directory is not a nested group:\n%s", nav)
@@ -2041,14 +2045,70 @@ func TestNestedContentPagesRender(t *testing.T) {
 		t.Errorf("the active page is not inside the setup group:\n%s", nav)
 	}
 	if !strings.Contains(nav, `<summary class="side-subsum"><span>Deep</span>`) {
-		t.Errorf("a three-deep group did not collapse to its top directory:\n%s", nav)
+		t.Errorf("the deep group is missing:\n%s", nav)
+	}
+	if !strings.Contains(nav, `<details class="side-sub" name="wiki-sub-guide/deep"><summary class="side-subsum"><span>Deeper</span>`) {
+		t.Errorf("a three-deep group did not nest inside its parent:\n%s", nav)
+	}
+	if !strings.Contains(nav, `<li><a href="/wiki/guide/deep/deeper/x.html">X</a></li>`) {
+		t.Errorf("the page of a three-deep group is missing:\n%s", nav)
 	}
 	if !strings.Contains(nav, `<li><a href="/wiki/guide/intro.html">Intro</a></li>`) {
 		t.Errorf("a page directly under the section is not a loose item:\n%s", nav)
 	}
+	if strings.Index(nav, "<span>Deep</span>") > strings.Index(nav, "<span>Setup</span>") {
+		t.Error("groups are not ordered by directory name")
+	}
 	if strings.Contains(nav, `<li><a href="/wiki/guide/setup/install.html">`) &&
 		!strings.Contains(nav, `<details class="side-sub"`) {
 		t.Error("a nested page was rendered flat outside its group")
+	}
+
+	// The active page opens each disclosure above it, and sibling directories
+	// at one level share the disclosure name so only one of them opens.
+	deepNav := r.sidebarHTML("guide", "guide/deep/deeper/x")
+	if !strings.Contains(deepNav, `<details class="side-sub" name="wiki-sub-guide" open><summary class="side-subsum"><span>Deep</span>`) {
+		t.Errorf("the deep group is not open for a page below it:\n%s", deepNav)
+	}
+	if !strings.Contains(deepNav, `<details class="side-sub" name="wiki-sub-guide/deep" open><summary class="side-subsum"><span>Deeper</span>`) {
+		t.Errorf("the deeper group is not open for its page:\n%s", deepNav)
+	}
+	if !strings.Contains(deepNav, `<details class="side-sub" name="wiki-sub-guide/deep"><summary class="side-subsum"><span>Other</span>`) {
+		t.Errorf("a sibling group does not share the nested disclosure name:\n%s", deepNav)
+	}
+	if !strings.Contains(deepNav, `<li class="active"><a href="/wiki/guide/deep/deeper/x.html" aria-current="true">X</a></li>`) {
+		t.Errorf("the active page is not inside the deeper group:\n%s", deepNav)
+	}
+}
+
+// TestBreadcrumbSectionWithoutIndexIsText covers a section that has no index
+// page: its crumb must not link at a file the render does not write.
+func TestBreadcrumbSectionWithoutIndexIsText(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, filepath.Join(dir, "logs", "2026", "10"))
+	mustWrite(t, filepath.Join(dir, "index.md"),
+		"---\ntitle: Home\n---\n# Home\n")
+	mustWrite(t, filepath.Join(dir, "logs", "2026", "10", "entry.md"),
+		"---\ntitle: Entry\n---\n# Entry\n")
+
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page Page
+	for _, s := range r.Sections() {
+		for _, p := range s.Pages {
+			if p.Slug == "logs/2026/10/entry" {
+				page = p
+			}
+		}
+	}
+	crumb := r.breadcrumbHTML(page)
+	if strings.Contains(crumb, "logs/index.html") {
+		t.Errorf("a section without an index is linked at a missing page:\n%s", crumb)
+	}
+	if !strings.Contains(crumb, `<span>Logs</span>`) {
+		t.Errorf("the section title is not plain text:\n%s", crumb)
 	}
 }
 
@@ -4404,6 +4464,7 @@ func multiSiteHeaderFixture(t *testing.T) string {
 	mustWrite(t, filepath.Join(dir, "clients", "example", ".meta.json"),
 		`{"title": "Example", "description": "The Example engagement."}`)
 	mustMkdir(t, filepath.Join(dir, "clients", "example", "operations", "guides"))
+	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "guides", "index.md"), "# Guides\n")
 	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "index.md"),
 		"---\ntype: Overview\ntitle: Operations\n---\n# Operations\n")
 	mustWrite(t, filepath.Join(dir, "clients", "example", "operations", "guides", "setup.md"),
@@ -4659,10 +4720,14 @@ func TestMultiSiteRootGroupBreadcrumb(t *testing.T) {
 func TestMultiSiteRootWikiHeaderAndTrail(t *testing.T) {
 	dir := t.TempDir()
 	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustMkdir(t, filepath.Join(dir, "logs", "2026", "10"))
+	mustWrite(t, filepath.Join(dir, "guide", "index.md"), "# Guide\n")
 	mustWrite(t, filepath.Join(dir, "index.md"),
 		"---\ntype: Overview\ntitle: Home\n---\n# Home\n")
 	mustWrite(t, filepath.Join(dir, "guide", "setup.md"),
 		"---\ntype: Guide\ntitle: Setup\n---\n# Setup\n")
+	mustWrite(t, filepath.Join(dir, "logs", "2026", "10", "entry.md"),
+		"---\ntype: Log Entry\ntitle: Entry\n---\n# Entry\n")
 
 	out := t.TempDir()
 	r, err := New(Config{Content: dir, Base: "/family/", Brand: Brand{Name: "okf-wiki", Title: "Wiki"}, MultiSite: true})
@@ -4697,6 +4762,20 @@ func TestMultiSiteRootWikiHeaderAndTrail(t *testing.T) {
 	if got != want {
 		t.Errorf("root wiki deep trail =\n%s\nwant\n%s", got, want)
 	}
+
+	// A section without an index is plain text in the tree too, not a link at
+	// a group index the render never writes.
+	entry, err := os.ReadFile(filepath.Join(out, "family", "logs", "2026", "10", "entry.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = breadcrumbHTMLOf(t, string(entry))
+	want = `<a href="/family/">Wiki</a><span class="crumb-sep">/</span>` +
+		`<span>Logs</span><span class="crumb-sep">/</span>` +
+		`<span class="crumb-cur">Entry</span>`
+	if got != want {
+		t.Errorf("tree section without an index trail =\n%s\nwant\n%s", got, want)
+	}
 }
 
 // TestSingleBundleHeaderUnchanged pins a single bundle's header: the brand and
@@ -4705,6 +4784,7 @@ func TestMultiSiteRootWikiHeaderAndTrail(t *testing.T) {
 func TestSingleBundleHeaderUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	mustMkdir(t, filepath.Join(dir, "guide"))
+	mustWrite(t, filepath.Join(dir, "guide", "index.md"), "# Guide\n")
 	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
 	mustWrite(t, filepath.Join(dir, "guide", "setup.md"),
 		"---\ntype: Guide\ntitle: Setup\n---\n# Setup\n")

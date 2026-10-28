@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"path"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -752,13 +753,15 @@ func (r *Renderer) sidebarHTML(activeSection, activeSlug string) string {
 	return b.String()
 }
 
-// sidebarGroup is the pages of a section that share a first sub-directory under
-// the section. dir is that sub-directory's name, root its index.md if it has
-// one, and pages the rest.
+// sidebarGroup is the pages of a section that share a directory. dir is that
+// directory's name, path its slug prefix, root its index.md if it has one,
+// pages the pages directly in it, and groups the directories below it.
 type sidebarGroup struct {
-	dir   string
-	root  *Page
-	pages []Page
+	dir    string
+	path   string
+	root   *Page
+	pages  []Page
+	groups []sidebarGroup
 }
 
 // childBase is the path the first segment of a slug is measured against: the
@@ -771,17 +774,13 @@ func childBase(secID string) string {
 	return secID + "/"
 }
 
-// groupChildren splits a section's child pages by the first path segment below
-// the section, so a page at mods/acp-agents/architecture belongs to the
-// acp-agents group. A page directly under the section has no second segment and
-// is returned as a loose page. The group's own index.md is pulled out as the
-// group root rather than left among its pages.
-//
-// One extra level is deliberate: a docs bundle is usually two deep, and a rail
-// that nests every directory arbitrarily is tall and busy. Deeper paths collapse
-// into their top group.
-func groupChildren(secID string, pages []Page) (loose []Page, groups []sidebarGroup) {
-	base := childBase(secID)
+// groupChildren splits a set of pages by the first path segment below prefix,
+// so a page at mods/acp-agents/architecture belongs to the acp-agents group. A
+// page directly in prefix is returned as a loose page. The group's own index.md
+// is pulled out as the group root rather than left among its pages, and the
+// group's remaining pages are split again by the next segment.
+func groupChildren(prefix string, pages []Page) (loose []Page, groups []sidebarGroup) {
+	base := childBase(prefix)
 	byDir := map[string]*sidebarGroup{}
 	var order []string
 	for _, p := range pages {
@@ -804,15 +803,25 @@ func groupChildren(secID string, pages []Page) (loose []Page, groups []sidebarGr
 		}
 		g.pages = append(g.pages, p)
 	}
+	// Directory order, not the order a page happened to sort first: a group must
+	// not move when an entry's title changes.
+	sort.Strings(order)
 	for _, dir := range order {
-		groups = append(groups, *byDir[dir])
+		g := byDir[dir]
+		g.path = dir
+		if prefix != "" {
+			g.path = prefix + "/" + dir
+		}
+		g.pages, g.groups = groupChildren(g.path, g.pages)
+		groups = append(groups, *g)
 	}
 	return loose, groups
 }
 
 // writeSidebarEntries writes the items of one section: its loose pages first,
-// then a nested disclosure per sub-directory group. A group with no pages of its
-// own beyond its index is a leaf, like a section with only a home page.
+// then a nested disclosure per sub-directory group. A group with no pages or
+// groups of its own beyond its index is a leaf, like a section with only a home
+// page.
 func (r *Renderer) writeSidebarEntries(b *strings.Builder, base string, sec Section, pages []Page, activeSlug string) {
 	loose, groups := groupChildren(sec.ID, pages)
 	for _, page := range loose {
@@ -845,12 +854,12 @@ func (r *Renderer) writeSidebarItem(b *strings.Builder, base string, page Page, 
 }
 
 // writeSidebarGroup writes a sub-directory of a section as its own list item: a
-// nested disclosure when it holds pages, and a plain link when it holds only its
-// index. The disclosure's summary is the group's index page when it has one, so
-// the heading is a link the way a section heading is. secID names the disclosure
-// group, so a section opens only one of its own groups at a time and a rail of
-// many groups stays short.
-func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarGroup, activeSlug, secID string) {
+// nested disclosure when it holds pages or groups, and a plain link when it
+// holds only its index. The disclosure's summary is the group's index page when
+// it has one, so the heading is a link the way a section heading is. parent
+// names the level the disclosure belongs to, so a section opens one of its own
+// groups at a time and each nested level does the same.
+func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarGroup, activeSlug, parent string) {
 	// label is what the heading shows, honouring a page's nav override; prefix
 	// is the group's own title, so a child that repeats it is shortened in the
 	// rail whichever label the heading ends up carrying.
@@ -868,7 +877,7 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 		}
 	}
 
-	if len(g.pages) == 0 && g.root != nil {
+	if len(g.pages) == 0 && len(g.groups) == 0 && g.root != nil {
 		active := ""
 		cur := ""
 		if g.root.Slug == activeSlug {
@@ -880,19 +889,15 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 	}
 
 	open := ""
-	cur := ""
-	for i := range g.pages {
-		if g.pages[i].Slug == activeSlug {
-			open = " open"
-			break
-		}
-	}
-	if g.root != nil && g.root.Slug == activeSlug {
+	if groupHolds(g, activeSlug) {
 		open = " open"
+	}
+	cur := ""
+	if g.root != nil && g.root.Slug == activeSlug {
 		cur = ariaCurrentMark
 	}
 
-	fmt.Fprintf(b, `<li><details class="side-sub" name="wiki-sub-%s"%s><summary class="side-subsum">`, template.HTMLEscapeString(secID), open)
+	fmt.Fprintf(b, `<li><details class="side-sub" name="wiki-sub-%s"%s><summary class="side-subsum">`, template.HTMLEscapeString(parent), open)
 	if href != "" {
 		fmt.Fprintf(b, `<a href="%s"%s>%s</a>`, href, cur, template.HTMLEscapeString(label))
 	} else {
@@ -903,7 +908,30 @@ func (r *Renderer) writeSidebarGroup(b *strings.Builder, base string, g sidebarG
 	for _, page := range g.pages {
 		r.writeSidebarItem(b, base, page, activeSlug, prefix)
 	}
+	for _, sub := range g.groups {
+		r.writeSidebarGroup(b, base, sub, activeSlug, g.path)
+	}
 	b.WriteString(`</ul></details></li>`)
+}
+
+// groupHolds reports whether slug is the group's root, one of its pages, or a
+// page of a group below it. The disclosure for the current page stays open at
+// every level above it.
+func groupHolds(g sidebarGroup, slug string) bool {
+	if g.root != nil && g.root.Slug == slug {
+		return true
+	}
+	for _, p := range g.pages {
+		if p.Slug == slug {
+			return true
+		}
+	}
+	for _, sub := range g.groups {
+		if groupHolds(sub, slug) {
+			return true
+		}
+	}
+	return false
 }
 
 // sidebarLabel shortens a page label for the rail by dropping a group prefix the
@@ -1040,18 +1068,35 @@ func (r *Renderer) breadcrumbHTML(p Page) string {
 	parts := []string{`<a href="` + r.siteHomeURL("") + `">Docs</a>`}
 	if p.Section != "" {
 		for _, s := range r.sections {
-			if s.ID == p.Section {
-				parts = append(parts, fmt.Sprintf(`<a href="%s%s/index.html">%s</a>`, base, s.ID, template.HTMLEscapeString(s.Title)))
-				break
+			if s.ID != p.Section {
+				continue
 			}
+			if sectionHasIndex(s) {
+				parts = append(parts, crumbLink(base+s.ID+"/index.html", s.Title))
+			} else {
+				parts = append(parts, crumbText(s.Title))
+			}
+			break
 		}
 	}
 	title := p.Title
 	if title == "" {
 		title = p.Slug
 	}
-	parts = append(parts, fmt.Sprintf(`<span class="crumb-cur">%s</span>`, template.HTMLEscapeString(title)))
+	parts = append(parts, crumbCur(title))
 	return strings.Join(parts, `<span class="crumb-sep">/</span>`)
+}
+
+// sectionHasIndex reports whether a section has an index page to link a crumb
+// at. A section without one has no page at its index path, so its crumb is text
+// rather than a dead link.
+func sectionHasIndex(s Section) bool {
+	for _, p := range s.Pages {
+		if p.Slug == s.ID+"/index" {
+			return true
+		}
+	}
+	return false
 }
 
 // treeBreadcrumbHTML builds the trail of a page in a multi-site tree: the tree
@@ -1072,7 +1117,11 @@ func (r *Renderer) treeBreadcrumbHTML(p Page) string {
 	if p.Section != "" {
 		for _, s := range r.sections {
 			if s.ID == p.Section {
-				parts = append(parts, crumbLink(base+s.ID+"/index.html", s.Title))
+				if sectionHasIndex(s) {
+					parts = append(parts, crumbLink(base+s.ID+"/index.html", s.Title))
+				} else {
+					parts = append(parts, crumbText(s.Title))
+				}
 				break
 			}
 		}
@@ -1125,6 +1174,12 @@ func (r *Renderer) nodeIsHome(p Page) bool {
 
 func crumbLink(href, title string) string {
 	return fmt.Sprintf(`<a href="%s">%s</a>`, template.HTMLEscapeString(href), template.HTMLEscapeString(title))
+}
+
+// crumbText renders a breadcrumb segment that has no page to link at, such as a
+// section without an index.
+func crumbText(title string) string {
+	return fmt.Sprintf(`<span>%s</span>`, template.HTMLEscapeString(title))
 }
 
 // crumbCur renders the current breadcrumb segment. It carries the crumb-cur

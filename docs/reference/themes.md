@@ -185,14 +185,14 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `side-title-link` or `side-title-text`, and `side-chevron`. A section with no
   child pages is emitted as `side-leaf` rather than a `details`, so it carries no
   disclosure triangle.
-- `details.side-sub` with `summary.side-subsum`, a nested group one level down
-  for pages that share a sub-directory under their section, wrapping a `ul` of
-  the group's pages. The disclosure carries `name="wiki-sub-<section id>"`, so a
-  section opens one of its groups at a time. The summary carries the row's
-  horizontal padding and the link inside it adds none, so a group heading stays
-  aligned with the loose pages and leaf groups beside it. A group holding only
-  its `index.md` is a plain `li.side-leaf` link instead, the way a section with
-  no child pages is.
+- `details.side-sub` with `summary.side-subsum`, a nested group for pages that
+  share a directory, wrapping a `ul` of the group's pages and of the groups
+  below it. The disclosure carries `name="wiki-sub-<parent path>"`, the section
+  id at the top level and the parent group's path below it, so each level opens
+  one of its groups at a time. The summary carries the row's horizontal padding
+  and the link inside it adds none, so a group heading stays aligned with the
+  loose pages and leaf groups beside it. A group holding only its `index.md` is
+  a plain `li.side-leaf` link instead, the way a section with no child pages is.
 - `.active`, on the current page's sidebar link and on the current section's
   title, which is how a theme marks position. The same link carries
   `aria-current="true"`, so a screen reader announces the position the class
@@ -364,9 +364,10 @@ crumbs link to the group indexes and the wiki title links to the wiki home; the
 current page is always the last crumb. A group index ends at the group name,
 and the tree root ends at the tree title alone. A tag page keeps the trail of
 its wiki and then reads `Tags / #tag`, since it is a page of that wiki; a
-single-bundle tag page is still `Docs / Tags / #tag`. Every segment uses
-`.crumb-sep` and `.crumb-cur`, so a theme that styles the single-bundle
-breadcrumb styles the tree one too.
+single-bundle tag page is still `Docs / Tags / #tag`. A section without an
+`index.md` is a plain `span` in both trails, as it already is in the rail. Every
+segment uses `.crumb-sep` and `.crumb-cur`, so a theme that styles the
+single-bundle breadcrumb styles the tree one too.
 
 ## Provenance
 
