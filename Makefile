@@ -29,7 +29,7 @@ BRANDING   = --brand $(BRAND) --brand-sub $(SUB) --title $(TITLE) --base $(BASE)
 export GOCACHE ?= $(CURDIR)/.scratch/gocache
 
 .PHONY: setup vendor build test vet fmt lint check run render render-themed firefox \
-        screenshots container/build container/run container/shell clean help
+        screenshots social-card container/build container/run container/shell clean help
 
 ##@ Bootstrap
 
@@ -72,6 +72,12 @@ firefox: ## Render $(CONTENT) offline and run the Firefox smoke test (needs Fire
 # change to the theme or the renderer shows up in the next capture.
 screenshots: vendor ## Capture the README screenshots (needs Playwright and Chrome)
 	python3 scripts/capture-readme-screenshots.py
+
+# The cards are static and checked in, so this runs only when the card, the
+# brand mark, or the theme's tokens or fonts change. GitHub takes one image at
+# 1280x640; the light and dark pair is kept so a re-skin has both ready.
+social-card: ## Render the GitHub social preview cards (needs Chrome)
+	python3 scripts/capture-social-card.py
 
 ##@ Build & Quality
 

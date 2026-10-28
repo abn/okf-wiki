@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<meta charset="utf-8">
+<title>okf-wiki social preview</title>
+<script>
+  addEventListener("error", (event) => {
+    document.documentElement.dataset.assetError = event.target.tagName.toLowerCase();
+  }, true);
+</script>
+<!-- One document, two cards. Append ?theme=dark for the pinned dark ground;
+     tokens.css is the same file the wiki loads, so a palette change reaches the
+     cards on the next render. -->
+<style>
+  @import url("../../internal/wiki/themes/default/assets/tokens.css");
+  @import url("../../internal/wiki/themes/default/assets/fonts.css");
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 640px; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-heading);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .card {
+    position: absolute;
+    inset: 0;
+    padding: 88px 96px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 72px;
+  }
+
+  .copy { max-width: 660px; }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--color-text-faint);
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-accent-text);
+    flex: none;
+  }
+
+  h1 {
+    margin-top: 24px;
+    font-family: var(--font-display);
+    font-size: 104px;
+    font-weight: 700;
+    letter-spacing: -0.038em;
+    line-height: 1;
+  }
+
+  .lead {
+    margin-top: 22px;
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.15;
+  }
+
+  .sub {
+    margin-top: 18px;
+    font-size: 23px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+  }
+
+  .mark {
+    width: 288px;
+    height: 288px;
+    flex: none;
+    margin-right: 8px;
+    display: block;
+  }
+
+  .foot {
+    border-top: 1px solid var(--color-line);
+    height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 19px;
+    color: var(--color-text-faint);
+  }
+</style>
+<body>
+  <div class="card">
+    <div class="main">
+      <div class="copy">
+        <div class="eyebrow"><span class="dot"></span>Open Knowledge Format · v0.2</div>
+        <h1>okf-wiki</h1>
+        <div class="lead">Your docs, rendered as a wiki.</div>
+        <div class="sub">A static, searchable, themeable site<br>from a folder of Markdown.</div>
+      </div>
+      <img class="mark" src="../../.github/assets/readme/brand-mark.svg" alt="">
+    </div>
+    <div class="foot">
+      <span>One binary or one container, with no build pipeline per project.</span>
+      <span>github.com/abn/okf-wiki</span>
+    </div>
+  </div>
+  <script>
+    const theme = new URLSearchParams(location.search).get("theme");
+    if (theme === "dark") document.documentElement.dataset.theme = "dark";
+    document.fonts.ready.then(() => {
+      const faces = Array.from(document.fonts);
+      if (faces.length === 0 || faces.some((face) => face.status === "error")) {
+        document.documentElement.dataset.fontError = "1";
+      }
+    });
+  </script>
+</body>
+</html>

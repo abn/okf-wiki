@@ -5,6 +5,11 @@ deprecated, or restructured. It is deliberately separate from software releases.
 
 ## 2026-10-28
 
+* **Tooling**: `make social-card` renders the GitHub social preview card in a
+  light and a dark palette at 1280x640 from `scripts/social-card/card.html`,
+  which imports the theme's tokens and fonts and shows the committed brand mark.
+  The cards live under `.github/assets/social/`, and the contribution guide and
+  README record the target and its Chrome requirement.
 * **Docs**: The rendered wiki labels the `adr/` section "Decisions". The title
   comes from `--sections`, set in the Makefile and the Pages workflow; the
   directory and its URLs are unchanged.
