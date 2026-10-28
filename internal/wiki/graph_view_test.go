@@ -712,3 +712,38 @@ func TestGraphViewCountsContract(t *testing.T) {
 		}
 	}
 }
+
+// TestGraphViewSectionFitContract pins how a section name is fitted: shortened
+// with an ellipsis rather than compressed, and measured again after a webfont
+// swap.
+func TestGraphViewSectionFitContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function fitSectionLabel",
+		"lastIndexOf(' '",
+		"function refitSectionLabels",
+		"refitSectionLabels();",
+		"zoomSettlesAt",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"spacingAndGlyphs", "lengthAdjust"} {
+		if strings.Contains(js, unwanted) {
+			t.Errorf("graph.js still squeezes a name with %q", unwanted)
+		}
+	}
+}

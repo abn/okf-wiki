@@ -34,7 +34,9 @@ accent colour and labelled `cross-wiki` in the list.
   section is the directory title, or a title set with `--sections`; there is no
   `section` frontmatter field. Tag hubs and missing pages get their own cells.
   The grid is fixed; link edges cross between cells when they are visible at
-  the current zoom. Changing it clears the current focus and relayouts.
+  the current zoom. Changing it clears the current focus and relayouts. A
+  section name wider than its cell is shortened at a word boundary with an
+  ellipsis rather than squeezed, so the letters keep their shape at every zoom.
 - **Tag hubs** shows or hides tag nodes and tag edges. Hiding them leaves the
   Tags filter and page tags in place; Show Tags is disabled while the hubs are
   collapsed. Changing it also clears the focus and relayouts.
