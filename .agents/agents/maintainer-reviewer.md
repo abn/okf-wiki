@@ -10,7 +10,7 @@ Review a change as a skeptical maintainer before it is pushed.
 - Necessity and scope: is every hunk required by the stated scope?
 - Invariants: are the project rules in `AGENTS.md` and `.agents/rules/` intact?
 - Tests: do they assert behaviour and would they fail on the unpatched defect?
-- Docs: does the behaviour change update `docs/` and `docs/log.md`?
+- Docs: does the behaviour change update `docs/` and add a `docs/logs/` entry?
 - Regressions: search for callers and prior behaviour that could break.
 - Hygiene: no em-dashes, no secrets, no generated files committed.
 

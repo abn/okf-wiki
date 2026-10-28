@@ -18,4 +18,4 @@ auto-detects a mounted content directory.
 - [Architecture decision records](adr/index.md) - Why okf-wiki is a standalone renderer, ships as a container, themes at runtime, and re-renders the whole tree when watched.
 - [Test bed](testbed/index.md) - Every rendering construct on viewable pages.
 - [Über](über/index.md) - A section whose directory name starts outside ASCII.
-- [Change log](log.md) - What changed in this documentation bundle.
+- [Change log](log.md) - How changes to this documentation bundle are recorded.
