@@ -3,8 +3,8 @@ name: Release Please
 # Versioning and releases. Release Please creates the release pull request and
 # the release with the workflow GITHUB_TOKEN, and a tag or release created that
 # way starts no workflow. The follow-up work is therefore done here rather than
-# left to triggers that would never fire: the semver check is called directly,
-# and the image publish is dispatched at the new tag.
+# left to triggers that would never fire: the semver check and the binaries run
+# from here, and the image publish is dispatched at the new tag.
 
 on:
   push:
@@ -41,6 +41,16 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/semver.yml
+
+  binaries:
+    name: Release binaries
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/binaries.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
 
   publish:
     name: Publish the release image

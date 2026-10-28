@@ -113,17 +113,22 @@ podman run --rm -p 8080:8080 -v "$PWD/docs:/content:ro" ghcr.io/abn/okf-wiki:lat
 The same command works with `docker`. On an SELinux host, append `,Z` to the
 mount: `-v "$PWD/docs:/content:ro,Z"`. Replace `$PWD/docs` with any OKF bundle.
 
-Binary, if you have Go 1.25 or newer:
+Prebuilt binaries, for linux, macOS and Windows on amd64 and arm64, are on the
+[releases page](https://github.com/abn/okf-wiki/releases/latest):
 
 ```bash
-go install github.com/abn/okf-wiki/cmd/okf-wiki@latest
-okf-wiki serve --content ./docs
+curl -fsSLO https://github.com/abn/okf-wiki/releases/latest/download/okf-wiki_linux_amd64.tar.gz
+tar -xzf okf-wiki_linux_amd64.tar.gz
+cd okf-wiki_linux_amd64
+./okf-wiki serve --content /path/to/bundle
 # okf-wiki: serving .scratch/wiki at http://127.0.0.1:8080/wiki/
 ```
 
-`go install` puts the binary in `$(go env GOPATH)/bin`. The example serves
-`./docs` from a checkout; point `--content` at any OKF bundle. `make run` does
-the same from a checkout and opens the browser.
+The archive carries the diagram runtime, so a bundle with diagrams needs no CDN
+call. With Go 1.25 or newer, `go install github.com/abn/okf-wiki/cmd/okf-wiki@latest`
+builds the same binary from source and puts it in `$(go env GOPATH)/bin`. Point
+`--content` at any OKF bundle; `make run` does the same from a checkout and
+opens the browser.
 
 ## Use from an agent
 

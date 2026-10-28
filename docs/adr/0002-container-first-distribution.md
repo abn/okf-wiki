@@ -13,15 +13,17 @@ status: stable
 The action has to run a render in a consumer's workflow. Either download a
 release binary or run the published image.
 
-This project publishes no releases. `publish.yml` pushes to ghcr on every push to
-`main` and on `v*` tags, and that is the only channel. A binary would need a
-release pipeline first, and would have to carry the mermaid bundle too, since
-that is built by a Node stage in the image.
+This project published no releases when this was written. `publish.yml` pushes
+to ghcr on every push to `main` and on `v*` tags, and that was the only channel.
+A binary would need a release pipeline first, and would have to carry the mermaid
+bundle too, since that is built by a Node stage in the image. Release archives
+exist now ([0005](0005-release-binaries.md)); the action still runs the image.
 
 ## Decision
 
 The action runs `ghcr.io/abn/okf-wiki:latest` with podman, overridable through
-the `image` input and the `IMAGE_NAME` repository variable. No release artifacts.
+the `image` input and the `IMAGE_NAME` repository variable. The action downloads
+no release artifact.
 
 ## Rationale
 

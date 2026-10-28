@@ -76,6 +76,8 @@ and the house rule is podman throughout. Rejected for releases too: with no
 tagged releases, users consume commit-id images and
 `go install ...@latest` resolves to a pseudo-version. Worth revisiting if binary
 archives are ever wanted, scoped to archives so it does not duplicate publishing.
+Revisited in [0005](0005-release-binaries.md), which adds them with `go build`
+and still leaves goreleaser out.
 
 ## See also
 
