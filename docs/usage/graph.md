@@ -26,7 +26,9 @@ accent colour and labelled `cross-wiki` in the list.
 ## Reading it
 
 - **Filter** narrows by title, section, tag, or node ID. Matching nodes stay
-  lit and the rest fade.
+  lit and the rest fade. The line under the controls reports how many nodes are
+  visible, and names the fraction only when a filter, tag, or focus narrows the
+  view. Counts are grouped, so a large catalogue reads as `5,713 nodes`.
 - **Show** switches between all nodes, pages, tags, and missing pages.
 - **Sections** groups pages by their top-level section in a labelled grid. The
   section is the directory title, or a title set with `--sections`; there is no
