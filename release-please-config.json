@@ -5,7 +5,9 @@
       "release-type": "go",
       "version-file": "cmd/okf-wiki/main.go",
       "initial-version": "1.0.0",
-      "include-v-in-tag": true
+      "include-v-in-tag": true,
+      "draft": true,
+      "force-tag-creation": true
     }
   }
 }

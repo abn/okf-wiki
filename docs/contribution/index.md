@@ -118,32 +118,58 @@ Releases are driven by Conventional Commits and
 from the commits since the last tag, and opens or updates a release pull
 request. That pull request bumps the `Version` constant in
 `cmd/okf-wiki/main.go` and adds the changelog entry. Merging it is the release:
-Release Please creates the `vX.Y.Z` tag and the GitHub release, starting at
-`1.0.0` for the first one.
+Release Please creates the `vX.Y.Z` tag and a **draft** GitHub release, starting
+at `1.0.0` for the first one.
+
+The draft is deliberate. Releases here are immutable: once one is published, its
+tag and its assets are locked, and GitHub rejects a later upload with
+`HTTP 422: Cannot upload assets to an immutable release`. Every archive therefore
+has to be attached while the release is still a draft, and only the last step
+publishes it. The config sets `force-tag-creation`, so the tag exists as soon as
+the draft does and the binaries workflow can check it out.
 
 The release pull request and the release are both made with the workflow
 `GITHUB_TOKEN`, and events from that token start no other workflows. The release
-job therefore runs the follow-up work itself:
+job therefore runs the follow-up work itself, in this order:
 
+- It calls `binaries.yml`, which builds the static binary for linux, macOS and
+  Windows on amd64 and arm64 with `CGO_ENABLED=0`, builds the mermaid runtime
+  with the same Node commands as the image, and packs each archive with the
+  binary, `LICENSE`, `README.md`, `THIRD-PARTY.md` and `mermaid/`. It writes
+  `checksums.txt` and attaches the lot to the draft release, then compares the
+  attached names and sizes against the files it built, because a missed file
+  cannot be added after publication. The native archive is run before upload and
+  must report the tag's version. The file takes a `tag` input, so archives can be
+  attached again by dispatching it at a release that is still a draft.
+- It publishes the draft, which is the point the tag and the archives become
+  immutable and the release gets its attestation.
 - It calls `semver.yml`, which runs
   [`actions-semver-checker`](https://github.com/jessehouwing/actions-semver-checker)
   with auto-fix. The checker keeps the references the action is consumed
   through correct: `vX` and `vX.Y` point at the newest patch release, every
   `vX.Y.Z` tag has a published release, and the newest release is marked latest.
-  Marketplace checks are off, because `action.yml` lives under `action/` and the
-  repository is not a Marketplace listing. The same file runs on a published
-  release and on manual dispatch, so a tag pushed or released by other means is
-  repaired too.
-- It calls `binaries.yml`, which builds the static binary for linux, macOS and
-  Windows on amd64 and arm64 with `CGO_ENABLED=0`, builds the mermaid runtime
-  with the same Node commands as the image, and packs each archive with the
-  binary, `LICENSE`, `README.md`, `THIRD-PARTY.md` and `mermaid/`. It writes
-  `checksums.txt` and attaches the lot to the release. The native archive is run
-  before upload and must report the tag's version. The file takes a `tag` input,
-  so a release that predates the workflow can be backfilled by dispatching it.
+  It runs after the publish step because the checker counts a draft as an
+  unpublished release. Marketplace checks are off, because
+  `action.yml` lives under `action/` and the repository is not a Marketplace
+  listing. The same file runs on a published release and on manual dispatch, so
+  a tag pushed or released by other means is repaired too.
 - It dispatches `publish.yml` at the new tag, which publishes
   `ghcr.io/abn/okf-wiki:vX.Y.Z`. The tag trigger in `publish.yml` still covers a
   tag pushed by hand.
+
+If a step fails before the release is published, the release stays a draft and
+nothing is lost. Re-running the failed jobs retries it as it was, so it covers a
+failure outside the repository, not a fix pushed afterwards: a re-run replays the
+same commit and workflow file. For that, dispatch `binaries.yml` with the tag,
+publish with `gh release edit vX.Y.Z --draft=false`, then dispatch `semver.yml`
+and `publish.yml` at the tag. Re-running every job does not help, because the
+release pull request is already spent: Release Please creates nothing and the
+dependent jobs stay skipped. Leaving the draft is no better, since the semver
+checker's auto-fix publishes any draft it finds, and this one would then be
+published without its archives.
+
+A release that was already published before this order was in place cannot gain
+archives; the tag cannot be reused either, so the next release carries them.
 
 A release pull request is opened by the GitHub Actions app, so its
 `pull_request` runs are created in `action_required`: nothing executes until

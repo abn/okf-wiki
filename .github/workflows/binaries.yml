@@ -1,8 +1,12 @@
 name: Binaries
 
-# Static release archives. release-please.yml calls this once the release that
-# carries the tag exists; dispatch it with an older tag to fill in a release
-# that predates the workflow.
+# Static release archives. release-please.yml calls this while the release is
+# still a draft, then publishes it. Dispatch it with a tag to attach the
+# archives to a release that is still a draft, for example after a failed run.
+#
+# Attaching is separate from publishing because this repository publishes
+# immutable releases: once a release is published, its assets cannot be added,
+# replaced or removed. A draft is the only place an archive can still land.
 #
 # The binary is pure Go and built with CGO off, so one Linux runner can build
 # every target. macOS runners would add cost without adding capability.
@@ -109,11 +113,45 @@ jobs:
 
           (cd dist && sha256sum ./*.tar.gz ./*.zip > checksums.txt)
 
-      - name: Attach the archives to the release
+      - name: Attach the archives to the draft release
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" dist/*.tar.gz dist/*.zip dist/checksums.txt --clobber
+
+          # The API answers 422 for a published immutable release. Say what that
+          # means, since a dispatch against an old tag is the usual way here,
+          # and keep the raw output for any other cause.
+          if ! output=$(gh release upload \
+            "$TAG" dist/*.tar.gz dist/*.zip dist/checksums.txt --clobber 2>&1); then
+            printf '%s\n' "$output" >&2
+            case "$output" in
+              *"immutable release"*)
+                printf 'Archives attach to a draft release: %s is published and accepts no asset.\n' \
+                  "$TAG" >&2 ;;
+              *)
+                printf 'No draft release accepted the archives for %s; check the tag and its state.\n' \
+                  "$TAG" >&2 ;;
+            esac
+            exit 1
+          fi
+
+          # The publish job locks the release immediately after this one, and a
+          # file missed here can never be added later. Check what landed against
+          # what was built before the release is published.
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "\(.name) \(.size)"' > "$RUNNER_TEMP/attached.txt"
+
+          (cd dist && stat -c '%n %s' -- *.tar.gz *.zip checksums.txt) \
+            > "$RUNNER_TEMP/built.txt"
+          test -s "$RUNNER_TEMP/built.txt"
+
+          while read -r name size; do
+            if ! grep -qxF "$name $size" "$RUNNER_TEMP/attached.txt"; then
+              printf 'release %s does not carry asset %s at %s bytes\n' \
+                "$TAG" "$name" "$size" >&2
+              exit 1
+            fi
+          done < "$RUNNER_TEMP/built.txt"
