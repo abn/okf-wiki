@@ -10,6 +10,9 @@ deprecated, or restructured. It is deliberately separate from software releases.
   which imports the theme's tokens and fonts and shows the committed brand mark.
   The cards live under `.github/assets/social/`, and the contribution guide and
   README record the target and its Chrome requirement.
+* **Graph**: A section name wider than its cell is shortened at a word boundary
+  instead of compressed to fit, and is measured again once the webfont swaps
+  in. `usage/graph.md` records the rule.
 * **Graph**: The status line reports `5,713 nodes` when nothing is filtered and
   names the fraction only when a filter, tag, or focus narrows the view, and
   counts are grouped. `usage/graph.md` records it.

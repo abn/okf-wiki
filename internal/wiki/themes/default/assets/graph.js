@@ -1248,25 +1248,81 @@
     sizeSectionLabels();
   }
 
+  // A zoom gesture changes the label font on every wheel step. Measuring each
+  // name on each step is what makes a large section grid drop frames, so the
+  // exact fit waits for the gesture to stop. zoomSettlesAt is the moment the
+  // last step is old enough to be over.
+  var zoomSettlesAt = 0;
+  var sectionFitTimer = 0;
+
   function sizeSectionLabels() {
     if (!sectionLayer) return;
     var scale = state.scale || 1;
     var pad = 6 / scale;
+    var font = 12 / scale;
     Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
       var key = label.getAttribute('data-section');
       var cell = state.sectionCells && state.sectionCells[key];
       if (!cell) return;
-      label.style.fontSize = (12 / scale) + 'px';
+      label.style.fontSize = font + 'px';
       label.setAttribute('x', (cell.x + pad).toFixed(2));
       label.setAttribute('y', (cell.y + pad).toFixed(2));
-      label.removeAttribute('textLength');
-      label.removeAttribute('lengthAdjust');
-      var available = Math.max(18, cell.w - pad * 2);
-      if (label.getComputedTextLength() > available) {
-        label.setAttribute('textLength', available.toFixed(2));
-        label.setAttribute('lengthAdjust', 'spacingAndGlyphs');
-      }
     });
+    if (sectionFitTimer) {
+      window.clearTimeout(sectionFitTimer);
+      sectionFitTimer = 0;
+    }
+    var wait = zoomSettlesAt - Date.now();
+    if (wait > 0) {
+      sectionFitTimer = window.setTimeout(sizeSectionLabels, wait + 10);
+      return;
+    }
+    fitSectionLabels(font, pad);
+  }
+
+  function fitSectionLabels(font, pad) {
+    Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
+      var key = label.getAttribute('data-section');
+      var cell = state.sectionCells && state.sectionCells[key];
+      if (!cell) return;
+      fitSectionLabel(label, state.clusterLabels[key] || key, font, Math.max(18, cell.w - pad * 2));
+    });
+  }
+
+  // A section name that does not fit its cell is shortened with an ellipsis,
+  // not squeezed. Compressing the glyphs keeps every character and loses the
+  // shapes that make the name readable, and the result spills into the next
+  // cell at a narrow width. The fit is cached by font size and width, because
+  // only those change the room a name has.
+  function fitSectionLabel(label, full, font, available) {
+    var key = font.toFixed(2) + '/' + available.toFixed(1);
+    if (label.getAttribute('data-fit') === key) return;
+    label.setAttribute('data-fit', key);
+    label.textContent = full;
+    if (label.getComputedTextLength() <= available) return;
+    var low = 0;
+    var high = full.length;
+    while (low < high) {
+      var mid = Math.ceil((low + high) / 2);
+      label.textContent = full.slice(0, mid) + '\u2026';
+      if (label.getComputedTextLength() <= available) low = mid;
+      else high = mid - 1;
+    }
+    var cut = low;
+    var space = full.lastIndexOf(' ', cut);
+    if (space > 0) cut = space;
+    label.textContent = full.slice(0, cut).replace(/\s+$/, '') + '\u2026';
+  }
+
+  // A webfont that swaps in after first paint changes every measurement. The
+  // node labels already forget their widths for that reason; the section fit
+  // is cached by size, so it has to forget too.
+  function refitSectionLabels() {
+    if (!sectionLayer) return;
+    Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
+      label.removeAttribute('data-fit');
+    });
+    sizeSectionLabels();
   }
 
   function tick() {
@@ -2422,6 +2478,7 @@
 
   svg.addEventListener('wheel', function (ev) {
     ev.preventDefault();
+    zoomSettlesAt = Date.now() + 120;
     var v = state.view;
     var previousW = v.w;
     var factor = Math.exp(ev.deltaY * 0.0015);
@@ -2531,6 +2588,7 @@
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () {
       state.widths = Object.create(null);
+      refitSectionLabels();
       scheduleLabels();
     });
   }
