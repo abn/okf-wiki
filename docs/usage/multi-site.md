@@ -156,11 +156,12 @@ is itself a wiki keeps that wiki's own catalogue at the base, with no aggregate
 written over it.
 
 The tree also writes one `graph.html` at its base. Every wiki and group links to
-it from the header, and it draws the aggregate, so the view spans the tree the
-way search does. A wiki's header link carries `?site=<siteKey>`, so the view
-opens on that wiki's pages rather than on the whole tree; the tree index and a
-group index open all wikis. The Wiki control changes the scope, and the list
-groups by wiki. The per-wiki files stay where they are for an exporter.
+it from the header, and it draws the aggregate. Opened from the tree index or a
+group index it shows a map of the wikis, sized by page count and grouped by
+top-level directory; opened from a wiki it carries `?site=<siteKey>` and shows
+that wiki's pages. A cross-wiki link is an edge between the two wikis on the
+map. The Wiki control changes the scope, and the list groups by directory or
+section. The per-wiki files stay where they are for an exporter.
 `--graph-inline` embeds the aggregate once in that page rather than a copy in
 every wiki. A root that is itself a wiki writes the page from its own render,
 with its own catalogue. See [Graph view](graph.md). An offline render
