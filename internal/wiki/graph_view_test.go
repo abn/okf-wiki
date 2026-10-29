@@ -58,6 +58,10 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphSvg"`,
 		`id="graphSite"`,
 		`id="graphType"`,
+		`id="graphKindField"`,
+		`id="graphSectionsField"`,
+		`id="graphTagHubsField"`,
+		`id="graphLabelsField"`,
 		`id="graphDownload"`,
 		`id="graphFit"`,
 		`id="graphClearFocus"`,
@@ -169,6 +173,38 @@ func TestGraphViewStateContract(t *testing.T) {
 		"function initSiteControl",
 		"function initTypeControl",
 		"function cappedListNodes",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+}
+
+// TestGraphViewSiteMapContract pins the tree's first screen and the cell-level
+// edges that keep a scoped wiki readable. The Firefox smoke test covers the
+// drawing.
+func TestGraphViewSiteMapContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	if js == "" {
+		t.Fatal("the default theme has no graph.js")
+	}
+	for _, want := range []string{
+		"function buildSiteMap",
+		"function layoutSiteMap",
+		"function openSite",
+		"function renderCellEdges",
+		"function sliceTreemap",
+		"state.siteMap",
+		"show-cell-edges",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)

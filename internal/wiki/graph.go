@@ -372,7 +372,7 @@ func (r *Renderer) RenderGraphPage(inline []byte) (string, error) {
 	return r.RenderPage(Page{
 		Slug:        "graph",
 		Title:       "Knowledge graph",
-		Description: "Pages and tags as nodes, links and tags as edges.",
+		Description: "Wikis, pages and tags as nodes, and the links and tags between them.",
 		Body:        r.graphPageBody(inline),
 		Synthetic:   true,
 	})
@@ -395,13 +395,13 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<input type="search" id="graphFilter" placeholder="Title, section, tag or wiki" autocomplete="off" spellcheck="false"></label>`)
 	b.WriteString(`<label class="graph-field" id="graphTypeField" hidden><span class="graph-field-label">Type</span>`)
 	b.WriteString(`<select id="graphType"></select></label>`)
-	b.WriteString(`<label class="graph-field"><span class="graph-field-label">Show</span>`)
+	b.WriteString(`<label class="graph-field" id="graphKindField"><span class="graph-field-label">Show</span>`)
 	b.WriteString(`<select id="graphKind"><option value="all">All nodes</option><option value="page">Pages</option>`)
 	b.WriteString(`<option value="tag">Tags</option><option value="stub">Missing pages</option></select></label>`)
 	b.WriteString(`<details class="graph-tags" id="graphTags"><summary class="graph-tags-summary" id="graphTagsSummary">Tags: any</summary><div class="graph-tags-menu" id="graphTagsMenu" role="group" aria-label="Filter by tag"></div></details>`)
-	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphSections" checked> Sections</label>`)
-	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphTagHubs" checked> Tag hubs</label>`)
-	b.WriteString(`<label class="graph-check"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
+	b.WriteString(`<label class="graph-check" id="graphSectionsField"><input type="checkbox" id="graphSections" checked> Sections</label>`)
+	b.WriteString(`<label class="graph-check" id="graphTagHubsField"><input type="checkbox" id="graphTagHubs" checked> Tag hubs</label>`)
+	b.WriteString(`<label class="graph-check" id="graphLabelsField"><input type="checkbox" id="graphLabels" checked> Labels</label>`)
 	b.WriteString(`<button type="button" class="graph-fit" id="graphFit">Fit view</button>`)
 	b.WriteString(`<a class="graph-fit" id="graphClearFocus" href="`)
 	b.WriteString(template.HTMLEscapeString(base + "graph.html"))
@@ -415,7 +415,7 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`<p class="graph-status" id="graphStatus" role="status">Loading the graph...</p>`)
 	b.WriteString(`<div class="graph-main">`)
 	b.WriteString(`<div class="graph-canvas"><svg id="graphSvg" viewBox="0 0 1000 700" role="group" aria-labelledby="graphTitle graphDesc" preserveAspectRatio="xMidYMid meet">`)
-	b.WriteString(`<title id="graphTitle">Knowledge graph</title><desc id="graphDesc">Pages and tags as nodes. Drag a node to move it, scroll to zoom, drag the background to pan, and use the arrow keys to move between nodes.</desc>`)
+	b.WriteString(`<title id="graphTitle">Knowledge graph</title><desc id="graphDesc">Wikis, pages and tags as nodes. Drag a node to move it, scroll to zoom, drag the background to pan, and use the arrow keys to move between nodes.</desc>`)
 	b.WriteString(`<g id="graphEdges"></g><g id="graphNodes"></g><g id="graphSectionLayer" aria-hidden="true"></g></svg></div>`)
 	b.WriteString(`<aside class="graph-list" id="graphList" aria-label="List view" data-no-heading-anchor>`)
 	b.WriteString(`<div class="graph-list-head"><h2>List view</h2><p class="graph-list-status" id="graphListStatus">Loading the graph...</p></div>`)

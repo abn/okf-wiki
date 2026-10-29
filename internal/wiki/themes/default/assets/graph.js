@@ -26,6 +26,9 @@
   // of the graph fits on screen at a readable size.
   var READABLE_SCALE = 0.9;
   var FOCUS_SCALE = 0.45;
+  // Above this scale the individual edges are worth drawing; at the overview
+  // the section cells carry the structure instead.
+  var CELL_EDGE_SCALE = 1.0;
   // Below this screen scale a plain page keeps its name back and only hubs
   // label the map. Zooming in brings the page names in.
   var PAGE_LABEL_SCALE = 0.9;
@@ -41,6 +44,11 @@
   var siteSelect = document.getElementById('graphSite');
   var typeField = document.getElementById('graphTypeField');
   var typeSelect = document.getElementById('graphType');
+  var kindField = document.getElementById('graphKindField');
+  var sectionsField = document.getElementById('graphSectionsField');
+  var tagHubsField = document.getElementById('graphTagHubsField');
+  var labelsField = document.getElementById('graphLabelsField');
+  var pathBox = document.getElementById('graphPath');
   var sectionsCheck = document.getElementById('graphSections');
   var tagHubsCheck = document.getElementById('graphTagHubs');
   var labels = document.getElementById('graphLabels');
@@ -86,6 +94,11 @@
     siteMissing: false,
     siteByKey: Object.create(null),
     sitePages: Object.create(null),
+    siteMap: false,
+    mapGroups: Object.create(null),
+    mapActive: false,
+    labelsPrev: true,
+    hasTypeControl: false,
     typeFilter: TYPE_ALL,
     defaultType: TYPE_ALL,
     typeBySlug: Object.create(null),
@@ -141,6 +154,7 @@
   }
 
   function nodeRadius(n) {
+    if (n.kind === 'site') return Math.min(46, 8 + Math.sqrt(n.pages || 0) * 1.2);
     return 5 + Math.min(10, Math.sqrt(n.degree) * 2.2) + (n.kind === 'tag' ? 1 : 0);
   }
 
@@ -149,6 +163,10 @@
   }
 
   function ariaLabel(n) {
+    if (n.kind === 'site') {
+      return 'Open ' + n.short + ', wiki, ' + countText(n.pages || 0, 'page', 'pages') +
+        ', ' + countText(n.tagCount || 0, 'tag', 'tags');
+    }
     var what = n.kind === 'tag' ? 'tag' : n.stub ? 'missing page' : 'page';
     var links = 0;
     (state.adj[n.id] || []).forEach(function (link) {
@@ -298,9 +316,11 @@
     state.defaultType = types.length >= 2 && isTreeCatalogue() && state.hasLogs ? TYPE_CONTENT : TYPE_ALL;
     if (!typeSelect || !typeField) return;
     if (types.length < 2) {
+      state.hasTypeControl = false;
       typeField.hidden = true;
       return;
     }
+    state.hasTypeControl = true;
     typeField.hidden = false;
     typeSelect.textContent = '';
     function add(value, label, parent) {
@@ -336,6 +356,13 @@
   // rebuild the drawing instead of only changing the controls.
   function readScopeState(params) {
     var site = params.get('site') || '';
+    // A focus link from a page names a node, not a wiki. Open the wiki that
+    // owns the node instead of the wiki map, so the local graph still works.
+    if (!site) {
+      var focusID = params.get('focus');
+      var focusNode = focusID && state.nodeByID[focusID];
+      if (focusNode && focusNode.siteKey) site = focusNode.siteKey;
+    }
     var siteChanged = site !== state.site;
     state.siteMissing = !!site && !state.siteByKey[site];
     state.site = state.siteMissing ? '' : site;
@@ -376,6 +403,142 @@
     if (n.stub) return state.typeFilter === TYPE_CONTENT;
     if (state.typeFilter === TYPE_CONTENT) return (n.type || 'Untyped') !== LOG_TYPE;
     return (n.type || 'Untyped') === state.typeFilter;
+  }
+
+  function siteGroupKey(key) {
+    var at = key.indexOf('/');
+    return at === -1 ? '' : key.slice(0, at);
+  }
+
+  // buildSiteMap is the first screen of a tree: one node per wiki, sized by its
+  // page count, with a cross-wiki link as an edge between the two wikis. It is
+  // derived here rather than written into graph.json, which stays a catalogue
+  // of pages and tags.
+  function buildSiteMap() {
+    var sites = Object.keys(state.siteByKey).map(function (key) {
+      return state.siteByKey[key];
+    }).sort(function (a, b) {
+      var aa = siteGroupKey(a.key) || '\uffff';
+      var bb = siteGroupKey(b.key) || '\uffff';
+      return aa.localeCompare(bb) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
+    });
+    var bySite = Object.create(null);
+    var titleCounts = Object.create(null);
+    sites.forEach(function (site) { titleCounts[site.title] = (titleCounts[site.title] || 0) + 1; });
+    var nodes = sites.map(function (site, i) {
+      var groupKey = siteGroupKey(site.key);
+      var short = site.title;
+      if (titleCounts[site.title] > 1) {
+        var at = site.key.lastIndexOf('/');
+        var parent = at === -1 ? '' : site.key.slice(0, at).split('/').pop();
+        short = site.title + (parent ? ' (' + groupLabel(parent) + ')' : '');
+      }
+      var node = {
+        id: 'site:' + site.key,
+        title: site.title,
+        short: short,
+        url: '',
+        kind: 'site',
+        section: '',
+        sectionID: '',
+        tags: [],
+        tagSlugs: [],
+        stub: false,
+        type: '',
+        status: '',
+        site: site.title,
+        siteKey: site.key,
+        groupKey: groupKey,
+        groupLabel: groupKey ? groupLabel(groupKey) : 'Top level',
+        pages: site.pages,
+        tagCount: 0,
+        matched: true,
+        degree: 0,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        index: i,
+        el: null,
+        circle: null,
+        fixed: false
+      };
+      bySite[site.key] = node;
+      return node;
+    });
+    state.allNodes.forEach(function (n) {
+      if (n.kind !== 'tag') return;
+      var node = bySite[n.siteKey];
+      if (node) node.tagCount += 1;
+    });
+
+    var pairs = Object.create(null);
+    state.allEdges.forEach(function (e) {
+      if (e.kind !== 'link') return;
+      var fromKey = siteKeyOf(e.from);
+      var toKey = siteKeyOf(e.to);
+      if (!fromKey || !toKey || fromKey === toKey) return;
+      var a = bySite[fromKey];
+      var b = bySite[toKey];
+      if (!a || !b) return;
+      var key = fromKey < toKey ? fromKey + '\x00' + toKey : toKey + '\x00' + fromKey;
+      if (!pairs[key]) pairs[key] = { from: fromKey < toKey ? a : b, to: fromKey < toKey ? b : a, count: 0 };
+      pairs[key].count += 1;
+    });
+    var edges = Object.keys(pairs).map(function (key) {
+      var pair = pairs[key];
+      return { from: pair.from, to: pair.to, kind: 'link', anchor: '', text: '', count: pair.count };
+    });
+
+    state.mapGroups = Object.create(null);
+    nodes.forEach(function (n) {
+      (state.mapGroups[n.groupKey] || (state.mapGroups[n.groupKey] = [])).push(n);
+    });
+    state.scopeNodes = nodes;
+    state.nodes = nodes;
+    state.edges = edges;
+    state.hubIDs = Object.create(null);
+    state.logHidden = 0;
+    state.selectedTags = [];
+    state.adj = Object.create(null);
+    nodes.forEach(function (n) { state.adj[n.id] = []; });
+    edges.forEach(function (e) {
+      e.from.degree += 1;
+      e.to.degree += 1;
+      state.adj[e.from.id].push({ node: e.to, dir: 'out', kind: e.kind });
+      state.adj[e.to.id].push({ node: e.from, dir: 'in', kind: e.kind });
+    });
+    fillPathOptions();
+  }
+
+  function setMapControls() {
+    var map = state.siteMap;
+    if (map && !state.mapActive) {
+      state.labelsPrev = labels.checked;
+      labels.checked = true;
+    }
+    if (!map && state.mapActive) {
+      labels.checked = state.labelsPrev;
+    }
+    state.mapActive = map;
+    if (kindField) kindField.hidden = map;
+    if (sectionsField) sectionsField.hidden = map;
+    if (tagHubsField) tagHubsField.hidden = map;
+    if (labelsField) labelsField.hidden = map;
+    if (typeField) typeField.hidden = map || !state.hasTypeControl;
+    if (tagsDetails) tagsDetails.hidden = map;
+    if (pathBox) pathBox.hidden = map;
+    app.classList.toggle('hide-labels', !labels.checked && !map);
+  }
+
+  function openSite(key) {
+    if (!key || !state.siteByKey[key]) return;
+    state.site = key;
+    state.siteTitle = state.siteByKey[key].title;
+    state.siteMissing = false;
+    state.selectedTags = [];
+    if (siteSelect) siteSelect.value = key;
+    relayoutGraph(true, 'push');
   }
 
   function initTagFilter() {
@@ -470,6 +633,11 @@
 
     var allNodes = state.nodes.filter(listVisible).slice();
     allNodes.sort(function (a, b) {
+      if (state.siteMap) {
+        var byGroup = (a.groupLabel || '').localeCompare(b.groupLabel || '');
+        if (byGroup) return byGroup;
+        return a.short.localeCompare(b.short) || a.siteKey.localeCompare(b.siteKey);
+      }
       var bySite = siteTitleOf(a).localeCompare(siteTitleOf(b)) ||
         siteKeyOf(a).localeCompare(siteKeyOf(b));
       if (bySite) return bySite;
@@ -501,21 +669,28 @@
     }
     var edges = state.listAllEdges ? allEdges : allEdges.slice(0, LIST_EDGE_LIMIT);
     if (listStatus) {
-      var parts = [];
-      if (nodes.length !== allNodes.length) {
-        parts.push(formatCount(nodes.length) + ' of ' + formatCount(allNodes.length) + ' nodes');
+      if (state.siteMap) {
+        listStatus.textContent = (nodes.length !== allNodes.length ? 'Showing ' : '') +
+          formatCount(nodes.length) + ' of ' + formatCount(allNodes.length) + ' wikis.';
       } else {
-        parts.push(formatCount(allNodes.length) + (allNodes.length === 1 ? ' node' : ' nodes'));
+        var parts = [];
+        if (nodes.length !== allNodes.length) {
+          parts.push(formatCount(nodes.length) + ' of ' + formatCount(allNodes.length) + ' nodes');
+        } else {
+          parts.push(formatCount(allNodes.length) + (allNodes.length === 1 ? ' node' : ' nodes'));
+        }
+        if (edges.length !== allEdges.length) {
+          parts.push(formatCount(edges.length) + ' of ' + formatCount(allEdges.length) + ' edges');
+        } else {
+          parts.push(formatCount(allEdges.length) + (allEdges.length === 1 ? ' edge' : ' edges'));
+        }
+        var capped = nodes.length !== allNodes.length || edges.length !== allEdges.length;
+        listStatus.textContent = (capped ? 'Showing ' : '') + parts.join(', ') + '.';
       }
-      if (edges.length !== allEdges.length) {
-        parts.push(formatCount(edges.length) + ' of ' + formatCount(allEdges.length) + ' edges');
-      } else {
-        parts.push(formatCount(allEdges.length) + (allEdges.length === 1 ? ' edge' : ' edges'));
-      }
-      var capped = nodes.length !== allNodes.length || edges.length !== allEdges.length;
-      listStatus.textContent = (capped ? 'Showing ' : '') + parts.join(', ') + '.';
     }
-    if (listNodesTitle) listNodesTitle.textContent = 'Nodes (' + formatCount(allNodes.length) + ')';
+    if (listNodesTitle) {
+      listNodesTitle.textContent = (state.siteMap ? 'Wikis (' : 'Nodes (') + formatCount(allNodes.length) + ')';
+    }
     if (listEdgesTitle) listEdgesTitle.textContent = 'Edges (' + formatCount(allEdges.length) + ')';
 
     listNodes.textContent = '';
@@ -526,19 +701,26 @@
     var lastSection = '';
     nodes.forEach(function (n) {
       var siteKey = siteKeyOf(n);
-      if (!state.site && isTreeCatalogue() && siteKey !== lastSite) {
-        var pages = state.sitePages[siteKey] || 0;
-        listNodes.appendChild(listHeading(
-          listSiteLabel(n) + ' \u00b7 ' + formatCount(pages) + (pages === 1 ? ' page' : ' pages'),
-          'graph-list-site'
-        ));
-        lastSite = siteKey;
-        lastSection = '';
-      }
-      var section = listSectionLabel(n);
-      if (section !== lastSection) {
-        listNodes.appendChild(listHeading(section, 'graph-list-section-label'));
-        lastSection = section;
+      if (state.siteMap) {
+        if ((n.groupLabel || '') !== lastSection) {
+          listNodes.appendChild(listHeading(n.groupLabel || 'Top level', 'graph-list-site'));
+          lastSection = n.groupLabel || 'Top level';
+        }
+      } else {
+        if (!state.site && isTreeCatalogue() && siteKey !== lastSite) {
+          var pages = state.sitePages[siteKey] || 0;
+          listNodes.appendChild(listHeading(
+            listSiteLabel(n) + ' \u00b7 ' + formatCount(pages) + (pages === 1 ? ' page' : ' pages'),
+            'graph-list-site'
+          ));
+          lastSite = siteKey;
+          lastSection = '';
+        }
+        var section = listSectionLabel(n);
+        if (section !== lastSection) {
+          listNodes.appendChild(listHeading(section, 'graph-list-section-label'));
+          lastSection = section;
+        }
       }
       var links = connections(n);
       var item = document.createElement('li');
@@ -611,7 +793,8 @@
       if (edge.from.short !== edge.from.title) from.title = edge.from.title;
       var action = document.createElement('span');
       action.className = 'graph-list-edge-action';
-      action.textContent = edge.kind === 'tag' ? 'tagged' : 'links to';
+      action.textContent = edge.kind === 'tag' ? 'tagged'
+        : (state.siteMap && edge.count ? 'connects' : 'links to');
       var to = document.createElement('span');
       to.className = 'graph-list-edge-node';
       to.textContent = edge.to.short;
@@ -619,6 +802,7 @@
       var type = document.createElement('span');
       type.className = 'graph-list-edge-kind';
       type.textContent = cross ? 'cross-wiki' : edge.kind;
+      if (edge.count > 1) type.textContent += ' \u00d7' + edge.count;
       item.appendChild(from);
       item.appendChild(action);
       item.appendChild(to);
@@ -694,6 +878,7 @@
   }
 
   function listSectionLabel(n) {
+    if (n.kind === 'site') return n.groupLabel || 'Top level';
     if (n.kind === 'tag') return 'Tags';
     if (n.stub) return 'Missing pages';
     return n.section || 'Overview';
@@ -718,7 +903,7 @@
   // alphabetical catalogue. A tree spreads the cap over its wikis; a scoped
   // wiki spends the whole page on that wiki.
   function cappedListNodes(allNodes) {
-    if (state.listAllNodes) return allNodes;
+    if (state.listAllNodes || state.siteMap) return allNodes;
     var siteCount = Object.keys(state.siteByKey).length;
     if (state.site || siteCount < 2) return allNodes.slice(0, LIST_NODE_LIMIT);
     var per = Math.max(4, Math.floor(LIST_NODE_LIMIT / siteCount));
@@ -744,6 +929,9 @@
   }
 
   function listKind(n) {
+    if (n.kind === 'site') {
+      return 'Wiki / ' + formatCount(n.pages) + ' pages / ' + formatCount(n.tagCount) + ' tags';
+    }
     if (n.kind === 'tag') return 'Tag hub';
     if (n.stub) return 'Missing page';
     var bits = ['Page'];
@@ -832,7 +1020,7 @@
     wanted.forEach(function (slug) {
       if (selected.indexOf(slug) === -1) selected.push(slug);
     });
-    state.selectedTags = selected;
+    state.selectedTags = state.siteMap ? [] : selected;
     renderTagMenu();
     updateTagSummary();
 
@@ -856,29 +1044,35 @@
     params.delete('site');
     params.delete('type');
     var focus = null;
-    if (state.selected && state.focus) {
-      focus = { id: state.selected.id, hops: state.focusHops || 1 };
-    } else if (state.pendingFocus) {
-      focus = { id: state.pendingFocus.node.id, hops: state.pendingFocus.hops };
-    }
-    if (focus) {
-      params.set('focus', focus.id);
-      params.set('depth', String(focus.hops));
-    }
-    if (state.site) params.set('site', state.site);
-    if (state.typeFilter !== state.defaultType) {
-      if (state.typeFilter === TYPE_ALL || state.typeFilter === TYPE_CONTENT) {
-        params.set('type', state.typeFilter);
-      } else {
-        params.set('type', typeSlug(state.typeFilter));
+    if (!state.siteMap) {
+      if (state.selected && state.focus) {
+        focus = { id: state.selected.id, hops: state.focusHops || 1 };
+      } else if (state.pendingFocus) {
+        focus = { id: state.pendingFocus.node.id, hops: state.pendingFocus.hops };
+      }
+      if (focus) {
+        params.set('focus', focus.id);
+        params.set('depth', String(focus.hops));
       }
     }
-    if (kind.value !== 'all') params.set('kind', kind.value);
+    if (state.site) params.set('site', state.site);
+    if (!state.siteMap) {
+      if (state.typeFilter !== state.defaultType) {
+        if (state.typeFilter === TYPE_ALL || state.typeFilter === TYPE_CONTENT) {
+          params.set('type', state.typeFilter);
+        } else {
+          params.set('type', typeSlug(state.typeFilter));
+        }
+      }
+      if (kind.value !== 'all') params.set('kind', kind.value);
+    }
     var q = filter.value.trim();
     if (q) params.set('q', q);
-    state.selectedTags.slice().sort().forEach(function (slug) {
-      params.append('tag', slug);
-    });
+    if (!state.siteMap) {
+      state.selectedTags.slice().sort().forEach(function (slug) {
+        params.append('tag', slug);
+      });
+    }
     var next = url.pathname + url.search + url.hash;
     var current = window.location.pathname + window.location.search + window.location.hash;
     if (next === current) return;
@@ -1042,6 +1236,13 @@
   // loss of the tag filter or of the data. Site and type are scopes: they
   // change which nodes exist, not only which ones are lit.
   function buildVisibleGraph() {
+    state.siteMap = isTreeCatalogue() && !state.site &&
+      Object.keys(state.siteByKey).length > 1;
+    if (state.siteMap) {
+      buildSiteMap();
+      setMapControls();
+      return;
+    }
     var pages = state.allNodes.filter(function (n) {
       return n.kind !== 'tag' && siteMatches(n) && typeMatches(n);
     });
@@ -1094,6 +1295,7 @@
       state.adj[e.to.id].push({ node: e.from, dir: 'in', kind: e.kind });
     });
     fillPathOptions();
+    setMapControls();
   }
 
   // A page is a hub when it sits in the busiest quarter of the connected
@@ -1450,30 +1652,61 @@
   // In section mode the grid is the layout. Each group occupies one cell and
   // its members sit in a small grid inside it, so sections never dissolve into
   // the link cloud. The link edges still show the connections between cells.
+  // sliceTreemap gives each group a cell whose area follows its member count.
+  // The equal grid a small bundle could afford turned a private tree into 172
+  // same-sized cells, where a 1,003-page archive had the same room as a
+  // two-page section.
+  function sliceTreemap(items, x, y, w, h, out) {
+    if (!items.length) return;
+    if (items.length === 1) {
+      out[items[0].key] = { x: x, y: y, w: w, h: h };
+      return;
+    }
+    var total = 0;
+    items.forEach(function (item) { total += item.weight; });
+    var half = total / 2;
+    var acc = 0;
+    var cut = 0;
+    for (var i = 0; i < items.length; i++) {
+      acc += items[i].weight;
+      cut = i + 1;
+      if (acc >= half) break;
+    }
+    if (cut < 1) cut = 1;
+    if (cut >= items.length) cut = items.length - 1;
+    var first = items.slice(0, cut);
+    var rest = items.slice(cut);
+    var firstWeight = 0;
+    first.forEach(function (item) { firstWeight += item.weight; });
+    var ratio = firstWeight / total;
+    if (w >= h) {
+      sliceTreemap(first, x, y, w * ratio, h, out);
+      sliceTreemap(rest, x + w * ratio, y, w * (1 - ratio), h, out);
+    } else {
+      sliceTreemap(first, x, y, w, h * ratio, out);
+      sliceTreemap(rest, x, y + h * ratio, w, h * (1 - ratio), out);
+    }
+  }
+
   function layoutInitialClustered() {
     var groups = clusterGroups();
     var names = Object.keys(groups).sort();
+    var items = names.map(function (name) {
+      return { key: name, weight: Math.max(1, groups[name].length) };
+    }).sort(function (a, b) {
+      return b.weight - a.weight || a.key.localeCompare(b.key);
+    });
     var cells = Object.create(null);
+    sliceTreemap(items, 0, 0, W, H, cells);
     state.sectionCells = cells;
-    var cols = names.length <= 1 ? 1 : Math.ceil(Math.sqrt(names.length * (W / H)));
-    cols = Math.max(1, Math.min(names.length, cols));
-    var rows = Math.ceil(names.length / Math.max(1, cols));
-    var cellW = W / Math.max(1, cols);
-    var cellH = H / Math.max(1, rows);
-    names.forEach(function (name, i) {
-      var cell = {
-        x: (i % cols) * cellW,
-        y: Math.floor(i / cols) * cellH,
-        w: cellW,
-        h: cellH
-      };
-      cells[name] = cell;
+    names.forEach(function (name) {
+      var cell = cells[name];
       var members = groups[name];
       var innerCols = Math.max(1, Math.min(members.length,
-        Math.ceil(Math.sqrt(members.length * (cellW / cellH)))));
+        Math.ceil(Math.sqrt(members.length * (cell.w / cell.h)))));
       var innerRows = Math.ceil(members.length / innerCols);
-      var gapX = cellW / (innerCols + 1);
-      var gapY = cellH / (innerRows + 1);
+      var gapX = cell.w / (innerCols + 1);
+      var gapY = cell.h / (innerRows + 1);
       members.forEach(function (n, j) {
         n.x = cell.x + gapX * ((j % innerCols) + 1);
         n.y = cell.y + gapY * (Math.floor(j / innerCols) + 1);
@@ -1483,9 +1716,48 @@
     });
   }
 
+  // The wiki map arranges its top-level groups as rows and the wikis inside
+  // each group as a small grid. A row is taller when it holds more wikis, and
+  // the site circle grows with its page count.
+  function layoutSiteMap() {
+    var groups = state.mapGroups;
+    var names = Object.keys(groups).sort(function (a, b) {
+      var aa = a ? groupLabel(a) : 'Top level';
+      var bb = b ? groupLabel(b) : 'Top level';
+      return aa.localeCompare(bb);
+    });
+    var total = Math.max(1, state.nodes.length);
+    var cells = Object.create(null);
+    var labels = Object.create(null);
+    state.sectionCells = cells;
+    state.clusterLabels = labels;
+    var y = 0;
+    names.forEach(function (key) {
+      var members = groups[key].slice().sort(function (a, b) {
+        return a.title.localeCompare(b.title);
+      });
+      var h = H * members.length / total;
+      var cell = { x: 0, y: y, w: W, h: h };
+      cells[key] = cell;
+      labels[key] = key ? groupLabel(key) : 'Top level';
+      var cols = Math.max(1, Math.min(members.length,
+        Math.round(Math.sqrt(members.length * (W / Math.max(1, h))))));
+      var rows = Math.ceil(members.length / cols);
+      members.forEach(function (n, j) {
+        n.x = cell.x + cell.w * ((j % cols) + 0.5) / cols;
+        n.y = cell.y + cell.h * (Math.floor(j / cols) + 0.5) / rows;
+        n.vx = 0;
+        n.vy = 0;
+      });
+      y += h;
+    });
+  }
+
   function layoutInitial() {
     seedLayout();
-    if (state.clusterSections) {
+    if (state.siteMap) {
+      layoutSiteMap();
+    } else if (state.clusterSections) {
       layoutInitialClustered();
     } else {
       layoutInitialWalk();
@@ -1561,7 +1833,7 @@
   function renderSections() {
     if (!sectionLayer) return;
     sectionLayer.textContent = '';
-    if (!state.clusterSections || !state.sectionCells) return;
+    if ((!state.clusterSections && !state.siteMap) || !state.sectionCells) return;
     Object.keys(state.sectionCells).sort().forEach(function (name) {
       var cell = state.sectionCells[name];
       var label = document.createElementNS(NS, 'text');
@@ -1777,17 +2049,60 @@
     });
   }
 
+  function clusterKeyOf(n) {
+    if (n.kind === 'tag') return '\x00tag-hubs';
+    if (n.stub) return '\x00missing-pages';
+    return pageSectionKey(n);
+  }
+
+  // A section view at overview scale shows the traffic between cells, not every
+  // thread inside them. The individual edges stay in the DOM for the zoomed-in
+  // view and for a focus, where the reader is asking about one page.
+  function renderCellEdges() {
+    if (state.siteMap || !state.clusterSections || !state.sectionCells) return;
+    var pairs = Object.create(null);
+    state.edges.forEach(function (e) {
+      var from = clusterKeyOf(e.from);
+      var to = clusterKeyOf(e.to);
+      if (!from || !to || from === to) return;
+      var key = from < to ? from + '\x00' + to : to + '\x00' + from;
+      if (!pairs[key]) pairs[key] = { from: from, to: to, count: 0 };
+      pairs[key].count += 1;
+    });
+    Object.keys(pairs).forEach(function (key) {
+      var pair = pairs[key];
+      var a = state.sectionCells[pair.from];
+      var b = state.sectionCells[pair.to];
+      if (!a || !b) return;
+      var line = document.createElementNS(NS, 'line');
+      line.setAttribute('class', 'graph-cell-edge');
+      line.setAttribute('x1', (a.x + a.w / 2).toFixed(2));
+      line.setAttribute('y1', (a.y + a.h / 2).toFixed(2));
+      line.setAttribute('x2', (b.x + b.w / 2).toFixed(2));
+      line.setAttribute('y2', (b.y + b.h / 2).toFixed(2));
+      line.setAttribute('stroke-width', String(1 + Math.min(4, Math.sqrt(pair.count))));
+      var title = document.createElementNS(NS, 'title');
+      var fromLabel = state.clusterLabels[pair.from] || pair.from;
+      var toLabel = state.clusterLabels[pair.to] || pair.to;
+      title.textContent = countText(pair.count, 'link', 'links') + ' between ' + fromLabel + ' and ' + toLabel;
+      line.appendChild(title);
+      edgeLayer.appendChild(line);
+    });
+  }
+
   function draw() {
     sectionLayer.textContent = '';
     edgeLayer.textContent = '';
     nodeLayer.textContent = '';
     state.edgeElements = [];
+    renderCellEdges();
 
     state.edges.forEach(function (e) {
       var line = document.createElementNS(NS, 'line');
       var cross = e.from.siteKey && e.to.siteKey && e.from.siteKey !== e.to.siteKey;
       line.setAttribute('class', 'graph-edge ' + e.kind + (cross ? ' cross-site' : ''));
       line.setAttribute('vector-effect', 'non-scaling-stroke');
+      if (e.count) line.setAttribute('stroke-width', String(1 + Math.min(4, Math.sqrt(e.count))));
       edgeLayer.appendChild(line);
       state.edgeElements.push({ el: line, edge: e });
     });
@@ -1888,6 +2203,17 @@
       app.setAttribute('data-layout', 'ready');
     }
 
+    if (state.siteMap) {
+      state.totalTicks = 0;
+      state.step = 0;
+      initialView();
+      renderPositions();
+      renderSections();
+      applyFilter();
+      applyPendingFocus();
+      finishLayout();
+      return;
+    }
     if (state.clusterSections) {
       state.totalTicks = 0;
       state.step = 0;
@@ -1954,6 +2280,9 @@
 
   function updateEdgeVisibility() {
     app.classList.toggle('hide-edges', !state.focus && 11 * state.scale < EDGE_MIN_TEXT_PX);
+    app.classList.toggle('show-cell-edges',
+      state.clusterSections && !state.siteMap && !state.focus && !state.path &&
+      state.scale < CELL_EDGE_SCALE);
   }
 
   function applyView() {
@@ -2100,6 +2429,12 @@
   }
 
   function matches(n) {
+    if (state.siteMap) {
+      var mapQuery = state.query;
+      if (!mapQuery) return true;
+      var mapHay = (n.title + ' ' + n.siteKey + ' ' + n.groupLabel).toLowerCase();
+      return mapHay.indexOf(mapQuery) !== -1;
+    }
     if (kind.value === 'page' && (n.kind !== 'page' || n.stub)) return false;
     if (kind.value === 'tag' && n.kind !== 'tag') return false;
     if (kind.value === 'stub' && !n.stub) return false;
@@ -2139,6 +2474,19 @@
     var shown = 0;
     state.nodes.forEach(function (n) { if (n.matched) shown += 1; });
     var noun = total === 1 ? 'node' : 'nodes';
+    if (state.siteMap) {
+      var wikis = total === 1 ? 'wiki' : 'wikis';
+      var mapText = shown === total
+        ? formatCount(total) + ' ' + wikis + '.'
+        : 'Showing ' + formatCount(shown) + ' of ' + formatCount(total) + ' ' + wikis + '.';
+      mapText += ' Select a wiki to open its graph.';
+      if (state.focusMissing) mapText += ' Focus node not found; showing the wiki map.';
+      setStatus(mapText);
+      var mapDesc = document.getElementById('graphDesc');
+      if (mapDesc) mapDesc.textContent = 'Wikis as nodes. ' + mapText +
+        ' Use the arrow keys to move between wikis and Enter to open one.';
+      return;
+    }
     var prefix = state.site ? state.siteTitle + ': ' : (isTreeCatalogue() ? 'All wikis: ' : '');
     var text = prefix + (shown === total
       ? formatCount(total) + ' ' + noun + '.'
@@ -2215,7 +2563,7 @@
   }
 
   function isLabelHub(n) {
-    return n.kind === 'tag' || !!state.hubIDs[n.id];
+    return n.kind === 'site' || n.kind === 'tag' || !!state.hubIDs[n.id];
   }
 
   function labelTier(n) {
@@ -2226,7 +2574,7 @@
   // A focus, a filter or a zoomed-in view is a request for page names. The
   // map itself stays at hubs.
   function pagesMayLabel() {
-    return state.scale >= PAGE_LABEL_SCALE || !!state.focus || !!state.query ||
+    return state.siteMap || state.scale >= PAGE_LABEL_SCALE || !!state.focus || !!state.query ||
       (kind && kind.value !== 'all') || state.selectedTags.length > 0;
   }
 
@@ -2262,7 +2610,7 @@
         label.setAttribute('y', String(-(nodeRadius(n) + 4 / scale + fontWorld * 0.2)));
       }
     });
-    if (!labels.checked || !state.nodes.length) return;
+    if ((!labels.checked && !state.siteMap) || !state.nodes.length) return;
 
     var grid = circleGrid();
     var boxes = [];
@@ -2541,6 +2889,10 @@
   }
 
   function select(n, withView, hops, restoring) {
+    if (n.kind === 'site') {
+      openSite(n.siteKey);
+      return;
+    }
     if (!restoring) state.pendingFocus = null;
     var keepFocus = details.contains(document.activeElement);
     state.selected = n;
@@ -2707,7 +3059,7 @@
   }
 
   function startDrag(ev, n) {
-    if (ev.button !== 0) return;
+    if (ev.button !== 0 || n.kind === 'site') return;
     ev.stopPropagation();
     ev.preventDefault();
     swallowClick = false;

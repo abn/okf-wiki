@@ -126,6 +126,13 @@ demand rather than with every page. `--graph-inline` embeds the same bytes in
 the page and the client reads them instead, which removes the second request.
 An offline render embeds it automatically.
 
+In a tree with no `site`, the view derives a map from the aggregate: one node
+per wiki, its radius following the page count, grouped by the wiki's top-level
+directory rows. A cross-wiki link becomes one edge between the two wiki nodes,
+weighted by how many links cross. The map is a view of the same catalogue, not a
+new node in it; `graph.json` still holds pages and tags only. Selecting a wiki
+sets `site` and draws that wiki's pages.
+
 The page carries its view state in the query string. Defaults are omitted.
 
 | Parameter | Meaning |
@@ -135,7 +142,7 @@ The page carries its view state in the query string. Defaults are omitted.
 | `kind` | `all`, `page`, `tag` or `stub`; absent means all nodes |
 | `q` | text matched against title, section, type, tag, ID and site |
 | `tag` | tag slug, repeated for more tags; a page must carry every named tag |
-| `site` | wiki key to scope an aggregate to one wiki, for example `site=projects%2Froundhouse`; absent means all wikis |
+| `site` | wiki key to scope an aggregate to one wiki, for example `site=projects%2Froundhouse`; absent opens the wiki map |
 | `type` | `all`, `content`, or a type slug such as `log-entry`; `content` hides log entries |
 
 Repeated tags combine with AND. A page's Connections panel uses `focus` and
@@ -160,7 +167,9 @@ entries, the Type control opens on `content`, so the first view is the pages
 that carry navigation; `all` and the named types bring the rest back. The status
 line names the scope and reports how many log entries are hidden. A catalogue
 with more than 500 nodes opens with tag hubs collapsed; the checkbox and the tag
-filter still work.
+filter still work. At a section-clustered overview the drawing shows one weighted
+edge per pair of cells; the individual links join when the reader zooms in or
+selects a node.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,

@@ -46,6 +46,11 @@ the semantic layer.
   matches from the search modal.
 - [x] Scope by wiki and by page type: the aggregate opens on a wiki's content
   pages, the URL carries `site` and `type`, and the list groups by wiki.
+- [x] Wiki map: the tree opens on one node per wiki, sized by page count and
+  grouped by top-level directory, with cross-wiki links as edges.
+- [x] Proportional section cells and cell-level edges: a section gets room in
+  proportion to its pages, and overview edges connect cells rather than every
+  page pair.
 
 ### Scale and readability
 
@@ -77,6 +82,6 @@ the semantic layer.
 
 Local graph and backlinks, shareable view state, the accessible list view,
 collapsed tag hubs, section clusters, a deterministic layout, semantic zoom,
-cross-wiki edges, typed page-order edges, and wiki and type scope are shipped.
-The next item is a first screen that maps the wikis themselves, then graph diff
-between two renders or commits.
+cross-wiki edges, typed page-order edges, wiki and type scope, the wiki map and
+proportional cell edges are shipped. The next item is graph diff between two
+renders or commits.

@@ -1359,6 +1359,9 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
 }
 .graph-check input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
+.graph-check[hidden] { display: none; }
+.graph-tags[hidden] { display: none; }
+.graph-path[hidden] { display: none; }
 .graph-tags { position: relative; }
 .graph-tags-summary {
   display: inline-flex; align-items: center; gap: var(--space-2);
@@ -1589,6 +1592,15 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 }
 .graph-edge.tag { stroke: var(--color-accent-text); stroke-dasharray: 3 3; stroke-opacity: .14; }
 .graph-edge.cross-site { stroke: var(--color-accent-text); stroke-dasharray: 6 4; stroke-opacity: .24; }
+.graph-cell-edge {
+  stroke: var(--color-accent-text); stroke-opacity: .16;
+  vector-effect: non-scaling-stroke; display: none; pointer-events: none;
+}
+.graph-app.show-cell-edges .graph-cell-edge { display: block; }
+.graph-app.show-cell-edges .graph-edge { display: none; }
+.graph-app.has-path .graph-cell-edge { display: none; }
+.graph-app.has-path .graph-edge { display: block; }
+.graph-app.has-path .graph-edge.is-culled { display: none; }
 .graph-edge.is-dim { opacity: .08; }
 .graph-edge.is-focus-far { opacity: .04; }
 .graph-edge.is-culled { display: none; }
@@ -1599,6 +1611,10 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   stroke-width: 1.5; cursor: pointer;
 }
 .graph-node-group.tag circle { fill: var(--color-text-faint); }
+.graph-node-group.site circle {
+  fill: var(--color-accent-soft); stroke: var(--color-accent-text); stroke-width: 2;
+}
+.graph-node-group.site .graph-label { fill: var(--color-heading); font-weight: var(--fw-semibold); }
 .graph-node-group.stub circle {
   fill: var(--color-surface-sunken); stroke: var(--status-danger-text); stroke-dasharray: 3 2;
 }
