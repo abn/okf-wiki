@@ -27,7 +27,7 @@ import (
 
 // Version is the binary's release. Release Please bumps this constant in the
 // release pull request, so keep the form `const Version = "x.y.z"`.
-const Version = "1.1.0"
+const Version = "1.2.0"
 
 func main() {
 	if len(os.Args) < 2 {
