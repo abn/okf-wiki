@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/abn/okf-wiki/compare/v1.1.0...v1.2.0) (2026-10-29)
+
+
+### Features
+
+* **wiki:** nest sidebar groups at every depth ([fdb3acd](https://github.com/abn/okf-wiki/commit/fdb3acd5aeca2d0d36ac393183ef22a9d4aeeb5d))
+
+
+### Bug Fixes
+
+* **release:** publish immutable releases in the documented order ([356a36c](https://github.com/abn/okf-wiki/commit/356a36c4094ddb6960dd97c5c59f2d4b9db1a81f))
+
 ## [1.1.0](https://github.com/abn/okf-wiki/compare/v1.0.0...v1.1.0) (2026-10-28)
 
 
