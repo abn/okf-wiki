@@ -44,6 +44,8 @@ the semantic layer.
   beside the drawing.
 - [x] Search integration: open a search hit in the graph, and highlight graph
   matches from the search modal.
+- [x] Scope by wiki and by page type: the aggregate opens on a wiki's content
+  pages, the URL carries `site` and `type`, and the list groups by wiki.
 
 ### Scale and readability
 
@@ -75,5 +77,6 @@ the semantic layer.
 
 Local graph and backlinks, shareable view state, the accessible list view,
 collapsed tag hubs, section clusters, a deterministic layout, semantic zoom,
-cross-wiki edges and typed page-order edges are shipped. The next item is
-graph diff between two renders or commits.
+cross-wiki edges, typed page-order edges, and wiki and type scope are shipped.
+The next item is a first screen that maps the wikis themselves, then graph diff
+between two renders or commits.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -125,6 +126,18 @@ func (r *Renderer) graphBase() string {
 		return r.treeBase
 	}
 	return r.cfg.base()
+}
+
+// graphHref is the header's link to the graph view. A page of a multi-site tree
+// opens the aggregate scoped to its own wiki, so a reader arriving from a wiki
+// does not have to find that wiki again in the tree-wide graph. The tree index,
+// group indexes and the single-bundle view keep the unscoped link.
+func (r *Renderer) graphHref() string {
+	href := r.graphBase() + "graph.html"
+	if r.treeBase == "" || r.siteRel == "" || r.groupIndex || r.graphPage {
+		return href
+	}
+	return href + "?site=" + url.QueryEscape(r.siteRel)
 }
 
 // urlBase returns the prefix asset and page URLs hang off. Online it is the
@@ -447,7 +460,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Lang:           r.cfg.lang(),
 		SearchBase:     searchBase,
 		GraphBase:      graphBase,
-		GraphHref:      graphBase + "graph.html",
+		GraphHref:      r.graphHref(),
 		BundleHref:     bundleHref,
 		GraphPage:      r.graphPage,
 		Offline:        r.cfg.Offline,

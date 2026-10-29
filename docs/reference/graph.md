@@ -133,8 +133,10 @@ The page carries its view state in the query string. Defaults are omitted.
 | `focus` | node ID to select and focus, for example `page:usage/graph` |
 | `depth` | focus distance in hops, clamped to 1 through 3 when `focus` is present |
 | `kind` | `all`, `page`, `tag` or `stub`; absent means all nodes |
-| `q` | text matched against title, section, tag, ID and site |
+| `q` | text matched against title, section, type, tag, ID and site |
 | `tag` | tag slug, repeated for more tags; a page must carry every named tag |
+| `site` | wiki key to scope an aggregate to one wiki, for example `site=projects%2Froundhouse`; absent means all wikis |
+| `type` | `all`, `content`, or a type slug such as `log-entry`; `content` hides log entries |
 
 Repeated tags combine with AND. A page's Connections panel uses `focus` and
 `depth` to open the graph around that page, for example
@@ -149,11 +151,21 @@ parameters. The force layout is seeded from the visible catalogue, so positions
 repeat on every visit; they are not stored in the file. Labels are tiered:
 tag hubs and the busiest quarter of the connected pages name the overview, and
 ordinary page names join as the reader zooms in.
+
+A wiki's header control opens the aggregate with `site=<siteKey>`, so the view
+starts in that wiki. The tree index, a group index and a single bundle keep the
+unscoped link. The Wiki control offers every wiki in the tree, grouped by its
+top-level directory, and All wikis clears the scope. In a tree that carries log
+entries, the Type control opens on `content`, so the first view is the pages
+that carry navigation; `all` and the named types bring the rest back. The status
+line names the scope and reports how many log entries are hidden. A catalogue
+with more than 500 nodes opens with tag hubs collapsed; the checkbox and the tag
+filter still work.
 See [Graph view](../usage/graph.md) for the controls and the reserved path.
 
 The view is a client of this schema, not a second one. It reads `version`,
-`nodes`, `edges`, `kind`, `stub`, `url`, `title`, `section`, `sectionId`,
-`tags`, `site` and `siteKey`;
+`nodes`, `edges`, `kind`, `stub`, `url`, `title`, `label`, `section`,
+`sectionId`, `type`, `status`, `tags`, `site` and `siteKey`;
 a field added here does not change the drawing unless the client is taught to
 use it.
 
