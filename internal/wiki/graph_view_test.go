@@ -56,6 +56,8 @@ func TestGraphPageIsWritten(t *testing.T) {
 		`id="graphApp"`,
 		`data-graph-base="/wiki/"`,
 		`id="graphSvg"`,
+		`id="graphSite"`,
+		`id="graphType"`,
 		`id="graphDownload"`,
 		`id="graphFit"`,
 		`id="graphClearFocus"`,
@@ -97,6 +99,9 @@ func TestGraphPageIsWritten(t *testing.T) {
 	if !strings.Contains(string(home), `href="/wiki/graph.html"`) ||
 		!strings.Contains(string(home), `aria-label="Knowledge graph"`) {
 		t.Error("an ordinary page has no accessible graph control")
+	}
+	if strings.Contains(string(home), `graph.html?site=`) {
+		t.Error("a single bundle scopes its graph to a wiki it does not have")
 	}
 }
 
@@ -157,8 +162,13 @@ func TestGraphViewStateContract(t *testing.T) {
 		"params.append('tag'",
 		"params.set('q'",
 		"params.set('kind'",
+		"params.set('site'",
 		"function initTagFilter",
 		"function tagSlug",
+		"function readScopeState",
+		"function initSiteControl",
+		"function initTypeControl",
+		"function cappedListNodes",
 	} {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)
@@ -514,13 +524,18 @@ func TestMultiSiteGraphPageAtTreeBase(t *testing.T) {
 			t.Errorf("%s kept a second graph page, want one at the tree base", rel)
 		}
 	}
-	for _, rel := range []string{"alpha/index.html", "alpha/child.html", "group/index.html"} {
+	for rel, want := range map[string]string{
+		"alpha/index.html":      `href="/family/graph.html?site=alpha"`,
+		"alpha/child.html":      `href="/family/graph.html?site=alpha"`,
+		"group/beta/index.html": `href="/family/graph.html?site=group%2Fbeta"`,
+		"group/index.html":      `href="/family/graph.html"`,
+	} {
 		raw, err := os.ReadFile(filepath.Join(out, "family", filepath.FromSlash(rel)))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(raw), `href="/family/graph.html"`) {
-			t.Errorf("%s does not link to the tree view", rel)
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("%s does not link to the tree view with %q", rel, want)
 		}
 	}
 }

@@ -1341,6 +1341,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
 }
+.graph-field[hidden] { display: none; }
 .graph-field-label { font-weight: var(--fw-medium); }
 .graph-field input[type="search"], .graph-field select {
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text);
@@ -1474,6 +1475,19 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
 .graph-list-status {
   margin: 2px 0 0; color: var(--color-text-muted);
   font-family: var(--font-ui); font-size: var(--text-sm);
+}
+.graph-list-heading { list-style: none; padding: 0; }
+.graph-list-site {
+  margin: 0; padding: var(--space-2) 0 2px;
+  color: var(--color-heading); font-family: var(--font-ui);
+  font-size: var(--text-sm); font-weight: var(--fw-semibold);
+  border-top: 1px solid var(--color-line);
+}
+.graph-list-heading:first-child .graph-list-site { border-top: 0; padding-top: 0; }
+.graph-list-section-label {
+  margin: 0; padding: 2px 0;
+  color: var(--color-text-muted); font-family: var(--font-ui);
+  font-size: var(--text-xs); font-weight: var(--fw-semibold);
 }
 .graph-list-section + .graph-list-section {
   margin-top: var(--space-3); padding-top: var(--space-3);

@@ -15,6 +15,12 @@
   // useful on a large catalogue. Show all is an explicit choice.
   var LIST_NODE_LIMIT = 200;
   var LIST_EDGE_LIMIT = 300;
+  // The graph is a structural view, not an archive viewer. A large tree opens
+  // with its log entries out of the way; the Type control brings them back.
+  var LOG_TYPE = 'Log Entry';
+  var TYPE_ALL = 'all';
+  var TYPE_CONTENT = 'content';
+  var TAG_HUB_LIMIT = 500;
   // Screen pixels per world unit for the first view and for a focused
   // neighbourhood. Names are drawn at 11 screen pixels, so these set how much
   // of the graph fits on screen at a readable size.
@@ -31,6 +37,10 @@
   var status = document.getElementById('graphStatus');
   var filter = document.getElementById('graphFilter');
   var kind = document.getElementById('graphKind');
+  var siteField = document.getElementById('graphSiteField');
+  var siteSelect = document.getElementById('graphSite');
+  var typeField = document.getElementById('graphTypeField');
+  var typeSelect = document.getElementById('graphType');
   var sectionsCheck = document.getElementById('graphSections');
   var tagHubsCheck = document.getElementById('graphTagHubs');
   var labels = document.getElementById('graphLabels');
@@ -58,6 +68,7 @@
   var state = {
     allNodes: [],
     allEdges: [],
+    scopeNodes: [],
     nodes: [],
     edges: [],
     edgeElements: [],
@@ -70,6 +81,17 @@
     focusHops: 0,
     pendingFocus: null,
     focusMissing: false,
+    site: '',
+    siteTitle: '',
+    siteMissing: false,
+    siteByKey: Object.create(null),
+    sitePages: Object.create(null),
+    typeFilter: TYPE_ALL,
+    defaultType: TYPE_ALL,
+    typeBySlug: Object.create(null),
+    typeMissing: false,
+    hasLogs: false,
+    logHidden: 0,
     selectedTags: [],
     tagBySlug: Object.create(null),
     nodeByID: Object.create(null),
@@ -132,7 +154,11 @@
     (state.adj[n.id] || []).forEach(function (link) {
       if (link.kind === 'link') links += 1;
     });
-    return n.short + ', ' + what + ', ' + countText(links, 'link', 'links');
+    var bits = [n.short, what];
+    if (n.type) bits.push(n.type);
+    if (n.site) bits.push(n.site);
+    bits.push(countText(links, 'link', 'links'));
+    return bits.join(', ');
   }
 
   function countText(count, one, many) {
@@ -176,9 +202,185 @@
     return tag ? tag.title : '#' + slug;
   }
 
+  function typeSlug(value) {
+    var slug = tagSlug(value);
+    return slug || 'untyped';
+  }
+
+  function siteKeyOf(n) {
+    return n && n.siteKey ? n.siteKey : '';
+  }
+
+  function siteTitleOf(n) {
+    return n && n.site ? n.site : siteKeyOf(n);
+  }
+
+  function isTreeCatalogue() {
+    return state.allNodes.some(function (n) { return !!n.siteKey; });
+  }
+
+  function groupLabel(key) {
+    return key.replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) {
+      return c.toUpperCase();
+    });
+  }
+
+  // siteOptionLabel names a wiki in the tree. The title alone repeats between
+  // groups ("Operations"), so a nested wiki carries its parent directory.
+  function siteOptionLabel(site) {
+    var at = site.key.lastIndexOf('/');
+    var parent = at === -1 ? '' : site.key.slice(0, at).split('/').pop();
+    var label = site.title + (parent ? ' (' + groupLabel(parent) + ')' : '');
+    return label + ' \u00b7 ' + formatCount(site.pages) + (site.pages === 1 ? ' page' : ' pages');
+  }
+
+  function initSiteControl() {
+    var byKey = Object.create(null);
+    state.allNodes.forEach(function (n) {
+      var key = siteKeyOf(n);
+      if (!key) return;
+      if (!byKey[key]) byKey[key] = { key: key, title: siteTitleOf(n), pages: 0 };
+      if (n.kind === 'page' && !n.stub) byKey[key].pages += 1;
+    });
+    state.siteByKey = byKey;
+    state.sitePages = Object.create(null);
+    Object.keys(byKey).forEach(function (key) {
+      state.sitePages[key] = byKey[key].pages;
+    });
+    var sites = Object.keys(byKey).map(function (key) {
+      return byKey[key];
+    }).sort(function (a, b) {
+      return a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
+    });
+    if (!sites.length || !siteSelect || !siteField) return;
+    siteField.hidden = false;
+    siteSelect.textContent = '';
+    var all = document.createElement('option');
+    all.value = '';
+    all.textContent = 'All wikis (' + sites.length + ')';
+    siteSelect.appendChild(all);
+
+    var groups = Object.create(null);
+    sites.forEach(function (site) {
+      var at = site.key.indexOf('/');
+      var key = at === -1 ? '' : site.key.slice(0, at);
+      (groups[key] || (groups[key] = [])).push(site);
+    });
+    Object.keys(groups).sort().forEach(function (key) {
+      var group = document.createElement('optgroup');
+      group.label = key ? groupLabel(key) : 'Top level';
+      groups[key].forEach(function (site) {
+        var option = document.createElement('option');
+        option.value = site.key;
+        option.textContent = siteOptionLabel(site);
+        group.appendChild(option);
+      });
+      siteSelect.appendChild(group);
+    });
+  }
+
+  function initTypeControl() {
+    var counts = Object.create(null);
+    state.allNodes.forEach(function (n) {
+      if (n.kind !== 'page' || n.stub) return;
+      var type = n.type || 'Untyped';
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    var types = Object.keys(counts).sort(function (a, b) {
+      return counts[b] - counts[a] || a.localeCompare(b);
+    });
+    state.typeBySlug = Object.create(null);
+    types.forEach(function (type) {
+      var slug = typeSlug(type);
+      if (!state.typeBySlug[slug]) state.typeBySlug[slug] = type;
+    });
+    state.hasLogs = !!counts[LOG_TYPE];
+    state.defaultType = types.length >= 2 && isTreeCatalogue() && state.hasLogs ? TYPE_CONTENT : TYPE_ALL;
+    if (!typeSelect || !typeField) return;
+    if (types.length < 2) {
+      typeField.hidden = true;
+      return;
+    }
+    typeField.hidden = false;
+    typeSelect.textContent = '';
+    function add(value, label, parent) {
+      var option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      (parent || typeSelect).appendChild(option);
+    }
+    if (state.hasLogs) add(TYPE_CONTENT, 'Content pages (no logs)');
+    add(TYPE_ALL, 'All types');
+    var common = types.slice(0, 10);
+    var rare = types.slice(10);
+    if (common.length) {
+      var commonGroup = document.createElement('optgroup');
+      commonGroup.label = 'Common types';
+      typeSelect.appendChild(commonGroup);
+      common.forEach(function (type) {
+        add(type, type + ' (' + formatCount(counts[type]) + ')', commonGroup);
+      });
+    }
+    if (rare.length) {
+      var rareGroup = document.createElement('optgroup');
+      rareGroup.label = 'Other types';
+      typeSelect.appendChild(rareGroup);
+      rare.forEach(function (type) {
+        add(type, type + ' (' + formatCount(counts[type]) + ')', rareGroup);
+      });
+    }
+  }
+
+  // readScopeState applies the wiki and type scope before the visible graph is
+  // built. It returns true when either dimension changed, so a popstate can
+  // rebuild the drawing instead of only changing the controls.
+  function readScopeState(params) {
+    var site = params.get('site') || '';
+    var siteChanged = site !== state.site;
+    state.siteMissing = !!site && !state.siteByKey[site];
+    state.site = state.siteMissing ? '' : site;
+    if (state.siteMissing) siteChanged = true;
+    state.siteTitle = state.site && state.siteByKey[state.site] ? state.siteByKey[state.site].title : '';
+
+    var raw = params.get('type') || '';
+    var next = state.defaultType;
+    state.typeMissing = false;
+    if (raw === TYPE_ALL) {
+      next = TYPE_ALL;
+    } else if (raw === TYPE_CONTENT && state.hasLogs) {
+      next = TYPE_CONTENT;
+    } else if (raw === TYPE_CONTENT && !state.hasLogs) {
+      next = TYPE_ALL;
+    } else if (raw && state.typeBySlug[raw]) {
+      next = state.typeBySlug[raw];
+    } else if (raw) {
+      state.typeMissing = true;
+    }
+    var typeChanged = next !== state.typeFilter;
+    state.typeFilter = next;
+    return siteChanged || typeChanged;
+  }
+
+  function applyScopeControls() {
+    if (siteSelect && siteField && !siteField.hidden) siteSelect.value = state.site;
+    if (typeSelect && typeField && !typeField.hidden) typeSelect.value = state.typeFilter;
+  }
+
+  function siteMatches(n) {
+    return !state.site || siteKeyOf(n) === state.site;
+  }
+
+  function typeMatches(n) {
+    if (state.typeFilter === TYPE_ALL) return true;
+    if (n.kind !== 'page') return false;
+    if (n.stub) return state.typeFilter === TYPE_CONTENT;
+    if (state.typeFilter === TYPE_CONTENT) return (n.type || 'Untyped') !== LOG_TYPE;
+    return (n.type || 'Untyped') === state.typeFilter;
+  }
+
   function initTagFilter() {
     state.tagBySlug = Object.create(null);
-    state.allNodes.forEach(function (n) {
+    state.scopeNodes.forEach(function (n) {
       if (n.kind !== 'tag') return;
       var slug = tagSlugOfNode(n);
       if (!slug) return;
@@ -186,7 +388,7 @@
         state.tagBySlug[slug] = { slug: slug, title: n.title, count: 0 };
       }
     });
-    state.nodes.forEach(function (n) {
+    state.scopeNodes.forEach(function (n) {
       if (n.kind !== 'page' || n.stub) return;
       n.tagSlugs.forEach(function (slug) {
         if (state.tagBySlug[slug]) state.tagBySlug[slug].count += 1;
@@ -268,6 +470,11 @@
 
     var allNodes = state.nodes.filter(listVisible).slice();
     allNodes.sort(function (a, b) {
+      var bySite = siteTitleOf(a).localeCompare(siteTitleOf(b)) ||
+        siteKeyOf(a).localeCompare(siteKeyOf(b));
+      if (bySite) return bySite;
+      var bySection = listSectionLabel(a).localeCompare(listSectionLabel(b));
+      if (bySection) return bySection;
       var byKind = listRank(a) - listRank(b);
       if (byKind) return byKind;
       var byName = a.short.localeCompare(b.short);
@@ -286,10 +493,10 @@
       return a.kind.localeCompare(b.kind);
     });
 
-    var nodes = state.listAllNodes ? allNodes : allNodes.slice(0, LIST_NODE_LIMIT);
+    var nodes = cappedListNodes(allNodes);
     if (!state.listAllNodes && state.selected &&
         allNodes.indexOf(state.selected) !== -1 && nodes.indexOf(state.selected) === -1) {
-      nodes = nodes.slice(0, LIST_NODE_LIMIT - 1);
+      nodes = nodes.slice(0, nodes.length - 1);
       nodes.push(state.selected);
     }
     var edges = state.listAllEdges ? allEdges : allEdges.slice(0, LIST_EDGE_LIMIT);
@@ -315,7 +522,24 @@
     if (!allNodes.length) {
       listNodes.appendChild(listEmpty('nodes'));
     }
+    var lastSite = null;
+    var lastSection = '';
     nodes.forEach(function (n) {
+      var siteKey = siteKeyOf(n);
+      if (!state.site && isTreeCatalogue() && siteKey !== lastSite) {
+        var pages = state.sitePages[siteKey] || 0;
+        listNodes.appendChild(listHeading(
+          listSiteLabel(n) + ' \u00b7 ' + formatCount(pages) + (pages === 1 ? ' page' : ' pages'),
+          'graph-list-site'
+        ));
+        lastSite = siteKey;
+        lastSection = '';
+      }
+      var section = listSectionLabel(n);
+      if (section !== lastSection) {
+        listNodes.appendChild(listHeading(section, 'graph-list-section-label'));
+        lastSection = section;
+      }
       var links = connections(n);
       var item = document.createElement('li');
       item.className = 'graph-list-item';
@@ -448,7 +672,8 @@
   }
 
   function listEmpty(what) {
-    var hasFilters = !!state.query || kind.value !== 'all' || state.selectedTags.length > 0;
+    var hasFilters = !!state.query || kind.value !== 'all' || state.selectedTags.length > 0 ||
+      !!state.site || state.typeFilter !== TYPE_ALL;
     var item = document.createElement('li');
     item.className = 'graph-list-empty';
     if (state.focus) {
@@ -468,10 +693,63 @@
     return n.stub ? 2 : 0;
   }
 
+  function listSectionLabel(n) {
+    if (n.kind === 'tag') return 'Tags';
+    if (n.stub) return 'Missing pages';
+    return n.section || 'Overview';
+  }
+
+  function listSiteLabel(n) {
+    return siteTitleOf(n) || 'This wiki';
+  }
+
+  function listHeading(text, className) {
+    var item = document.createElement('li');
+    item.className = 'graph-list-heading';
+    item.setAttribute('role', 'presentation');
+    var label = document.createElement('p');
+    label.className = className;
+    label.textContent = text;
+    item.appendChild(label);
+    return item;
+  }
+
+  // The first list page should show every wiki, not the first 200 rows of an
+  // alphabetical catalogue. A tree spreads the cap over its wikis; a scoped
+  // wiki spends the whole page on that wiki.
+  function cappedListNodes(allNodes) {
+    if (state.listAllNodes) return allNodes;
+    var siteCount = Object.keys(state.siteByKey).length;
+    if (state.site || siteCount < 2) return allNodes.slice(0, LIST_NODE_LIMIT);
+    var per = Math.max(4, Math.floor(LIST_NODE_LIMIT / siteCount));
+    var keep = Object.create(null);
+    var counts = Object.create(null);
+    var kept = 0;
+    allNodes.forEach(function (n) {
+      var key = siteKeyOf(n);
+      var count = counts[key] || 0;
+      if (count >= per) return;
+      counts[key] = count + 1;
+      keep[n.id] = true;
+      kept += 1;
+    });
+    if (kept < LIST_NODE_LIMIT) {
+      allNodes.forEach(function (n) {
+        if (kept >= LIST_NODE_LIMIT || keep[n.id]) return;
+        keep[n.id] = true;
+        kept += 1;
+      });
+    }
+    return allNodes.filter(function (n) { return keep[n.id]; });
+  }
+
   function listKind(n) {
     if (n.kind === 'tag') return 'Tag hub';
     if (n.stub) return 'Missing page';
-    return n.section ? 'Page / ' + n.section : 'Page';
+    var bits = ['Page'];
+    if (n.section) bits.push(n.section);
+    if (n.type) bits.push(n.type);
+    return bits.join(' / ');
   }
 
   function listButtons() {
@@ -575,6 +853,8 @@
     params.delete('kind');
     params.delete('q');
     params.delete('tag');
+    params.delete('site');
+    params.delete('type');
     var focus = null;
     if (state.selected && state.focus) {
       focus = { id: state.selected.id, hops: state.focusHops || 1 };
@@ -584,6 +864,14 @@
     if (focus) {
       params.set('focus', focus.id);
       params.set('depth', String(focus.hops));
+    }
+    if (state.site) params.set('site', state.site);
+    if (state.typeFilter !== state.defaultType) {
+      if (state.typeFilter === TYPE_ALL || state.typeFilter === TYPE_CONTENT) {
+        params.set('type', state.typeFilter);
+      } else {
+        params.set('type', typeSlug(state.typeFilter));
+      }
     }
     if (kind.value !== 'all') params.set('kind', kind.value);
     var q = filter.value.trim();
@@ -605,7 +893,11 @@
 
   function applyURLState() {
     state.pendingFocus = null;
-    var next = readURLState(new URLSearchParams(window.location.search));
+    var params = new URLSearchParams(window.location.search);
+    var scoped = readScopeState(params);
+    applyScopeControls();
+    if (scoped) relayoutGraph(true, false);
+    var next = readURLState(params);
     state.focusMissing = !!(next && next.missing);
     applyFilter();
     if (next && next.node) {
@@ -669,6 +961,8 @@
         tags: nodeTags,
         tagSlugs: uniqueTagSlugs(nodeTags),
         stub: !!n.stub,
+        type: n.type ? String(n.type) : '',
+        status: n.status ? String(n.status) : '',
         site: n.site ? String(n.site) : '',
         siteKey: n.siteKey ? String(n.siteKey) : '',
         matched: true,
@@ -704,19 +998,31 @@
       });
     });
 
-    state.showTagHubs = tagHubsCheck ? tagHubsCheck.checked : true;
+    initSiteControl();
+    initTypeControl();
+
+    // A large catalogue opens with tag hubs collapsed. The checkbox carries
+    // the choice for this visit; the tag filter keeps working without them.
+    state.showTagHubs = state.allNodes.length <= TAG_HUB_LIMIT;
+    if (tagHubsCheck) tagHubsCheck.checked = state.showTagHubs;
     state.clusterSections = sectionsCheck ? sectionsCheck.checked : true;
+
+    var params = new URLSearchParams(window.location.search);
+    readScopeState(params);
+    applyScopeControls();
     buildVisibleGraph();
 
     if (!state.nodes.length) {
-      setStatus('The catalogue is empty. Add pages to the bundle and render again.');
+      setStatus(state.site || state.typeFilter !== TYPE_ALL
+        ? 'No nodes match the selected wiki and type.'
+        : 'The catalogue is empty. Add pages to the bundle and render again.');
       renderList();
       return;
     }
 
     initTagFilter();
     updateTagKindOption();
-    var initial = readURLState(new URLSearchParams(window.location.search));
+    var initial = readURLState(params);
     if (initial && initial.node) {
       state.pendingFocus = { node: initial.node, hops: initial.hops };
     } else if (initial && initial.missing) {
@@ -733,12 +1039,30 @@
 
   // The drawing and the list share one visible graph. The complete catalogue
   // stays in allNodes/allEdges so collapsing tag hubs is a view change, not a
-  // loss of the tag filter or of the data.
+  // loss of the tag filter or of the data. Site and type are scopes: they
+  // change which nodes exist, not only which ones are lit.
   function buildVisibleGraph() {
-    var visible = Object.create(null);
-    state.nodes = state.allNodes.filter(function (n) {
-      return state.showTagHubs || n.kind !== 'tag';
+    var pages = state.allNodes.filter(function (n) {
+      return n.kind !== 'tag' && siteMatches(n) && typeMatches(n);
     });
+    var pageIDs = Object.create(null);
+    pages.forEach(function (n) { pageIDs[n.id] = true; });
+
+    // A tag hub belongs to the scope only when it tags a page in it. A type
+    // scope that hides every page of a tag should not leave an isolated hub.
+    var tagIDs = Object.create(null);
+    state.allEdges.forEach(function (e) {
+      if (e.kind === 'tag' && pageIDs[e.from.id] && e.to.kind === 'tag' && siteMatches(e.to)) {
+        tagIDs[e.to.id] = true;
+      }
+    });
+    var tags = state.allNodes.filter(function (n) {
+      return n.kind === 'tag' && siteMatches(n) && tagIDs[n.id];
+    });
+
+    state.scopeNodes = pages.concat(tags);
+    state.nodes = state.showTagHubs ? state.scopeNodes.slice() : pages.slice();
+    var visible = Object.create(null);
     state.nodes.forEach(function (n) {
       n.degree = 0;
       visible[n.id] = true;
@@ -754,6 +1078,14 @@
       e.from.degree += 1;
       e.to.degree += 1;
     });
+    state.logHidden = 0;
+    if (state.typeFilter === TYPE_CONTENT) {
+      state.allNodes.forEach(function (n) {
+        if (n.kind === 'page' && !n.stub && siteMatches(n) && (n.type || 'Untyped') === LOG_TYPE) {
+          state.logHidden += 1;
+        }
+      });
+    }
     state.hubIDs = pageHubs();
     state.adj = Object.create(null);
     state.nodes.forEach(function (n) { state.adj[n.id] = []; });
@@ -898,10 +1230,11 @@
     if (!state.showTagHubs && kind && kind.value === 'tag') kind.value = 'all';
   }
 
-  // A layout toggle changes the visible graph. It clears the selection because
-  // the old focus or tag hub may no longer be on the canvas, then rebuilds and
-  // runs the same render path as the first load.
-  function relayoutGraph(rebuild) {
+  // A layout toggle or a scope change rebuilds the visible graph. It clears the
+  // selection because the old focus or tag hub may no longer be on the canvas,
+  // then runs the same render path as the first load. A popstate passes false
+  // so restoring history does not write another entry.
+  function relayoutGraph(rebuild, historyMode) {
     clearPath(false);
     state.selected = null;
     state.focus = null;
@@ -910,9 +1243,14 @@
     state.focusMissing = false;
     state.pendingFocus = null;
     state.tabbable = null;
+    state.listAllNodes = false;
+    state.listAllEdges = false;
     details.hidden = true;
     details.textContent = '';
-    if (rebuild) buildVisibleGraph();
+    if (rebuild) {
+      buildVisibleGraph();
+      initTagFilter();
+    }
     updateTagKindOption();
     state.anchor = starterPage();
     sizeWorld();
@@ -921,7 +1259,7 @@
     applyFocus();
     simulateThenRender();
     updateListSelection(null);
-    syncURL('push');
+    if (historyMode !== false) syncURL(historyMode || 'push');
   }
 
   // The view opens on a page with a typical number of connections rather than
@@ -1776,7 +2114,8 @@
     }
     var q = state.query;
     if (!q) return true;
-    var hay = (n.title + ' ' + n.id + ' ' + n.section + ' ' + n.tags.join(' ') + ' ' + n.site).toLowerCase();
+    var hay = (n.title + ' ' + n.id + ' ' + n.section + ' ' + n.type + ' ' +
+      n.tags.join(' ') + ' ' + n.site).toLowerCase();
     return hay.indexOf(q) !== -1;
   }
 
@@ -1800,9 +2139,18 @@
     var shown = 0;
     state.nodes.forEach(function (n) { if (n.matched) shown += 1; });
     var noun = total === 1 ? 'node' : 'nodes';
-    var text = shown === total
+    var prefix = state.site ? state.siteTitle + ': ' : (isTreeCatalogue() ? 'All wikis: ' : '');
+    var text = prefix + (shown === total
       ? formatCount(total) + ' ' + noun + '.'
-      : 'Showing ' + formatCount(shown) + ' of ' + formatCount(total) + ' ' + noun + '.';
+      : 'Showing ' + formatCount(shown) + ' of ' + formatCount(total) + ' ' + noun + '.');
+    if (state.logHidden) {
+      text += ' ' + formatCount(state.logHidden) + ' log entries hidden.';
+    }
+    if (!state.showTagHubs && state.scopeNodes.some(function (n) { return n.kind === 'tag'; })) {
+      text += ' Tag hubs hidden.';
+    }
+    if (state.siteMissing) text += ' Wiki not found; showing all wikis.';
+    if (state.typeMissing) text += ' Type not found; showing the default.';
     if (state.focus && state.selected) {
       text += ' Focused on ' + state.selected.short + ': ' + formatCount(state.focusCount) +
         (state.focusCount === 1 ? ' node' : ' nodes') + ' within ' +
@@ -2237,6 +2585,8 @@
       countText(links.linksOut, 'link', 'links') + ' out'
     ];
     if (n.site) bits.push(n.site);
+    if (n.type) bits.push(n.type);
+    if (n.status) bits.push(n.status);
     meta.textContent = bits.join(' / ');
     details.appendChild(meta);
 
@@ -2376,6 +2726,23 @@
     applyFilter();
     syncURL('replace');
   });
+  if (siteSelect) {
+    siteSelect.addEventListener('change', function () {
+      state.site = siteSelect.value;
+      state.siteTitle = state.site && state.siteByKey[state.site]
+        ? state.siteByKey[state.site].title : '';
+      state.siteMissing = false;
+      state.selectedTags = [];
+      relayoutGraph(true, 'push');
+    });
+  }
+  if (typeSelect) {
+    typeSelect.addEventListener('change', function () {
+      state.typeFilter = typeSelect.value;
+      state.typeMissing = false;
+      relayoutGraph(true, 'push');
+    });
+  }
   kind.addEventListener('change', function () {
     applyFilter();
     syncURL('push');

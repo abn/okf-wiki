@@ -157,7 +157,10 @@ written over it.
 
 The tree also writes one `graph.html` at its base. Every wiki and group links to
 it from the header, and it draws the aggregate, so the view spans the tree the
-way search does. The per-wiki files stay where they are for an exporter.
+way search does. A wiki's header link carries `?site=<siteKey>`, so the view
+opens on that wiki's pages rather than on the whole tree; the tree index and a
+group index open all wikis. The Wiki control changes the scope, and the list
+groups by wiki. The per-wiki files stay where they are for an exporter.
 `--graph-inline` embeds the aggregate once in that page rather than a copy in
 every wiki. A root that is itself a wiki writes the page from its own render,
 with its own catalogue. See [Graph view](graph.md). An offline render

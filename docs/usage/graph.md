@@ -23,12 +23,25 @@ wiki and lands on a page in another becomes a cross-wiki edge in the
 aggregate; both ends keep their namespaced IDs, and the edge is drawn in the
 accent colour and labelled `cross-wiki` in the list.
 
+A wiki's header control opens the graph already scoped to that wiki, for
+example `graph.html?site=projects%2Froundhouse`. The tree index and a group
+index open the whole tree. The Wiki control switches between the two.
+
 ## Reading it
 
-- **Filter** narrows by title, section, tag, or node ID. Matching nodes stay
-  lit and the rest fade. The line under the controls reports how many nodes are
-  visible, and names the fraction only when a filter, tag, or focus narrows the
-  view. Counts are grouped, so a large catalogue reads as `5,713 nodes`.
+- **Wiki** scopes the view to one wiki. The list groups by wiki, and every
+  group names its wiki and page count. **All wikis** widens the view again.
+  A scope change rebuilds the drawing, so only the selected wiki is laid out.
+- **Type** narrows by frontmatter type. In a tree that carries log entries the
+  view opens on **Content pages (no logs)**, because a log archive is
+  chronological rather than linked. Choose **Log Entry** or **All types** to
+  bring the archive back. The status line reports how many log entries are
+  hidden.
+- **Filter** narrows by title, section, type, tag, wiki, or node ID. Matching
+  nodes stay lit and the rest fade. The line under the controls reports how many
+  nodes are visible, and names the fraction only when a filter, tag, or focus
+  narrows the view. Counts are grouped, so a large catalogue reads as
+  `2,035 nodes`.
 - **Show** switches between all nodes, pages, tags, and missing pages.
 - **Sections** groups pages by their top-level section in a labelled grid. The
   section is the directory title, or a title set with `--sections`; there is no
@@ -37,9 +50,10 @@ accent colour and labelled `cross-wiki` in the list.
   the current zoom. Changing it clears the current focus and relayouts. A
   section name wider than its cell is shortened at a word boundary with an
   ellipsis rather than squeezed, so the letters keep their shape at every zoom.
-- **Tag hubs** shows or hides tag nodes and tag edges. Hiding them leaves the
-  Tags filter and page tags in place; Show Tags is disabled while the hubs are
-  collapsed. Changing it also clears the focus and relayouts.
+- **Tag hubs** shows or hides tag nodes and tag edges. A catalogue with more
+  than 500 nodes opens with them collapsed. Hiding them leaves the Tags filter
+  and page tags in place; Show Tags is disabled while the hubs are collapsed.
+  Changing it also clears the focus and relayouts.
 - **Tags** opens a checkbox list of the bundle's tags. A page has to carry every
   selected tag; selected tag hubs stay visible. The count beside each tag is
   the number of pages that carry it. A tag named in the URL but absent from the
@@ -101,9 +115,16 @@ view settings; they are not part of the shared URL state.
 
 At wide widths a **List view** sits beside the drawing. At narrow widths it
 follows the drawing instead. It lists the nodes and edges that match the
-current Filter, Show, Tags, Sections and focus, with incoming and outgoing link
-counts on each node, and the link text and heading anchor on link edges. The
-counts in the status line stay in step with the drawing.
+current Filter, Wiki, Type, Show, Tags, Sections and focus, with incoming and
+outgoing link counts on each node, and the link text and heading anchor on link
+edges. In a tree the nodes are grouped under their wiki, then their section, and
+each wiki heading carries its page count. The counts in the status line stay in
+step with the drawing.
+
+The first page shows every wiki rather than the first two hundred rows of an
+alphabetical list: the per-wiki cap spreads the rows across the tree, and a
+scoped wiki spends the whole page on itself. **Show all** still expands the
+whole list.
 
 Select a node in the list to select it in the drawing, open its details and
 focus its neighbourhood. The list marks the current node. Node rows are normal
@@ -123,11 +144,13 @@ fades. The action is hidden for tag-search rows, which do not name a page node.
 
 ## Shareable view state
 
-The graph writes its view state into the URL. Focus, depth, Show, Filter and
-Tags share one link, for example
-`graph.html?focus=page:usage/graph&depth=1&kind=page&q=graph&tag=usage&tag=graph`.
+The graph writes its view state into the URL. Focus, depth, Show, Filter, Wiki,
+Type and Tags share one link, for example
+`graph.html?site=projects%2Froundhouse&type=content&focus=page:usage/graph&depth=1&kind=page&q=graph&tag=usage&tag=graph`.
 Defaults are omitted, so a plain `graph.html` stays plain. Repeated `tag`
-parameters narrow to pages carrying every named tag.
+parameters narrow to pages carrying every named tag. `site` names one wiki of
+a tree; `type` names a page type, `content` for everything except log entries,
+or `all`.
 
 Back and forward restore the controls, the tag checks and the focus state.
 Pan and zoom are not in the URL. Changing Show, Tags or focus adds a history

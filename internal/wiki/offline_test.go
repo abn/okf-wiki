@@ -248,7 +248,7 @@ func TestOfflineMultiSite(t *testing.T) {
 		`href="alpha/tokens.css`,
 		`href="alpha/topic.html"`,
 		`href="./index.html"`,
-		`href="./graph.html"`,
+		`href="./graph.html?site=alpha"`,
 	} {
 		if !strings.Contains(wiki, want) {
 			t.Errorf("offline wiki page is missing %q", want)
