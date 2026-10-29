@@ -2614,6 +2614,15 @@
 
     var grid = circleGrid();
     var boxes = [];
+    // A section label owns the top strip of its cell. Reserving that strip
+    // keeps a page name from being drawn under it, including before a webfont
+    // has settled and its measured width would still be the fallback's.
+    if (state.sectionCells && (state.clusterSections || state.siteMap)) {
+      Object.keys(state.sectionCells).forEach(function (key) {
+        var cell = state.sectionCells[key];
+        boxes.push({ x: cell.x, y: cell.y, w: cell.w, h: (12 / scale) * 2 });
+      });
+    }
     if (sectionLayer) {
       Array.prototype.forEach.call(sectionLayer.querySelectorAll('.graph-section-label'), function (label) {
         var box = label.getBBox();
