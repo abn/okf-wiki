@@ -203,6 +203,9 @@ func TestGraphViewSiteMapContract(t *testing.T) {
 		"function openSite",
 		"function renderCellEdges",
 		"function sliceTreemap",
+		"function initTagMenu",
+		"graphTagSearch",
+		"graphTagSingles",
 		"state.siteMap",
 		"show-cell-edges",
 	} {
@@ -574,6 +577,31 @@ func TestMultiSiteGraphPageAtTreeBase(t *testing.T) {
 			t.Errorf("%s does not link to the tree view with %q", rel, want)
 		}
 	}
+
+	// The map is derived by the client. The aggregate stays a catalogue of
+	// pages and tags, and every scoped header names a siteKey it carries.
+	raw, err := os.ReadFile(filepath.Join(out, "family", "graph.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g GraphIndex
+	if err := json.Unmarshal(raw, &g); err != nil {
+		t.Fatal(err)
+	}
+	sites := make(map[string]bool)
+	for _, n := range g.Nodes {
+		if n.Kind == "site" {
+			t.Errorf("graph.json carries a synthetic site node %q", n.ID)
+		}
+		if n.SiteKey != "" {
+			sites[n.SiteKey] = true
+		}
+	}
+	for _, key := range []string{"alpha", "group/beta"} {
+		if !sites[key] {
+			t.Errorf("aggregate has no node for site %q", key)
+		}
+	}
 }
 
 // TestMultiSiteEmptyGraphPage covers a tree with no readable wiki: it still
@@ -718,7 +746,8 @@ func TestGraphViewShortLabelContract(t *testing.T) {
 	for _, want := range []string{
 		"short: String(n.label || n.title",
 		"labelText(n.short)",
-		"'Select ' + n.short",
+		"function nodeAction",
+		"nodeAction(n) + n.short",
 		"state.selected.short",
 		"entry.node.short",
 		"n.short !== n.title",
@@ -729,7 +758,12 @@ func TestGraphViewShortLabelContract(t *testing.T) {
 			t.Errorf("graph.js is missing %q", want)
 		}
 	}
-	for _, want := range []string{"-webkit-line-clamp: 2", ".graph-neighbour { display: inline-flex"} {
+	for _, want := range []string{
+		"-webkit-line-clamp: 2",
+		".graph-neighbour { display: inline-flex",
+		".graph-app.show-cell-edges .graph-edge",
+		".graph-app.show-cell-edges .graph-cell-edge",
+	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("wiki.css is missing %q", want)
 		}

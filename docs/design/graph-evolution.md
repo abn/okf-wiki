@@ -60,6 +60,8 @@ the semantic layer.
 - [x] Path finding between two pages.
 - [x] Graph health: orphans, broken links, tag-only pages, cycles and the most
   connected pages.
+- [x] Tag menu search and one-off tags, and a wiki map that uses a narrow
+  screen's height.
 
 ### Schema and multi-site
 

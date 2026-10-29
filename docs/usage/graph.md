@@ -13,20 +13,21 @@ tree writes one at the tree base, and every wiki's header points there, so the
 view spans the tree the way search does. Opening it fetches `graph.json`; no
 other page loads the catalogue, and `--graph-inline` removes even that request.
 
-In a tree the first screen is a map of the wikis: one node per wiki, sized by
-its page count and grouped by its top-level directory. Select a wiki to open its
-pages; the Wiki control returns to the map or moves to another wiki. A
-cross-wiki link is an edge between the two wikis on the map. Inside a wiki the
-drawing has one node per page and per tag. A page linked from the bundle but
-missing from it appears as a dashed node, so a broken link is visible here as
-well as in the file. Edges are solid for Markdown links and dashed for
-frontmatter tags. The catalogue also carries previous and next page-order
-edges; the drawing keeps those out of the canvas and uses links and tags only.
-At overview scale a section view draws one edge between two sections, weighted
-by the links across them; individual links appear as you zoom in or select a
-node. In a tree, a relative Markdown link that climbs out of one wiki and lands
-on a page in another becomes a cross-wiki edge in the aggregate; both ends keep
-their namespaced IDs, and the edge is drawn in the accent colour and labelled
+In a tree of more than one wiki the first screen is a map of the wikis: one
+node per wiki, sized by its page count and grouped by its top-level directory.
+Select a wiki to open its pages; the Wiki control returns to the map or moves to
+another wiki. A tree with one wiki opens its pages directly. A cross-wiki link
+is an edge between the two wikis on the map. Inside a wiki the drawing has one
+node per page and per tag. A page linked from the bundle but missing from it
+appears as a dashed node, so a broken link is visible here as well as in the
+file. Edges are solid for Markdown links and dashed for frontmatter tags. The
+catalogue also carries previous and next page-order edges; the drawing keeps
+those out of the canvas and uses links and tags only. At overview scale a
+section view draws one edge between two sections, weighted by the links across
+them; individual links appear as you zoom in or select a node. In a tree, a
+relative Markdown link that climbs out of one wiki and lands on a page in
+another becomes a cross-wiki edge in the aggregate; both ends keep their
+namespaced IDs, and the edge is drawn in the accent colour and labelled
 `cross-wiki` in the list.
 
 A wiki's header control opens the graph already scoped to that wiki, for
@@ -37,15 +38,17 @@ index open the wiki map. The Wiki control switches between the two.
 
 - **Wiki** scopes the view to one wiki. **All wikis** opens the wiki map: one
   node per wiki, sized by its page count and grouped by its top-level
-  directory. The list groups the map by directory and a scoped wiki by section,
-  and every heading names its group and page count. A scope change rebuilds the
-  drawing, so only the selected wiki is laid out.
-- **Type** narrows by frontmatter type. In a tree that carries log entries the
-  view opens on **Content pages (no logs)**, because a log archive is
+  directory. A tree with only one wiki opens its pages directly. The list groups
+  the map by directory and a scoped wiki by section, and the wiki heading names
+  the page count. A scope change rebuilds the drawing, so only the selected wiki
+  is laid out.
+- **Type** narrows by frontmatter type. In a tree with `type: Log Entry` pages,
+  the view opens on **Content pages (no logs)**, because a log archive is
   chronological rather than linked. Choose **Log Entry** or **All types** to
   bring the archive back. The status line reports how many log entries are
-  hidden. The Type and page controls are hidden on the wiki map, where they do
-  not apply.
+  hidden. In a single bundle, or a tree whose pages have two or more types, the
+  Type control lists the types and defaults to all. The Type and page controls
+  are hidden on the wiki map, where they do not apply.
 - **Filter** narrows by title, section, type, tag, wiki, or node ID. Matching
   nodes stay lit and the rest fade. The line under the controls reports how many
   nodes are visible, and names the fraction only when a filter, tag, or focus
@@ -64,10 +67,12 @@ index open the wiki map. The Wiki control switches between the two.
   than 500 nodes opens with them collapsed. Hiding them leaves the Tags filter
   and page tags in place; Show Tags is disabled while the hubs are collapsed.
   Changing it also clears the focus and relayouts.
-- **Tags** opens a checkbox list of the bundle's tags. A page has to carry every
-  selected tag; selected tag hubs stay visible. The count beside each tag is
-  the number of pages that carry it. A tag named in the URL but absent from the
-  graph still appears in the list, marked as missing, so it can be removed.
+- **Tags** opens a checkbox list of the bundle's tags, most used first. A page
+  has to carry every selected tag; selected tag hubs stay visible. The count
+  beside each tag is the number of pages that carry it. A search field filters
+  the list, and tags used by one page stay behind **One-off tags**. A tag named
+  in the URL but absent from the graph still appears in the list, marked as
+  missing, so it can be removed.
 - Without Sections, a dense catalogue opens on a readable patch around a page
   with a typical number of connections. With Sections on, it opens on the
   section grid. **Fit view** draws the catalogue as a map, trimming the
@@ -127,14 +132,15 @@ At wide widths a **List view** sits beside the drawing. At narrow widths it
 follows the drawing instead. It lists the nodes and edges that match the
 current Filter, Wiki, Type, Show, Tags, Sections and focus, with incoming and
 outgoing link counts on each node, and the link text and heading anchor on link
-edges. The wiki map lists the wikis under their top-level directory. Inside a
-wiki the nodes are grouped under their section, and each section heading names
-the group. The counts in the status line stay in step with the drawing.
+edges. The wiki map groups wikis under their top-level directory. Inside a
+wiki the nodes are grouped under their section. The counts in the status line
+stay in step with the drawing.
 
 The first page shows every wiki rather than the first two hundred rows of an
 alphabetical list: the per-wiki cap spreads the rows across the tree, and a
 scoped wiki spends the whole page on itself. **Show all** still expands the
-whole list.
+whole list. On a narrow screen the list is the reliable path: the map keeps its
+shape and the names that fit, and the list below names every wiki.
 
 Select a node in the list to select it in the drawing, open its details and
 focus its neighbourhood. The list marks the current node. Node rows are normal
@@ -156,21 +162,25 @@ fades. The action is hidden for tag-search rows, which do not name a page node.
 
 The graph writes its view state into the URL. Focus, depth, Show, Filter, Wiki,
 Type and Tags share one link, for example
-`graph.html?site=projects%2Froundhouse&type=content&focus=page:usage/graph&depth=1&kind=page&q=graph&tag=usage&tag=graph`.
+`graph.html?site=projects%2Froundhouse&focus=projects%2Froundhouse%3Apage%3Aindex&depth=1&kind=page&q=graph`.
 Defaults are omitted, so a plain `graph.html` stays plain and opens the wiki
-map. Repeated `tag` parameters narrow to pages carrying every named tag. `site`
-names one wiki of a tree; `type` names a page type, `content` for everything
-except log entries, or `all`. A `focus` link without `site` opens the wiki that
-owns the focused node, so a page's Connections panel still lands on its local
-graph. While the map is showing, only `q` travels in the URL; page filters
-belong to a wiki.
+map. Repeated `tag` parameters narrow to pages carrying every named tag. In a
+tree a node ID carries its wiki key, so a focus names the full aggregate ID.
+`site` names one wiki of a tree; `type` names a page type, `content` for
+everything except `Log Entry` pages, or `all`. A `focus` link without `site`
+opens the wiki that owns the focused node, so a page's Connections panel still
+lands on its local graph. A focus that names a page the default type would hide,
+such as a log entry, widens the type scope rather than answering "not found".
+While the map is showing, only `q` travels in the URL; page filters belong to a
+wiki.
 
 Back and forward restore the controls, the tag checks and the focus state.
-Pan and zoom are not in the URL. Changing Show, Tags or focus adds a history
-entry. The toolbar's Show all also adds one; the list's Show all only expands
-rows. Typing in Filter replaces the current entry so a long query does not
-create one entry per keystroke; back and forward move between the discrete
-states around it.
+Pan and zoom are not in the URL. Changing Wiki, Type, Show, Tags or focus adds a
+history entry. The toolbar's Show all also adds one; the list's Show all only
+expands rows. Typing in Filter replaces the current entry so a long query does
+not create one entry per keystroke; back and forward move between the discrete
+states around it. The tag search and the one-off toggle are view settings, not
+URL state.
 
 ## Local graph and backlinks
 
