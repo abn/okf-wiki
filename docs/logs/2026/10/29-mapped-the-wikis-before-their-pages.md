@@ -9,10 +9,10 @@ status: stable
 
 The tree's graph has a first screen above the page view now. All wikis opens a
 map with one node per wiki, sized by page count and grouped by top-level
-directory. A cross-wiki link is one weighted edge between the two wikis, so a
-tree with no cross-wiki links reads as the directory it is instead of a cloud of
-thousands of dots. Selecting a wiki opens its pages, and the Wiki control
-returns to the map.
+directory; a tree of one wiki opens its pages. A cross-wiki link is one weighted
+edge between the two wikis, so a tree with no cross-wiki links reads as the
+directory it is instead of a cloud of thousands of dots. Selecting a wiki opens
+its pages, and the Wiki control returns to the map.
 
 Inside a wiki the section grid uses each section's page count. A log archive
 gets the room its pages need and a two-page section does not. At overview scale

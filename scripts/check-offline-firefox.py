@@ -180,6 +180,56 @@ def write_cross_fixture(root):
     return path
 
 
+def write_hidden_type_fixture(root):
+    source = (root / "graph.html").read_text()
+    data = json.dumps({
+        "version": 1,
+        "nodes": [
+            {
+                "id": "alpha:page:index",
+                "title": "Alpha home",
+                "url": "alpha/index.html",
+                "kind": "page",
+                "type": "Reference",
+                "site": "Alpha",
+                "siteKey": "alpha",
+            },
+            {
+                "id": "alpha:page:log",
+                "title": "Alpha log",
+                "url": "alpha/log.html",
+                "kind": "page",
+                "type": "Log Entry",
+                "site": "Alpha",
+                "siteKey": "alpha",
+            },
+            {
+                "id": "beta:page:index",
+                "title": "Beta home",
+                "url": "beta/index.html",
+                "kind": "page",
+                "type": "Reference",
+                "site": "Beta",
+                "siteKey": "beta",
+            },
+        ],
+        "edges": [],
+    })
+    pattern = re.compile(
+        r'<script type="application/json" id="graphData">.*?</script>',
+        re.S,
+    )
+    html, count = pattern.subn(
+        lambda _: '<script type="application/json" id="graphData">' + data + '</script>',
+        source,
+        count=1,
+    )
+    must(count == 1, "the graph page has no inline catalogue to replace")
+    path = root / "hidden-type-test.html"
+    path.write_text(html)
+    return path
+
+
 def label_tier_totals(driver):
     return driver.execute_script(
         """
@@ -841,16 +891,36 @@ def main():
             wait_for(driver, ".graph-node-group")
             wait_layout(driver)
             must(
+                len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group.site")) == 2,
+                "the tree did not open on a map of its two wikis",
+            )
+            must(
                 driver.find_elements(By.CSS_SELECTOR, ".graph-edge.cross-site"),
                 "the cross-wiki edge is not styled as crossing wikis",
             )
             must(
                 driver.find_element(By.CSS_SELECTOR, ".graph-list-edge-kind").text
-                == "cross-wiki",
+                == "cross-wiki \u00d71",
                 "the edge list does not name the cross-wiki edge",
             )
         finally:
             cross_page.unlink(missing_ok=True)
+
+        hidden_page = write_hidden_type_fixture(root)
+        try:
+            driver.get(hidden_page.as_uri() + "?focus=alpha%3Apage%3Alog&depth=1")
+            wait_for(driver, ".graph-node-group")
+            wait_layout(driver)
+            must(
+                "Focused on Alpha log" in driver.find_element(By.ID, "graphStatus").text,
+                "a focus link to a log page lost the page it named",
+            )
+            must(
+                driver.find_element(By.ID, "graphType").get_attribute("value") == "all",
+                "a focus link to a hidden type did not widen the type scope",
+            )
+        finally:
+            hidden_page.unlink(missing_ok=True)
 
         redirect = root.parent / "index.html"
         start = redirect.as_uri()

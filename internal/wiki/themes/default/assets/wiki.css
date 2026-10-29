@@ -1394,6 +1394,29 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   padding: 6px var(--space-2); border-radius: var(--radius-sm); cursor: pointer;
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text);
 }
+.graph-tags-controls {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+.graph-tags-search { flex: 1 1 140px; min-width: 0; }
+.graph-tags-search input {
+  width: 100%; font-family: var(--font-ui); font-size: var(--text-sm);
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  padding: 5px var(--space-3); min-height: 32px;
+}
+.graph-tags-search input:focus-visible {
+  outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+}
+.graph-tags-singles {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  font-family: var(--font-ui); font-size: var(--text-xs);
+  color: var(--color-text-muted); cursor: pointer;
+}
+.graph-tags-singles input { accent-color: var(--color-accent-text); width: 14px; height: 14px; }
 .graph-tag-option:hover { background: var(--color-surface-sunken); }
 .graph-tag-option input { accent-color: var(--color-accent-text); width: 16px; height: 16px; }
 .graph-tag-option small { margin-left: auto; color: var(--color-text-faint); font-size: var(--text-xs); }

@@ -68,7 +68,8 @@ type shellData struct {
 	// SearchBase it is the tree base in a multi-site tree, where one aggregate
 	// graph spans every wiki, and Base otherwise.
 	GraphBase string
-	// GraphHref is the graph page's URL: GraphBase plus graph.html.
+	// GraphHref is the graph page's URL: GraphBase plus graph.html, with a
+	// site query when the page belongs to a wiki of a multi-site tree.
 	GraphHref string
 	// BundleHref is this wiki's archive, at its own base beside its pages.
 	// Empty on a group index or the tree's graph view, which have no bundle of
