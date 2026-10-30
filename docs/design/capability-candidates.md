@@ -54,7 +54,7 @@ would ship, not the whole idea.
 
 | # | Candidate | What it does | Smallest useful version | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Citation surface | Parses frontmatter `sources` and footnote references, reports a footnote with no source and a source no page uses, and carries `verified` into the manifest | Parse and validate at render; add `sources` and `verified` to `pages.json` | Three projects converged on deterministic citation checks; our own bundles have the fields but no check |
+| 1 | Citation surface | Carries frontmatter `sources` and `verified`, and the validator's provenance findings, into the manifest an agent reads | Parse and publish at render; add `sources`, `verified` and the findings to `pages.json` | Three projects converged on deterministic citation checks; the OKF CLI has the checks, the render does not carry them |
 | 2 | Wiki health | Page-level checks beside the graph health: unresolved citation, missing provenance on a typed entry, stale `staleAfter`, near-duplicate subjects, a page title repeated across sections | New checks in `health.json`, the MCP `health` tool and a `check` subcommand | The most repeated finding in the pattern's thread |
 | 3 | Page planning | Ranks existing pages a draft should update, with the reason, and says whether it looks like a new subject | A deterministic lexical rank over `pages.json` and headings, as an MCP tool and a CLI verb | Routing decisions were most of the ingest cost; a classifier beat the model on them |
 | 4 | Retrieval receipts | Reports what an answer was given: sections read, bytes against the budget, what was clipped, and which pages were cited | Extend the `context_for` result and log one line per call | Silent truncation is invisible to recall and to confidence |
@@ -65,18 +65,19 @@ would ship, not the whole idea.
 ### 1. Citation surface
 
 The manifest already carries a content hash per page. What it does not carry is
-what the page is built on. A page's frontmatter can name its sources, and its
-body can refer to them by footnote, but the render copies both through without
-checking that they agree.
+what the page is built on. OKF v0.2 has the fields for it: a page names its
+sources in frontmatter, stamps `verified`, and cites them by footnote in the
+body. The `okf` CLI already validates the footnote definitions and reports a
+dangling marker, an unreferenced definition and an unmatched pair.
 
-Four checks are cheap: a footnote whose label has no `sources` entry, a source
-entry no footnote uses, a typed entry with no sources at all, and a `verified`
-stamp older than the page's own hash. Each is a set comparison over data the
-render already parses.
+None of that reaches the render. `okf-wiki render` does not run the validator
+and `pages.json` does not carry `sources` or `verified`, so an agent reading the
+manifest cannot tell a cited page from an uncited one, and a bundle served
+without a separate check can hold a page whose evidence does not resolve.
 
-The payoff is that an agent can ask "what supports this sentence" and get a
-record rather than prose, and a page that lost its evidence in an edit shows up
-at render instead of at citation time.
+The work here is to consume, not to rebuild: run the checks a render can afford,
+carry `sources`, `verified` and the finding list into the manifest, and let a
+reader ask which claim rests on which source.
 
 ### 2. Wiki health
 
@@ -84,9 +85,16 @@ at render instead of at citation time.
 cycles and the most connected pages. The page-level checks the pattern's thread
 kept asking for are a different pass, and they belong in the same artifact.
 
-- A footnote with no source, and a source with no use.
-- A page typed as a decision or an evaluation with no provenance.
-- `staleAfter` in the past, and a `verified` stamp older than the content hash.
+The `okf` CLI already computes several of them: broken links, footnote
+definitions, `stale_after` validity, status vocabulary, and the trust fields. A
+render should merge those findings into `health.json` rather than compute a
+second opinion.
+
+What neither the CLI nor the graph does is the part the thread cared about most:
+
+- A page typed as a decision or an evaluation with no `sources` at all. The
+  field is optional per page and required by the subject.
+- A `verified` stamp older than the page's own content hash.
 - Two pages in different subject directories whose titles and descriptions are
   close enough to be one subject.
 - A page title that appears unlinked in several pages, which usually means a
@@ -185,10 +193,11 @@ read frontmatter, footnotes and relative links and changed nothing.
 
 Three lessons.
 
-First, provenance is a convention, not a check. One bundle uses the fields
-everywhere and the other never does, and no render or check reports the
-difference. That is why the citation surface comes first: without it, the health
-checks have nothing to read.
+First, provenance does not reach the manifest. One bundle uses the fields
+everywhere and the other never does. The validator checks footnotes and links,
+but not whether a `sources` registry matches the body, and the render carries
+neither the fields nor the findings. That is why the citation surface comes
+first: without it, the health checks have nothing to read.
 
 Second, a naive duplicate check is worse than none. Almost all of the 1,019
 pairs are `overview`, `report` and `evidence` siblings of the same subject. The
