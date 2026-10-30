@@ -43,6 +43,8 @@ func main() {
 		runDetect(os.Args[2:])
 	case "search":
 		runSearch(os.Args[2:])
+	case "similar":
+		runSimilar(os.Args[2:])
 	case "mcp":
 		runMCP(os.Args[2:])
 	case "version", "-v", "--version":
@@ -64,6 +66,7 @@ usage:
   okf-wiki render [CONTENT [OUT]] [flags]   render only
   okf-wiki detect [flags]   print the auto-detected content directory
   okf-wiki search QUERY     search a rendered site
+  okf-wiki similar [flags]  plan a capture against an existing bundle
   okf-wiki mcp              serve search over MCP stdio or a separate HTTP port
   okf-wiki version
 
@@ -99,6 +102,15 @@ flags (search):
   --site SITE        filter by wiki title or site key
   --tag TAG          filter by page tag
   --section SECTION  filter by section title
+
+flags (similar):
+  --content DIR      OKF bundle to plan against (auto-detected if omitted)
+  --text FILE        draft to plan, or - for stdin; words on the command line
+                     are used when --text is absent
+  --top N            subject candidates to return, 1 through 20 (default 5)
+  --min-score F      update threshold, 0 uses the default
+  --base PATH        URL prefix for links in the response (default "/wiki/")
+  --json             write JSON
 
 flags (mcp):
   --out DIR          render output root (default: .scratch/wiki)

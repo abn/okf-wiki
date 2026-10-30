@@ -391,6 +391,92 @@ func (f *Federator) Search(query string, opts SearchOptions, sources []string) (
 	return SearchResponse{Query: strings.TrimSpace(strings.ToLower(query)), Total: total, Results: all, Errors: errs}, nil
 }
 
+// Similar plans a capture against the selected sources and returns one ranked
+// subject list. Page IDs and URLs are namespaced the same way search results
+// are, so a candidate can be passed straight to read_page.
+func (f *Federator) Similar(text string, opts SimilarOptions, sources []string) (SimilarResponse, error) {
+	selected, err := f.selected(sources)
+	if err != nil {
+		return SimilarResponse{}, err
+	}
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 20 {
+		limit = 20
+	}
+	threshold := opts.MinScore
+	if threshold <= 0 {
+		threshold = SimilarDefaultMinScore
+	}
+	normalize := func(src *AgentSource, c *SimilarCandidate) {
+		c.Source = src.Name
+		for i := range c.Pages {
+			c.Pages[i].URL = resolveSourceURL(src.Base, src.Corpus.Base, c.Pages[i].URL)
+			c.Pages[i].MarkdownURL = resolveSourceURL(src.Base, src.Corpus.Base, c.Pages[i].MarkdownURL)
+		}
+	}
+	if len(selected) == 1 {
+		src := selected[0]
+		resp, err := src.Corpus.Similar(text, opts)
+		if err != nil {
+			return SimilarResponse{}, fmt.Errorf("%s: %w", src.Name, err)
+		}
+		for i := range resp.Candidates {
+			normalize(src, &resp.Candidates[i])
+		}
+		if len(resp.Candidates) > limit {
+			resp.Candidates = resp.Candidates[:limit]
+		}
+		return resp, nil
+	}
+	all := []SimilarCandidate{}
+	total := 0
+	tokens := 0
+	truncated := false
+	errs := []string{}
+	for _, src := range selected {
+		resp, err := src.Corpus.Similar(text, opts)
+		if err != nil {
+			errs = append(errs, src.Name+": "+err.Error())
+			continue
+		}
+		total += resp.Total
+		if resp.Tokens > tokens {
+			tokens = resp.Tokens
+		}
+		truncated = truncated || resp.Truncated
+		for _, c := range resp.Candidates {
+			normalize(src, &c)
+			all = append(all, c)
+		}
+	}
+	if len(all) == 0 && len(errs) == len(selected) {
+		return SimilarResponse{}, fmt.Errorf("no source could be planned: %s", strings.Join(errs, "; "))
+	}
+	sort.SliceStable(all, func(i, j int) bool {
+		if all[i].Score != all[j].Score {
+			return all[i].Score > all[j].Score
+		}
+		if all[i].Source != all[j].Source {
+			return all[i].Source < all[j].Source
+		}
+		return all[i].Subject < all[j].Subject
+	})
+	if len(all) > limit {
+		all = all[:limit]
+	}
+	verdict := "new_subject"
+	if len(all) > 0 && all[0].Score >= threshold {
+		verdict = "update"
+	}
+	return SimilarResponse{
+		Verdict: verdict, Threshold: threshold, Total: total,
+		Tokens: tokens, Truncated: truncated, Candidates: all, Errors: errs,
+	}, nil
+}
+
 // ContextFor merges the best sections from the selected sources into one
 // budget. The same extractive text and truncation rules apply per source.
 func (f *Federator) ContextFor(query string, opts SearchOptions, maxTokens int, sources []string) (ContextResponse, error) {

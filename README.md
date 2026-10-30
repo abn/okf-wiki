@@ -46,6 +46,9 @@ it. No editor, no database, no auth; the Markdown stays the source of truth.
   search-to-graph.
 - **Agent-ready.** `llms.txt`, `pages.json`, Markdown sources, and a read-only
   MCP server.
+- **Plan a capture.** `okf-wiki similar` and the MCP `suggest_pages` tool rank
+  the pages a draft should update, so an ingest edits a subject instead of
+  duplicating it.
 - **Themes at runtime.** Light and dark, re-skinned by mounting a directory,
   with no rebuild.
 - **Deploy where you already are.** One static binary, one container, a GitHub
