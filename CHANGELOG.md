@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/abn/okf-wiki/compare/v1.2.0...v1.3.0) (2026-10-30)
+
+
+### Features
+
+* **graph:** map the wikis before their pages ([b7c6f01](https://github.com/abn/okf-wiki/commit/b7c6f0139ef6a22d09852e2b7da684016b708f2b))
+* **graph:** scope by wiki and page type ([b3d84be](https://github.com/abn/okf-wiki/commit/b3d84be8242a6023828b7d6a6f5a6c2c81561281))
+* **graph:** search tags and fit the map to phones ([17eef42](https://github.com/abn/okf-wiki/commit/17eef42f288ee6e31546aa14a0eb14dece8872c3))
+
+
+### Bug Fixes
+
+* **graph:** keep names clear of section labels ([04cbaf6](https://github.com/abn/okf-wiki/commit/04cbaf6af1533a281c74c2fad72787c811b5b5e7))
+
 ## [1.2.0](https://github.com/abn/okf-wiki/compare/v1.1.0...v1.2.0) (2026-10-29)
 
 
