@@ -156,6 +156,8 @@ When more than one source is configured:
 - Search results carry a `source` field.
 - `search_wiki` and `context_for` search every source unless you pass
   `sources`.
+- `suggest_pages` plans across every source unless you pass `sources`. Each
+  candidate carries its `source`, and its `site` when the source is a tree.
 - `read_page`, `read_section`, `neighbors`, `path`, `changes` and `health` take
   a `source`.
 - `neighbors` and `path` stay inside one source.
@@ -259,6 +261,25 @@ two pages:
 
 `path` uses link edges. `previous` and `next` are page-order navigation and
 come from `graph.json`. Tag hubs are not used to claim a page-to-page path.
+
+### Plan a capture
+
+`suggest_pages` ranks the subjects a draft would update, or answers that it
+starts a new one. Call it before creating a page.
+
+```json
+{
+  "text": "A draft, or a summary of the source being added",
+  "limit": 5
+}
+```
+
+The result carries `verdict` (`update` or `new_subject`), the threshold, the
+matched words, and for each subject the page ID, role and Markdown URL to read
+first. In a federation, a candidate carries its `source` and, for a tree, its
+`site`; the verdict covers only the sources that read, and a source that could
+not answer is named in `errors`. It is read-only and has no model in it;
+[Plan a capture](similar.md) covers the scoring and the measured threshold.
 
 ### Check freshness and health
 

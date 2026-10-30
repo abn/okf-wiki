@@ -23,6 +23,9 @@ okf-wiki serve --content ./docs --out .scratch/wiki --mcp
 # search a rendered site
 okf-wiki search "graph" --out .scratch/wiki --base /wiki/ --json
 
+# plan a capture against a bundle before writing a page
+okf-wiki similar --content ./docs --text draft.md
+
 # serve search over MCP stdio, locally or from published wikis
 okf-wiki mcp --out .scratch/wiki --base /wiki/
 okf-wiki mcp --source docs=https://docs.example.com/wiki/ --source-token docs=DOCS_TOKEN

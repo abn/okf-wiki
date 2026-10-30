@@ -1,6 +1,7 @@
 # Usage
 
 - [Command line](cli.md)
+- [Plan a capture](similar.md)
 - [Agent access](agent-access.md)
 - [MCP server](mcp.md)
 - [Graph view](graph.md)

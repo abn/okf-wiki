@@ -60,14 +60,14 @@ func TestMCPInitializeAndTools(t *testing.T) {
 	}
 	result = resp.Result.(map[string]any)
 	tools, ok := result["tools"].([]any)
-	if !ok || len(tools) != 9 {
+	if !ok || len(tools) != 10 {
 		t.Fatalf("tools = %+v", result["tools"])
 	}
 	names := map[string]bool{}
 	for _, item := range tools {
 		names[item.(map[string]any)["name"].(string)] = true
 	}
-	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path", "changes", "health", "list_sources"} {
+	for _, want := range []string{"search_wiki", "read_page", "read_section", "context_for", "neighbors", "path", "changes", "health", "suggest_pages", "list_sources"} {
 		if !names[want] {
 			t.Errorf("tools are missing %q: %v", want, names)
 		}
@@ -98,6 +98,36 @@ func TestMCPToolSearch(t *testing.T) {
 	}
 	if result["isError"] != false {
 		t.Errorf("isError = %v", result["isError"])
+	}
+}
+
+func TestMCPToolSuggestPages(t *testing.T) {
+	s := testMCPServer(t)
+	line := []byte(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"suggest_pages","arguments":{"text":"the install guide starts here","limit":3}}}`)
+	resp := s.handle(line)
+	if resp == nil || resp.Error != nil {
+		t.Fatalf("tools/call = %+v", resp)
+	}
+	result := resp.Result.(map[string]any)
+	content, ok := result["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("content = %+v", result["content"])
+	}
+	text := content[0].(map[string]any)["text"].(string)
+	var sim wiki.SimilarResponse
+	if err := json.Unmarshal([]byte(text), &sim); err != nil {
+		t.Fatal(err)
+	}
+	if sim.Verdict != "update" || len(sim.Candidates) == 0 {
+		t.Fatalf("suggest payload = %+v", sim)
+	}
+	if got := sim.Candidates[0].Pages[0].PageID; got != "page:index" {
+		t.Errorf("top page = %q, want page:index", got)
+	}
+	line = []byte(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"suggest_pages","arguments":{"text":"  "}}}`)
+	result = s.handle(line).Result.(map[string]any)
+	if result["isError"] != true {
+		t.Errorf("empty text result = %+v", result)
 	}
 }
 

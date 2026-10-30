@@ -290,7 +290,8 @@ func (s *mcpServer) handle(line []byte) *rpcResponse {
 			ID:      req.ID,
 			Result: map[string]any{"tools": []any{
 				mcpSearchTool(), mcpReadPageTool(), mcpReadSectionTool(), mcpContextTool(),
-				mcpNeighborsTool(), mcpPathTool(), mcpChangesTool(), mcpHealthTool(), mcpListSourcesTool(),
+				mcpNeighborsTool(), mcpPathTool(), mcpChangesTool(), mcpHealthTool(),
+				mcpSimilarTool(), mcpListSourcesTool(),
 			}},
 		}
 	case "tools/call":
@@ -458,6 +459,24 @@ func mcpSearchTool() map[string]any {
 	}
 }
 
+func mcpSimilarTool() map[string]any {
+	return map[string]any{
+		"name":        "suggest_pages",
+		"description": "Plan a capture against the wiki. Ranks existing subjects a draft should update, with the pages to read first, or answers that it is a new subject. Read-only: it plans and never writes.",
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"text":     map[string]any{"type": "string", "description": "The draft, summary or new source to plan."},
+				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
+				"sources":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional source names; omit for every source."},
+				"minScore": map[string]any{"type": "number", "minimum": 0, "maximum": 1, "description": "Update threshold; omit for the default."},
+			},
+			"required":             []string{"text"},
+			"additionalProperties": false,
+		},
+	}
+}
+
 type mcpCallParams struct {
 	Name      string          `json:"name"`
 	Arguments json.RawMessage `json:"arguments"`
@@ -499,6 +518,8 @@ func (s *mcpServer) callTool(raw json.RawMessage) map[string]any {
 		return s.changesTool(params.Arguments)
 	case "health":
 		return s.healthTool(params.Arguments)
+	case "suggest_pages":
+		return s.similarTool(params.Arguments)
 	case "list_sources":
 		return mcpToolJSON(s.fed.Info())
 	default:
@@ -522,6 +543,39 @@ func (s *mcpServer) searchTool(raw json.RawMessage) map[string]any {
 	}
 	resp, err := s.fed.Search(args.Query, wiki.SearchOptions{
 		Limit: args.Limit, Site: args.Site, Tag: args.Tag, Section: args.Section,
+	}, args.Sources)
+	if err != nil {
+		return mcpToolError(err.Error())
+	}
+	return mcpToolJSON(resp)
+}
+
+type mcpSimilarArgs struct {
+	Text     string   `json:"text"`
+	Sources  []string `json:"sources"`
+	Limit    int      `json:"limit"`
+	MinScore float64  `json:"minScore"`
+}
+
+func (s *mcpServer) similarTool(raw json.RawMessage) map[string]any {
+	var args mcpSimilarArgs
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return mcpToolError("invalid suggest_pages arguments")
+	}
+	if strings.TrimSpace(args.Text) == "" {
+		return mcpToolError("text is required")
+	}
+	if args.Limit == 0 {
+		args.Limit = 5
+	}
+	if args.Limit < 1 || args.Limit > 20 {
+		return mcpToolError("limit must be between 1 and 20")
+	}
+	if args.MinScore < 0 || args.MinScore > 1 {
+		return mcpToolError("minScore must be between 0 and 1")
+	}
+	resp, err := s.fed.Similar(args.Text, wiki.SimilarOptions{
+		Limit: args.Limit, MinScore: args.MinScore,
 	}, args.Sources)
 	if err != nil {
 		return mcpToolError(err.Error())

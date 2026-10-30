@@ -8,9 +8,10 @@ tags: [design, roadmap, agents, health]
 # Capability candidates
 
 This is a working list, like [Graph evolution](graph-evolution.md), not a decided
-design. It records what the LLM Wiki pattern and the projects built on it suggest
-that okf-wiki should consider, what the evidence for each one is, and how small
-the first version could be. Nothing here is committed to.
+design. One item has shipped: page planning, as `okf-wiki similar` and the MCP
+`suggest_pages` tool. The rest records what the LLM Wiki pattern and the projects
+built on it suggest that okf-wiki should consider, what the evidence for each one
+is, and how small the first version could be.
 
 The pattern itself is assessed in the investigations wiki, under
 `research/investigations/methods/llm-wiki/`. The finding that matters for this
@@ -56,7 +57,7 @@ would ship, not the whole idea.
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Citation surface | Carries frontmatter `sources` and `verified`, and the validator's provenance findings, into the manifest an agent reads | Parse and publish at render; add `sources`, `verified` and the findings to `pages.json` | Three projects converged on deterministic citation checks; the OKF CLI has the checks, the render does not carry them |
 | 2 | Wiki health | Page-level checks beside the graph health: unresolved citation, missing provenance on a typed entry, stale `staleAfter`, near-duplicate subjects, a page title repeated across sections | New checks in `health.json`, the MCP `health` tool and a `check` subcommand | The most repeated finding in the pattern's thread |
-| 3 | Page planning | Ranks existing pages a draft should update, with the reason, and says whether it looks like a new subject | A deterministic lexical rank over `pages.json` and headings, as an MCP tool and a CLI verb | Routing decisions were most of the ingest cost; a classifier beat the model on them |
+| 3 | Page planning | Ranks existing pages a draft should update, with the reason, and says whether it looks like a new subject | Shipped: `okf-wiki similar` and the MCP `suggest_pages` tool | Routing decisions were most of the ingest cost; a classifier beat the model on them |
 | 4 | Retrieval receipts | Reports what an answer was given: sections read, bytes against the budget, what was clipped, and which pages were cited | Extend the `context_for` result and log one line per call | Silent truncation is invisible to recall and to confidence |
 | 5 | Rules at the point of use | Indexes typed rule pages and returns the rule text verbatim before the pages for a task | A `rules.json` beside `pages.json` and a `rules_for` tool | The largest measured effect in the thread: 0 of 8 to 8 of 8 |
 | 6 | Human digest | A view of decisions, open questions with an owner, and what changed since a date | A server endpoint under `_/`, built from typed frontmatter | The counter-position: a wiki its owner cannot read after a break is agent memory, not a wiki |
@@ -82,7 +83,7 @@ reader ask which claim rests on which source.
 ### 2. Wiki health
 
 `health.json` covers the graph today: orphans, broken links, tag-only pages,
-cycles and the most connected pages. The page-level checks the pattern's thread
+cycles, stale pages and the most connected pages. The page-level checks the pattern's thread
 kept asking for are a different pass, and they belong in the same artifact.
 
 The `okf` CLI already computes several of them: broken links, footnote
@@ -108,16 +109,28 @@ subject and role, not just its title.
 
 ### 3. Page planning
 
+Shipped as `okf-wiki similar` and the MCP `suggest_pages` tool; the guide is
+[Plan a capture](../usage/similar.md).
+
 This is the only ingest-shaped capability that fits a read-only renderer,
-because it reads and never writes. Given a draft or a summary, return the
-existing pages it would touch, ranked, with the shared tags, headings and links
-that justify each one, and a verdict on whether it looks like a new subject.
+because it reads and never writes. Given a draft or a summary, it returns the
+existing subjects it would touch, ranked, with the pages to read first and the
+words that matched, and a verdict on whether it looks like a new subject.
 
 Today an ingest agent does this by reading the index and hoping. The thread's
 measurement says that is where most of the cost goes and where the model is
-least reliable. A lexical rank over titles, descriptions, headings and tags is
-deterministic, needs no model, and answers the one question that keeps
-duplicates out.
+least reliable. A lexical rank is deterministic, needs no model, and answers the
+one question that keeps duplicates out.
+
+The first version ranks title, description, tags, headings, path and body text
+with idf-weighted coverage, collapses a deep dive's role pages into one subject,
+and skips log entries and bare numbers. It was measured before the threshold was
+fixed, by replaying 25 real edits against the commit before each edit: on subject
+pages the edited subject came first 82 percent of the time and was in the top
+three 94 percent; edits to a section `index.md` were scored separately and did
+much worse, which is expected of a hub. On 10 genuinely new subjects it left 7
+below the threshold. The replay is re-runnable with
+`scripts/evaluate-similar.py`.
 
 ### 4. Retrieval receipts
 
@@ -177,19 +190,20 @@ catalogue and a lexical rank should be exhausted first.
 - **A database.** The bundle is the database. The moment it needs a second store
   to be useful, the format has already failed.
 
-## What the bundles look like today
+## What the probe found
 
-A read-only probe over two bundles on 30 October 2026 set the order above. It
-read frontmatter, footnotes and relative links and changed nothing.
+A read-only probe over the two bundles on 31 October 2026 set the order above.
+It read frontmatter, footnotes and relative links and changed nothing. The
+counts move as the bundles grow; the ratios are the point.
 
 | Measure | This docs bundle | A research bundle |
 | :--- | ---: | ---: |
-| Pages | 145 | 673 |
-| Pages with `sources` | 1 | 455 |
-| Pages with `verified` | 0 | 15 |
-| Pages using footnotes | 1 | 435 |
+| Pages | 149 | 679 |
+| Pages with `sources` | 1 | 460 |
+| Pages with `verified` | 0 | 16 |
+| Pages using footnotes | 1 | 440 |
 | Footnote pages with no `sources` | 0 | 17 |
-| Page pairs above 0.5 title similarity | 3 | 1,019 |
+| Page pairs above 0.5 title similarity | 3 | 1,055 |
 
 Three lessons.
 
@@ -199,7 +213,7 @@ but not whether a `sources` registry matches the body, and the render carries
 neither the fields nor the findings. That is why the citation surface comes
 first: without it, the health checks have nothing to read.
 
-Second, a naive duplicate check is worse than none. Almost all of the 1,019
+Second, a naive duplicate check is worse than none. Almost all of the 1,055
 pairs are `overview`, `report` and `evidence` siblings of the same subject. The
 check needs the subject and role, which the graph already computes for sections.
 
@@ -209,9 +223,12 @@ passes over data that exists, not a new pipeline.
 
 ## Suggested order
 
-1. Citation surface, because every later check reads it.
-2. Wiki health, on top of the citation data.
-3. Page planning, which closes the ingest loop without a write path.
+The first slice shipped first, because it changes what a writer does on every
+capture rather than reporting on it afterwards.
+
+1. Page planning. Shipped as `similar` and `suggest_pages`.
+2. Citation surface, because every check below reads it.
+3. Wiki health, on top of the citation data.
 4. Retrieval receipts, small and independent.
 5. Rules at the point of use, once the type vocabulary settles.
 6. Human digest.
