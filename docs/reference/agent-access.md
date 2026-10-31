@@ -178,12 +178,13 @@ stdio server:
 }
 ```
 
-The server exposes nine read-only tools:
+The server exposes ten read-only tools:
 
 | Tool | Arguments | Returns |
 | :--- | :--- | :--- |
 | `list_sources` | none | Configured wikis, their base URLs and render IDs. |
 | `search_wiki` | `query`, `sources`, `limit`, `site`, `tag`, `section` | Ranked snippets with citations. |
+| `suggest_pages` | `text`, `sources`, `limit`, `minScore` | Subjects a draft should update, or `new_subject`, with the pages to read first. |
 | `read_page` | `source`, `pageId`, `maxTokens` | The page's Markdown source, capped at the budget. |
 | `read_section` | `source`, `pageId`, `anchor`, `maxTokens` | One heading-anchored section as plain text. |
 | `context_for` | `query`, `sources`, `maxTokens`, `limit`, filters | The best sections that fit the budget. |
