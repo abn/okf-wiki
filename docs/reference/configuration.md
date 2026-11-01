@@ -68,7 +68,8 @@ that file fails the render rather than losing it. See
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so a rendered directory can be served by any static file server
 unchanged. In offline mode it is only the directory; the URLs are relative. It
-must not contain `.` or `..` segments.
+must not contain `.` or `..` segments. See
+[Static hosting](../usage/hosting.md) for how a host handles the page URLs.
 
 A base of `/` is the whole site: the pages are written at the top of `--out`
 with no wiki subdirectory, and there is no root redirect, because the wiki's own
@@ -112,9 +113,9 @@ endpoint has no authentication and no TLS, like the wiki beside it; it follows
 
 ## Endpoints
 
-- `/wiki/` and `/wiki/<slug>.html`: the rendered wiki, under `--base`.
-  `/wiki/graph.html` is the graph view, and it fetches `/wiki/graph.json`
-  unless the catalogue was inlined.
+- `/wiki/`, `/wiki/<slug>.html` and `/wiki/<section>/index.html`: the rendered
+  wiki, under `--base`. `/wiki/graph.html` is the graph view, and it fetches
+  `/wiki/graph.json` unless the catalogue was inlined.
 - `/wiki/okf-bundle.zip`: with `--bundle`, the wiki's source bundle, Markdown
   and assets under one folder. A multi-site tree writes one per wiki at that
   wiki's base.
