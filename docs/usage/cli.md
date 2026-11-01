@@ -80,7 +80,8 @@ have environment equivalents, `OKF_WIKI_THEME` and `OKF_WIKI_BASE`. See
 
 `--base` is both the URL prefix and the directory the pages are written into
 under `--out`, so the rendered directory can be served by any static file server
-unchanged. The default is `/wiki/`.
+unchanged. The default is `/wiki/`. See [Static hosting](hosting.md) for what a
+host does with the page URLs.
 
 ## Downloading the bundle
 
