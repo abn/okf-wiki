@@ -3,6 +3,7 @@ package wiki
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"net/url"
 	"path"
@@ -21,8 +22,14 @@ type shellData struct {
 	Kicker string
 	// TitleHTML is trusted H1 markup replacing Title when set. Ordinary
 	// pages never set it; their title stays escaped text.
-	TitleHTML    template.HTML
-	Description  string
+	TitleHTML template.HTML
+	// Description is the page summary for the meta description: the
+	// frontmatter description, else the first body paragraph, else the title.
+	// It is never empty.
+	Description string
+	// Lead is the paragraph under the title: the frontmatter description,
+	// empty when there is none or when it only repeats the title.
+	Lead         string
 	Version      string
 	GeneratedAt  string
 	AssetVersion string
@@ -403,7 +410,11 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		title = p.Slug
 	}
 
-	description := p.Description
+	lead := pageLead(p.Description, title)
+	description := strings.TrimSpace(p.Description)
+	if description == "" {
+		description = firstParagraphText(stripLeadingH1(p.Body, title), metaDescriptionMax)
+	}
 	if description == "" {
 		description = title
 	}
@@ -447,6 +458,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Kicker:         p.Kicker,
 		TitleHTML:      template.HTML(p.TitleHTML),
 		Description:    description,
+		Lead:           lead,
 		Version:        r.Version(),
 		GeneratedAt:    r.GeneratedAt(),
 		AssetVersion:   r.AssetVersion(),
@@ -1225,4 +1237,74 @@ func stripLeadingH1(body, title string) string {
 		}
 	}
 	return body
+}
+
+// metaDescriptionMax is where a meta description drawn from the body is cut,
+// in runes. Search engines truncate a snippet at about this length.
+const metaDescriptionMax = 160
+
+// pageLead returns the lead paragraph for a page: its description, unless that
+// is empty or only repeats the title once case and outer space are ignored.
+func pageLead(description, title string) string {
+	d := strings.TrimSpace(description)
+	if d == "" || strings.EqualFold(d, strings.TrimSpace(title)) {
+		return ""
+	}
+	return d
+}
+
+// firstParagraphText returns the text of the first <p> in rendered HTML, with
+// tags dropped, entities decoded and whitespace collapsed, cut to max runes at
+// a word boundary. It is empty when the body has no paragraph with text.
+func firstParagraphText(body string, max int) string {
+	rest := body
+	for {
+		start := strings.Index(rest, "<p>")
+		if start < 0 {
+			return ""
+		}
+		rest = rest[start+len("<p>"):]
+		end := strings.Index(rest, "</p>")
+		if end < 0 {
+			return ""
+		}
+		text := strings.Join(strings.Fields(html.UnescapeString(stripTags(rest[:end]))), " ")
+		rest = rest[end:]
+		if text == "" {
+			continue
+		}
+		return cutAtWord(text, max)
+	}
+}
+
+// stripTags drops every <...> run from s. The input is renderer output, where
+// a literal < in text is always escaped, so a bare < always opens a tag.
+func stripTags(s string) string {
+	var b strings.Builder
+	in := false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			in = true
+		case r == '>' && in:
+			in = false
+		case !in:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// cutAtWord shortens s to at most max runes, ending on a word boundary when the
+// prefix has one, and marks the cut with an ellipsis inside the limit.
+func cutAtWord(s string, max int) string {
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	runes := []rune(s)
+	cut := string(runes[:max-1])
+	if i := strings.LastIndexByte(cut, ' '); i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,;:.") + "…"
 }

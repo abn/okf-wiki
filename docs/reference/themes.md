@@ -147,6 +147,13 @@ The `{{.Connections}}` field is static page HTML. A template that omits it drops
 the backlinks and the Local graph entry point, while the graph page itself
 remains reachable from the header.
 
+The paragraph under the title belongs to `{{.Lead}}`, which is empty when a page
+has no description or its description repeats the title. `{{.Description}}` is
+never empty, since it feeds the meta description: without a description it is the
+first body paragraph, and without one of those the title. A template that writes
+`{{.Description}}` under the title still works, and repeats the title on a page
+with no description.
+
 `{{.BundleHref}}` is the wiki's own `okf-bundle.zip`. It is empty when
 `--bundle` is not set, and it is empty on a generated group index and on the
 graph view of a tree whose root is a group. The default theme uses it twice: an
