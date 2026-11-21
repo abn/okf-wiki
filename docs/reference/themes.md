@@ -205,7 +205,8 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
 - Tag pages: `.kicker`, `.tag-hash`, `.tag-often`, `.tag-all-link`,
   `.tag-controls`, `.seg` with `aria-pressed` buttons, `.tag-check`,
   `.tag-group`, `.tag-row` with `.tag-row-head`, `.tag-badges` and
-  `.tag-row-meta`, `.tag-muted`, `.tag-all`, and `a.chip[aria-current]` for
+  `.tag-row-meta`, `.tag-muted`, `.tag-all`, `.tag-all-log` with its
+  `.tag-all-label`, and `a.chip[aria-current]` for
   the current tag. The grouping and deprecated toggles, and whole-row
   navigation, are driven by an inline script on `data-tag-list`,
   `data-tag-group`, `data-tag-row`, `data-tag-setmode`, `data-tag-dep` and

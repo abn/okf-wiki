@@ -416,6 +416,7 @@ func (r *Renderer) graphPageBody(inline []byte) string {
 	b.WriteString(`</div></details>`)
 	b.WriteString(`</div></div>`)
 	b.WriteString(`<p class="graph-status" id="graphStatus" role="status">Loading the graph...</p>`)
+	b.WriteString(`<button type="button" class="graph-log-toggle" hidden></button>`)
 	b.WriteString(`<div class="graph-main">`)
 	b.WriteString(`<div class="graph-canvas"><svg id="graphSvg" viewBox="0 0 1000 700" role="group" aria-labelledby="graphTitle graphDesc" preserveAspectRatio="xMidYMid meet">`)
 	b.WriteString(`<title id="graphTitle">Knowledge graph</title><desc id="graphDesc">Wikis, pages and tags as nodes. Drag a node to move it, scroll to zoom, drag the background to pan, and use the arrow keys to move between nodes.</desc>`)

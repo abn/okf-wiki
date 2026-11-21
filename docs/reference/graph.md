@@ -164,11 +164,11 @@ the overview, and ordinary page names join as the reader zooms in.
 A wiki's header control opens the aggregate with `site=<siteKey>`, so the view
 starts in that wiki. The tree index, a group index and a single bundle keep the
 unscoped link. The Wiki control offers every wiki in the tree, grouped by its
-top-level directory, and All wikis opens the map. In a tree with
-`type: Log Entry` pages, the Type control opens on `content`, so the first view
-is the pages that carry navigation; `all` and the named types bring the rest
-back. The status line names the scope and reports how many log entries are
-hidden. A catalogue with more than 500 nodes opens with tag hubs collapsed; the
+top-level directory, and All wikis opens the map. In a single bundle or a
+tree with `type: Log Entry` pages and at least one other type, the Type control
+opens on `content`, so the first view is the pages that carry navigation; `all`
+and the named types bring the rest back. The status line names the scope and
+reports how many log entries are hidden, with a pill that shows them. A catalogue with more than 500 nodes opens with tag hubs collapsed; the
 checkbox and the tag filter still work. The tag menu sorts by page count,
 searches by name, and keeps one-off tags behind a toggle. At a section-clustered
 overview the drawing shows one weighted edge per pair of cells; the individual

@@ -50,13 +50,16 @@ Display and Export menus close on a click outside them or on Escape.
   the map by directory and a scoped wiki by section, and the wiki heading names
   the page count. A scope change rebuilds the drawing, so only the selected wiki
   is laid out.
-- **Type** narrows by frontmatter type. In a tree with `type: Log Entry` pages,
-  the view opens on **Content pages (no logs)**, because a log archive is
-  chronological rather than linked. Choose **Log Entry** or **All types** to
-  bring the archive back. The status line reports how many log entries are
-  hidden. In a single bundle, or a tree whose pages have two or more types, the
-  Type control lists the types and defaults to all. The Type and page controls
-  are hidden on the wiki map, where they do not apply.
+- **Type** narrows by frontmatter type. When the catalogue has `type: Log Entry`
+  pages and at least one other type, the view opens on **Content pages (no
+  logs)**, because a log archive is chronological rather than linked. Tag hubs
+  that tag only log entries drop out with them. The status line reports how
+  many log entries are hidden, followed by a **Show N log entries** pill that
+  switches Type to **All types**; once they are shown the pill reads **Hide
+  log entries** and switches back. Choosing **Log Entry** or **All types**
+  directly, or opening `graph.html?type=all`, works too. With pages of two or
+  more types the Type control lists them; with one type it stays hidden. The
+  Type and page controls are hidden on the wiki map, where they do not apply.
 - **Filter** narrows by title, section, type, tag, wiki, or node ID. Matching
   nodes stay lit and the rest fade. The line under the controls reports how many
   nodes are visible, and names the fraction only when a filter, tag, or focus

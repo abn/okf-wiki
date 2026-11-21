@@ -267,6 +267,15 @@ bundle actually carries: draft and deprecated from `status`, stale from
 `stale_after`. Trust tiers and dates need `verified` and `generated`
 frontmatter no page is required to have, so the page does not guess them.
 
+Some tags label a kind of change rather than a topic: `log`, `update` or
+`fix` on change log entries. They are detected rather than declared: a tag
+counts as a log-kind tag when only log entries carry it and at least a tenth of
+them do. A log entry is a page of type `Log Entry`, or, with no type, a page at
+`logs/YYYY/MM/DD-<slug>`. The catalogue at the bottom of a tag page puts these
+tags in a separate **Change log** row under the topics, most used first, and a
+topic tag's co-occurring tags leave them out. A topic tag that happens to sit
+on a few log entries, or on any other page, stays in the topic cloud.
+
 ## Sources
 
 A page declares the material its claims come from in a `sources` list in
