@@ -57,6 +57,7 @@ jobs:
           make vendor
           test -s mermaid/mermaid-bundle.min.mjs
           test -s mermaid/mermaid-bundle.min.js
+          test -s mermaid/vega-bundle.min.js
 
       - name: Build the archives
         env:
@@ -100,9 +101,10 @@ jobs:
 
             cp LICENSE README.md THIRD-PARTY.md "$stage/"
             mkdir -p "$stage/mermaid"
-            cp mermaid/mermaid-bundle.min.mjs mermaid/mermaid-bundle.min.js "$stage/mermaid/"
+            cp mermaid/mermaid-bundle.min.mjs mermaid/mermaid-bundle.min.js mermaid/vega-bundle.min.js "$stage/mermaid/"
             test -s "$stage/mermaid/mermaid-bundle.min.js"
             test -s "$stage/mermaid/mermaid-bundle.min.mjs"
+            test -s "$stage/mermaid/vega-bundle.min.js"
             if [ "$os" = windows ]; then
               (cd dist && zip -qr "$name.zip" "$name")
             else

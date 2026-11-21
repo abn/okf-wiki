@@ -84,8 +84,8 @@ flags (render):
   --base PATH        URL prefix the wiki is served under (default "/wiki/")
   --lang TAG         language the pages declare, e.g. de or pt-BR (default "en")
   --repo DIR         repository root exposed read-only at /repo/ (optional)
-  --vendor DIR       directory holding the mermaid bundle (required if the
-                     bundle has a diagram, or the render is not offline)
+  --vendor DIR       directory holding the diagram and chart bundles (required
+                     if the bundle has either, or the render is not offline)
   --theme DIR        theme directory layered over the embedded default (optional)
   --brand STR        brand wordmark (default "okf-wiki")
   --brand-sub STR    brand subtitle (default "docs")
@@ -286,7 +286,7 @@ func bindCommon(fs *flag.FlagSet) *wiki.Config {
 	fs.StringVar(&c.Base, "base", env("OKF_WIKI_BASE", wiki.DefaultBase), "URL prefix the wiki is served under")
 	fs.StringVar(&c.Lang, "lang", env("OKF_WIKI_LANG", wiki.DefaultLang), "language the pages declare, e.g. de or pt-BR")
 	fs.StringVar(&c.Repo, "repo", env("OKF_WIKI_REPO", ""), "repository root for /repo/")
-	fs.StringVar(&c.VendorDir, "vendor", env("OKF_WIKI_VENDOR", "mermaid"), "directory holding the mermaid ESM and classic bundles")
+	fs.StringVar(&c.VendorDir, "vendor", env("OKF_WIKI_VENDOR", "mermaid"), "directory holding the mermaid and Vega-Lite bundles")
 	fs.StringVar(&c.ThemeDir, "theme", env("OKF_WIKI_THEME", ""), "theme directory layered over the embedded default")
 	fs.StringVar(&c.Brand.Name, "brand", env("OKF_WIKI_BRAND", "okf-wiki"), "brand wordmark")
 	fs.StringVar(&c.Brand.Sub, "brand-sub", env("OKF_WIKI_BRAND_SUB", "docs"), "brand subtitle")

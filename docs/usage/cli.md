@@ -188,7 +188,7 @@ overwritten. See [Graph view](graph.md).
 
 `--offline` writes a folder that opens from `file://`: relative URLs, a per-page
 `<base>`, home links that name `index.html`, script-loaded search data, an
-embedded graph, and a classic Mermaid bundle for pages with diagrams. No request
+embedded graph, and the classic diagram and chart bundles for pages that use them. No request
 leaves the folder. `--repo` is refused, since a repository mount needs a server.
 
 ```bash
@@ -213,8 +213,8 @@ podman run --rm --network=host \
 **A release archive**, with no toolchain and no build step. Every release
 carries the static binary for linux, macOS and Windows on amd64 and arm64. Each
 archive holds the binary, the license, the README, the third-party notices and
-the mermaid runtime under `mermaid/`, so a bundle with diagrams renders without
-reaching for a CDN. `checksums.txt` covers all six:
+the diagram and chart runtimes under `mermaid/`, so a bundle with diagrams or
+charts renders without reaching for a CDN. `checksums.txt` covers all six:
 
 ```bash
 curl -fsSLO https://github.com/abn/okf-wiki/releases/latest/download/okf-wiki_linux_amd64.tar.gz
@@ -272,15 +272,16 @@ search, diagram and graph clients), `search-index.json` and its text companion
 `llms.txt` and `pages.json` for agent discovery, `changes.json` and
 `health.json` for change tracking and graph health, `okf-bundle.zip` when
 `--bundle` is set, and a `theme.json` recording which theme produced it. An
-offline render also writes the search and tag data as `.js` scripts, and copies
-the Mermaid runtime build it needs when the bundle has a diagram. The output is
+offline render also writes the search and tag data as `.js` scripts. The
+Mermaid runtime is copied when the bundle has a diagram, and the Vega-Lite
+runtime when it has a chart. The output is
 a plain static site, so any static file server can host it, and an offline
 folder can be opened from disk.
 
 ## Local development
 
 ```bash
-make run      # vendor the diagram bundle, render docs/, serve on :8080
+make run      # vendor the diagram and chart bundles, render docs/, serve on :8080
 make render   # render only
 make render-themed THEME=./themes/acme   # the same, with a theme layered over
 ```

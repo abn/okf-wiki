@@ -349,13 +349,22 @@ func (r *Renderer) renderInto(out, site string) error {
 	// A bundle with a diagram needs the runtime copied, or the browser reaches
 	// for the CDN. An offline render also needs the classic build, because a
 	// module cannot be imported from file://.
-	if r.hasMermaid() {
-		if r.cfg.Offline {
+	// Charts have one classic bundle for every mode, so it is required
+	// whenever a vendor directory is in play. Each runtime is copied only when
+	// some page uses it.
+	need := vendorNeeds{mermaid: r.hasMermaid(), charts: r.hasCharts()}
+	if need.mermaid || need.charts {
+		if need.mermaid && r.cfg.Offline {
 			if _, err := os.Stat(filepath.Join(r.cfg.VendorDir, "mermaid-bundle.min.js")); err != nil {
 				return fmt.Errorf("%w: offline diagram pages need vendor/mermaid-bundle.min.js; run make vendor or point --vendor at a directory holding both bundles: %v", errVendorRuntime, err)
 			}
 		}
-		if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor"), r.cfg.Offline); err != nil {
+		if need.charts && (r.cfg.Offline || r.cfg.VendorDir != "") {
+			if _, err := os.Stat(filepath.Join(r.cfg.VendorDir, "vega-bundle.min.js")); err != nil {
+				return fmt.Errorf("%w: chart pages need vendor/vega-bundle.min.js; run make vendor or point --vendor at a directory holding it: %v", errVendorRuntime, err)
+			}
+		}
+		if err := copyVendor(r.cfg.VendorDir, filepath.Join(site, "vendor"), r.cfg.Offline, need); err != nil {
 			return err
 		}
 	}
@@ -647,6 +656,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 	// anchored to the page itself.
 	currentAnchor := ""
 	currentHeading := ""
+	var walkErr error
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -686,6 +696,29 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 			nn.Destination = []byte(r.linkPath(p.Slug, string(nn.Destination)))
 		case *ast.Blockquote:
 			detectAlert(nn, src)
+		case *ast.FencedCodeBlock:
+			if string(nn.Language(src)) != chartLang {
+				break
+			}
+			var spec bytes.Buffer
+			for i := 0; i < nn.Lines().Len(); i++ {
+				line := nn.Lines().At(i)
+				spec.Write(line.Value(src))
+			}
+			html, err := prepareChart(spec.Bytes(), file, r.cfg.Content)
+			if err != nil {
+				where := file
+				if nn.Lines().Len() > 0 {
+					// The line before the spec's first line is the opening
+					// fence, which is the line reported. The body starts after
+					// the frontmatter, so the frontmatter is counted too.
+					offset := len(data) - len(body) + nn.Lines().At(0).Start
+					where = fmt.Sprintf("%s:%d", file, bytes.Count(data[:offset], []byte("\n")))
+				}
+				walkErr = fmt.Errorf("%s: %s chart: %w", where, chartLang, err)
+				return ast.WalkStop, nil
+			}
+			nn.SetAttributeString(chartAttr, []byte(html))
 		}
 		if h := headingText(n, src); h != "" && p.Title == "" && isH1(n) {
 			h1 = h
@@ -707,6 +740,9 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		}
 		return ast.WalkContinue, nil
 	})
+	if walkErr != nil {
+		return Page{}, walkErr
+	}
 
 	if p.Title == "" {
 		p.Title = h1
@@ -942,14 +978,30 @@ func slugify(s string) string {
 // a mermaid fence through unchanged, as a pre.mermaid block, so the rendered
 // body is what to look at.
 func (r *Renderer) hasMermaid() bool {
+	return r.anyBodyContains(`<pre class="mermaid">`)
+}
+
+// hasCharts reports whether any page has a chart in it.
+func (r *Renderer) hasCharts() bool {
+	return r.anyBodyContains(chartMarker)
+}
+
+func (r *Renderer) anyBodyContains(marker string) bool {
 	for _, s := range r.sections {
 		for _, p := range s.Pages {
-			if strings.Contains(p.Body, `<pre class="mermaid">`) {
+			if strings.Contains(p.Body, marker) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// vendorNeeds says which client runtimes a site uses, so the vendor copy
+// leaves out the ones no page would load.
+type vendorNeeds struct {
+	mermaid bool
+	charts  bool
 }
 
 // markdownFiles lists the Markdown files under root, at any depth, as paths
@@ -1003,12 +1055,12 @@ func resolveRoot(root string) (string, error) {
 	return real, nil
 }
 
-// copyVendor copies the mermaid bundle directory into the output, if present.
+// copyVendor copies the runtime bundles a site uses into the output.
 // It reports a missing directory rather than returning quietly, because the
 // runtime falls back to a public CDN in that case and a silent return made an
 // offline render look fine while it was not. A bundle with no diagram does not
 // need the runtime, so the caller only asks for it when there is one.
-func copyVendor(dir, dest string, classic bool) error {
+func copyVendor(dir, dest string, classic bool, need vendorNeeds) error {
 	if dir == "" {
 		return nil
 	}
@@ -1039,6 +1091,13 @@ func copyVendor(dir, dest string, classic bool) error {
 		if !isVendorArtifact(e.Name()) {
 			continue
 		}
+		lower := strings.ToLower(e.Name())
+		if strings.HasPrefix(lower, "mermaid-bundle.") && !need.mermaid {
+			continue
+		}
+		if strings.HasPrefix(lower, "vega-bundle.") && !need.charts {
+			continue
+		}
 		// An offline page loads the classic build through a script tag; a
 		// served page imports the ESM build. Copy only the one it can use.
 		if classic && strings.HasSuffix(strings.ToLower(e.Name()), ".mjs") {
@@ -1061,8 +1120,9 @@ func isVendorArtifact(name string) bool {
 	case ".mjs", ".wasm", ".css", ".map":
 		return true
 	case ".js":
-		// Only the classic mermaid bundle, not its entry source.
-		return strings.HasPrefix(strings.ToLower(name), "mermaid-bundle.")
+		// Only the classic bundles, not their entry sources.
+		lower := strings.ToLower(name)
+		return strings.HasPrefix(lower, "mermaid-bundle.") || strings.HasPrefix(lower, "vega-bundle.")
 	}
 	return false
 }

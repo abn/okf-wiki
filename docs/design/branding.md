@@ -30,6 +30,8 @@ document contract:
 - the search index pair, `search-index.json` and `search-content.json`, and
   their shape
 - the mermaid contract: `pre.mermaid` in, rendered SVG plus a lightbox out
+- the chart contract: `figure.chart` with a `.chart-view` and a `.chart-spec`
+  JSON script in, Vega-Lite SVG out, coloured from the `--chart-*` tokens
 
 That split is the point. A theme that only wants a different skin restyles the
 class names and never touches `template.html`; a theme that wants a different
@@ -75,7 +77,8 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.DocBase}}` | offline only: the relative path from this page to the render root, for the document `<base>`; empty online |
 | `{{.PageHref}}` | offline only: this page's own path under the render root, for in-document links; empty online |
 | `{{.Offline}}` | true when the page is written for opening without a server |
-| `{{.HasMermaid}}` | true when this page carries a diagram, so an offline page can load the classic runtime |
+| `{{.HasMermaid}}` | true when this page carries a diagram; the default template does not need it, since `diagrams.js` loads the runtime itself |
+| `{{.HasCharts}}` | true when this page carries a chart, so the template loads `charts.js` only there |
 | `{{.GraphBase}}` `{{.GraphHref}}` | where the graph catalogue is fetched and where the graph page lives |
 | `{{.BundleHref}}` | the wiki's own `okf-bundle.zip`, empty without `--bundle`, and on a group index and the graph view of a group-rooted tree |
 | `{{.AssetVersion}}` | the resolved theme's content hash |

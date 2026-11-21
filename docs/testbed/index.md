@@ -13,6 +13,7 @@ Nothing here is documentation about the renderer itself. That is
 | [Callouts](callouts.md) | All five GitHub alert levels, plus a plain blockquote |
 | [Blocks](blocks.md) | Tables, task lists, footnotes, links |
 | [Code](code.md) | Highlighting across languages, and unknown languages |
+| [Charts](charts.md) | Vega-Lite line, bar, scatter and quadrant charts, inline and from data files |
 | [Diagrams](diagrams.md) | Mermaid flowcharts, sequence diagrams, state machines |
 | [Headings](headings.md) | Table of contents depth, repeated and colliding headings |
 | [First run](nested/setup/first-run.md) | A page two directories deep, and links out of it |

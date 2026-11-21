@@ -36,9 +36,12 @@ environment equivalent is `OKF_WIKI_OFFLINE=true`.
   and forward work from `file://`. The graph's list view, section grid and tag
   hub toggle are built from the same embedded catalogue.
 - Pages with a diagram load `vendor/mermaid-bundle.min.js`, a classic build of
-  Mermaid and ELK. Pages without a diagram do not load it. There is no CDN
-  fallback from `file://`; if the runtime is missing, the render fails rather
-  than pretending to be offline.
+  Mermaid and ELK, and pages with a chart load `vendor/vega-bundle.min.js`.
+  Each is injected the first time a diagram or chart nears the viewport, and a
+  page without one does not load it. A chart's data file is carried in the
+  page, so nothing is fetched from beside it. There is no CDN fallback from
+  `file://`; if a runtime is missing, the render fails rather than pretending
+  to be offline.
 - The root redirect names the wiki's `index.html` rather than a directory.
 
 With `--bundle`, each wiki also writes its `okf-bundle.zip` beside its pages, so

@@ -1724,6 +1724,47 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
    controls, the jumps and the links out of the page; kept together are the
    things that read badly when split: a heading and what follows it, a callout,
    a code block, a diagram, a table row. */
+/* ---- charts ---------------------------------------------------------------
+   A vega-lite fence renders as a figure: the drawing, a caption from the
+   spec's description, and the data as a table behind a disclosure. The view
+   reserves its height before the runtime arrives, so the page does not move
+   when the chart is drawn, and the chart colours come from --chart-* tokens
+   through var() references, so a theme toggle restyles a drawn chart. */
+.chart {
+  margin: var(--space-6) 0; padding: var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+.chart-view { width: 100%; }
+.chart-view.is-drawn { min-height: 0 !important; }
+.chart-view svg { display: block; max-width: 100%; height: auto; }
+.chart-spec { display: none; }
+.chart-caption {
+  margin-top: var(--space-3);
+  color: var(--color-text-muted); font-size: var(--text-sm);
+}
+.chart-data { margin-top: var(--space-3); font-size: var(--text-sm); }
+.chart-data summary {
+  cursor: pointer; width: fit-content;
+  color: var(--color-text-muted); font-family: var(--font-ui); font-size: var(--text-xs);
+}
+.chart-data summary:hover { color: var(--color-accent-text); }
+.chart-data table { margin: var(--space-2) 0 0; }
+.chart-data caption { caption-side: top; text-align: left; color: var(--color-text-muted); padding-bottom: var(--space-1); }
+.chart-error {
+  padding: var(--space-3); border-radius: var(--radius-md);
+  border: 1px solid var(--status-danger-line); background: var(--status-danger-tint);
+  color: var(--status-danger-text); font-family: var(--font-ui); font-size: var(--text-sm);
+}
+/* The vega tooltip, restyled from the same tokens as the page. */
+#vg-tooltip-element {
+  font-family: var(--font-ui); font-size: var(--text-xs);
+  color: var(--color-text); background: var(--color-bg-elevated);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-md);
+  box-shadow: none;
+}
+#vg-tooltip-element table tr td.key { color: var(--color-text-muted); }
+
 @media print {
   .site-header, .breadcrumb-bar, .sidebar, .search-modal-backdrop,
   .theme-toggle, .skip-link, .toc, .toc-aside, .toc-btn, .toc-panel,
@@ -1737,6 +1778,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   h1, h2, h3, h4, h5, h6 { break-after: avoid; break-inside: avoid; }
   p, li, dd { orphans: 3; widows: 3; }
   .callout, pre.code, figure, .mermaid-frame, tr, img { break-inside: avoid; }
+  .chart-view svg { width: 100% !important; height: auto !important; }
   /* A table longer than a page still breaks, but its header repeats, so the
      columns stay named. The old rule kept whole tables together, which pushed
      a long one onto a fresh page and stranded the heading above it. */

@@ -87,7 +87,7 @@ func detectAlert(bq *ast.Blockquote, source []byte) {
 }
 
 // customRenderer implements callout blockquotes, table cells, and
-// chroma-highlighted fenced code blocks (with a mermaid passthrough).
+// chroma-highlighted fenced code blocks (with mermaid and chart passthroughs).
 //
 // The config is GFM's own TableConfig so that a table cell renders through the
 // same settings the GFM extension carries, alignment method included.
@@ -150,6 +150,13 @@ func (r *customRenderer) renderFencedCodeBlock(w util.BufWriter, source []byte, 
 		buf.Write(line.Value(source))
 	}
 	codeText := buf.String()
+
+	if lang == chartLang {
+		if html, ok := n.AttributeString(chartAttr); ok {
+			_, _ = w.Write(html.([]byte))
+			return ast.WalkSkipChildren, nil
+		}
+	}
 
 	if lang == "mermaid" {
 		_, _ = w.WriteString("<pre class=\"mermaid\">\n")

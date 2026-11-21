@@ -238,6 +238,25 @@
   --diagram-violet: #C4B5FD;
   --diagram-pink: #F9A8D4;
 
+  /* ---- chart palette ------------------------------------------------------
+     Read by charts.js, which hands Vega-Lite these as var() references
+     rather than resolved colours, so a chart follows a theme toggle and a
+     printout without being drawn again. The structural tokens point at the
+     colour tokens above and need no dark values of their own; only the
+     series are redeclared per ground. The font is resolved once, since Vega
+     measures text with it. */
+  --chart-font: var(--font-ui);
+  --chart-ink: var(--color-text);
+  --chart-muted: var(--color-text-muted);
+  --chart-grid: var(--color-line);
+  --chart-axis: var(--color-line-control);
+  --chart-1: #217A4B;
+  --chart-2: #1E40AF;
+  --chart-3: #B45309;
+  --chart-4: #8A3A1A;
+  --chart-5: #6D28D9;
+  --chart-6: #3D3D3D;
+
   /* ---- lightbox -----------------------------------------------------------
      The diagram viewer stages a diagram on a dark field in both grounds. It is
      a different surface from the page, so it carries its own tokens rather than
@@ -337,6 +356,12 @@
     --diagram-blue: #93C5FD;
     --diagram-violet: #C4B5FD;
     --diagram-pink: #F9A8D4;
+    --chart-1: #5FD68C;
+    --chart-2: #93C5FD;
+    --chart-3: #FCD34D;
+    --chart-4: #FCA5A5;
+    --chart-5: #C4B5FD;
+    --chart-6: #A1A1AA;
   }
 }
 
@@ -421,5 +446,11 @@
     --diagram-blue: #93C5FD;
     --diagram-violet: #C4B5FD;
     --diagram-pink: #F9A8D4;
+    --chart-1: #5FD68C;
+    --chart-2: #93C5FD;
+    --chart-3: #FCD34D;
+    --chart-4: #FCA5A5;
+    --chart-5: #C4B5FD;
+    --chart-6: #A1A1AA;
   }
 }

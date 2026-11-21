@@ -496,10 +496,11 @@ func TestOfflineSearchDataContract(t *testing.T) {
 	}
 }
 
-// TestOfflinePageCarriesClassicMermaid pins the file:// diagram path: the page
-// loads the classic bundle before diagrams.js, and does not ask for the ESM
-// bundle, which cannot be imported from disk.
-func TestOfflinePageCarriesClassicMermaid(t *testing.T) {
+// TestOfflinePageLoadsClassicMermaidOnDemand pins the file:// diagram path: the
+// page does not load the classic bundle up front, since diagrams.js injects it
+// when a diagram nears the viewport, and nothing asks for the ESM bundle,
+// which cannot be imported from disk.
+func TestOfflinePageLoadsClassicMermaidOnDemand(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n\n```mermaid\nflowchart LR\n  A --> B\n```\n")
 	vendor := t.TempDir()
@@ -519,16 +520,18 @@ func TestOfflinePageCarriesClassicMermaid(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := readRendered(t, filepath.Join(out, "wiki", "index.html"))
-	for _, want := range []string{
-		`src="./vendor/mermaid-bundle.min.js?v=`,
-		`src="./diagrams.js?v=`,
-	} {
-		if !strings.Contains(page, want) {
-			t.Errorf("offline diagram page is missing %q", want)
-		}
+	if !strings.Contains(page, `src="./diagrams.js?v=`) {
+		t.Error("offline diagram page does not load diagrams.js")
+	}
+	if strings.Contains(page, "vendor/mermaid-bundle.min.js") {
+		t.Error("the offline page loads the diagram runtime up front")
 	}
 	if strings.Contains(page, "vendor/mermaid-bundle.min.mjs") {
 		t.Error("the offline page asks for the ESM bundle")
+	}
+	client := readRendered(t, filepath.Join(out, "wiki", "diagrams.js"))
+	if !strings.Contains(client, "vendor/mermaid-bundle.min.js") {
+		t.Error("diagrams.js does not know where the classic bundle is")
 	}
 	if _, err := os.Stat(filepath.Join(out, "wiki", "vendor", "mermaid-bundle.min.js")); err != nil {
 		t.Error("the classic vendor bundle was not copied")

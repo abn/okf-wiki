@@ -727,6 +727,10 @@ def main():
             == 1,
             "the list roving tab stop drifted",
         )
+        # The list stops at a fixed number of nodes, so a docs bundle larger
+        # than that lists the page only after Show all.
+        for more in driver.find_elements(By.CSS_SELECTOR, "#graphListNodes .graph-list-more"):
+            more.click()
         driver.find_element(
             By.CSS_SELECTOR,
             '#graphListNodes button[data-id="page:usage/graph"]',
@@ -812,6 +816,16 @@ def main():
             "return document.querySelectorAll('.mermaid-frame svg').length;"
         )
         must(frames > 0, "Mermaid did not render")
+
+        # The first chart on the page is in view, so it draws without a
+        # scroll. Its line colour is a var() reference, which Firefox has to
+        # resolve from the theme tokens for the stroke to be a real colour.
+        check_page(driver, base + "testbed/charts.html", "figure.chart[data-drawn] svg")
+        stroke = driver.execute_script(
+            "var p = document.querySelector('figure.chart[data-drawn] .mark-line path');"
+            "return p ? getComputedStyle(p).stroke : '';"
+        )
+        must(stroke.startswith("rgb("), f"chart line colour did not resolve: {stroke!r}")
 
         check_page(driver, base + "graph.html", ".graph-node-group")
         nodes = driver.execute_script(

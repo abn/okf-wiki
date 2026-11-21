@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pinned mermaid + ELK bundle for the okf-wiki offline container",
+  "description": "Pinned client runtimes for okf-wiki: mermaid + ELK for diagrams, Vega-Lite for charts",
   "devDependencies": {
     "@mermaid-js/layout-elk": "1.0.1",
     "esbuild": "0.28.2",
-    "mermaid": "12.2.0"
+    "mermaid": "12.2.0",
+    "vega": "6.4.0",
+    "vega-embed": "7.3.0",
+    "vega-interpreter": "2.3.2",
+    "vega-lite": "6.5.0"
   }
 }
