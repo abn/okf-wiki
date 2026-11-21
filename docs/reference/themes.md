@@ -126,6 +126,7 @@ word would be announced twice. A table header cell is a `th` with
 | `searchScope` | `search.js` | the All-wikis / This-wiki toggle of a multi-site tree is not offered; single-wiki search is unaffected |
 | `searchGraph` | `search.js` | the selected search hit cannot open in the graph |
 | `menuBtn` `drawerBackdrop` `sideDrawer` | the drawer script in the template | the drawer script throws, so the mobile menu and Escape-to-close both die |
+| `drawerClose` | the drawer script in the template | the drawer has no close button of its own; the backdrop, Escape and the menu button still close it |
 | `themeToggle` | the toggle script in the template | the toggle does not respond |
 | `readingToggle` | the reading-mode script in the template | the full width reading mode does not toggle |
 | `main` | the skip link's `href="#main"` | the skip link jumps nowhere |
@@ -226,7 +227,9 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   The header's `{{.TopNav}}` links sit in `.top-nav`, each external one carrying
   `.nav-ext` on its arrow. The drawer repeats them under `.side-links`: the
   in-wiki `{{.TopNavInternal}}` first, then `{{.TopNavExternal}}`, each under a
-  `.side-links-title`.
+  `.side-links-title`. The drawer opens with `.drawer-head`, holding the
+  `.drawer-close` button first, which opening the drawer focuses, and a
+  `.drawer-brand` home link, shown only where the sidebar is a drawer.
 - The full width reading mode: the toggle is `.reading-toggle`, an `.icon-btn`
   in the header, hidden at 860px and below where the layout is one column
   anyway, and the script sets `reading-mode` on the `<html>` element, so
