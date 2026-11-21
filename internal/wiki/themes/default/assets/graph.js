@@ -38,6 +38,7 @@
   var edgeLayer = document.getElementById('graphEdges');
   var nodeLayer = document.getElementById('graphNodes');
   var status = document.getElementById('graphStatus');
+  var logToggle = document.querySelector('.graph-log-toggle');
   var filter = document.getElementById('graphFilter');
   var kind = document.getElementById('graphKind');
   var siteField = document.getElementById('graphSiteField');
@@ -159,6 +160,27 @@
   function setStatus(text, isError) {
     status.textContent = text;
     status.classList.toggle('is-error', !!isError);
+    if (logToggle) logToggle.hidden = true;
+  }
+
+  // The pill beside the status line that brings the hidden log entries back,
+  // or hides them again once they are shown. It drives the Type control, so
+  // the URL and history follow it the same way.
+  function syncLogToggle() {
+    if (!logToggle || !typeSelect || !state.hasTypeControl || state.siteMap) return;
+    if (state.logHidden) {
+      logToggle.textContent = 'Show ' + formatCount(state.logHidden) + ' log entries';
+      logToggle.setAttribute('data-type', TYPE_ALL);
+      logToggle.hidden = false;
+      return;
+    }
+    var logsInScope = state.typeFilter === TYPE_ALL && state.allNodes.some(function (n) {
+      return n.kind === 'page' && !n.stub && siteMatches(n) && n.type === LOG_TYPE;
+    });
+    if (!logsInScope) return;
+    logToggle.textContent = 'Hide log entries';
+    logToggle.setAttribute('data-type', TYPE_CONTENT);
+    logToggle.hidden = false;
   }
 
   function nodeRadius(n) {
@@ -323,7 +345,7 @@
       if (!state.typeBySlug[slug]) state.typeBySlug[slug] = type;
     });
     state.hasLogs = !!counts[LOG_TYPE];
-    state.defaultType = types.length >= 2 && isTreeCatalogue() && state.hasLogs ? TYPE_CONTENT : TYPE_ALL;
+    state.defaultType = types.length >= 2 && state.hasLogs ? TYPE_CONTENT : TYPE_ALL;
     if (!typeSelect || !typeField) return;
     if (types.length < 2) {
       state.hasTypeControl = false;
@@ -2640,6 +2662,7 @@
       text += ' Not in this graph: ' + missing.map(tagLabel).join(', ') + '.';
     }
     setStatus(text);
+    syncLogToggle();
     var desc = document.getElementById('graphDesc');
     if (desc) desc.textContent = 'Pages and tags as nodes. ' + text +
       ' Use the arrow keys to move between nodes and Enter for details.';
@@ -3229,6 +3252,12 @@
       state.typeFilter = typeSelect.value;
       state.typeMissing = false;
       relayoutGraph(true, 'push');
+    });
+  }
+  if (logToggle && typeSelect) {
+    logToggle.addEventListener('click', function () {
+      typeSelect.value = logToggle.getAttribute('data-type');
+      typeSelect.dispatchEvent(new Event('change'));
     });
   }
   kind.addEventListener('change', function () {

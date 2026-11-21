@@ -127,7 +127,14 @@ func (r *Renderer) tagPageBody(t tagListing, all []tagListing, dep int, now time
 		titles[s.ID] = s.Title
 	}
 
-	if often := oftenWith(t, all); len(often) > 0 {
+	// A topic tag's co-occurring tags name other topics; a log-kind tag's
+	// page keeps the other kinds, which are the useful neighbours there.
+	logKinds := r.logKindTags(all)
+	var skip map[string]bool
+	if !logKinds[t.Slug] {
+		skip = logKinds
+	}
+	if often := oftenWith(t, skip); len(often) > 0 {
 		b.WriteString(`<div class="tag-often"><span class="tag-muted">Often with</span> `)
 		for _, o := range often {
 			fmt.Fprintf(&b, `%s `, tagChip(base, o.Slug, o.Display, o.Pages, false))
@@ -189,10 +196,23 @@ func (r *Renderer) tagPageBody(t tagListing, all []tagListing, dep int, now time
 	})
 	b.WriteString("<hr>\n")
 	b.WriteString(`<h3 id="all-tags">All tags</h3>` + "\n" + `<div class="tag-all">` + "\n")
+	var kinds []tagListing
 	for _, o := range sorted {
+		if logKinds[o.Slug] {
+			kinds = append(kinds, o)
+			continue
+		}
 		b.WriteString(tagChip(base, o.Slug, o.Display, len(o.Pages), o.Slug == t.Slug) + "\n")
 	}
 	b.WriteString(`</div>` + "\n")
+	if len(kinds) > 0 {
+		sort.SliceStable(kinds, func(i, j int) bool { return len(kinds[i].Pages) > len(kinds[j].Pages) })
+		b.WriteString(`<div class="tag-all tag-all-log"><span class="tag-all-label">Change log</span>` + "\n")
+		for _, o := range kinds {
+			b.WriteString(tagChip(base, o.Slug, o.Display, len(o.Pages), o.Slug == t.Slug) + "\n")
+		}
+		b.WriteString(`</div>` + "\n")
+	}
 	b.WriteString(tagScript)
 	return b.String()
 }
@@ -282,9 +302,9 @@ type coTag struct {
 }
 
 // oftenWith collects the tags co-occurring on the listed tag's pages, minus
-// the tag itself, most frequent first. Capped at five: the full catalogue
-// sits at the bottom of the page for browsing.
-func oftenWith(t tagListing, all []tagListing) []coTag {
+// the tag itself and any slug in skip, most frequent first. Capped at five:
+// the full catalogue sits at the bottom of the page for browsing.
+func oftenWith(t tagListing, skip map[string]bool) []coTag {
 	counts := map[string]int{}
 	display := map[string]string{}
 	for _, p := range t.Pages {
@@ -294,7 +314,7 @@ func oftenWith(t tagListing, all []tagListing) []coTag {
 				continue
 			}
 			slug := slugify(name)
-			if slug == "" || slug == t.Slug {
+			if slug == "" || slug == t.Slug || skip[slug] {
 				continue
 			}
 			counts[slug]++
@@ -315,6 +335,43 @@ func oftenWith(t tagListing, all []tagListing) []coTag {
 	})
 	if len(out) > 5 {
 		out = out[:5]
+	}
+	return out
+}
+
+// logKindMinShare is the fraction of log entries a tag must reach to count as
+// a log-kind tag, so a topic tag that happens to sit on one or two entries
+// stays a topic.
+const logKindMinShare = 0.10
+
+// logKindTags returns the slugs of the tags that label kinds of change rather
+// than topics: tags carried only by log entries, and by at least
+// logKindMinShare of them. They are detected rather than declared, so a
+// bundle needs no configuration for them.
+func (r *Renderer) logKindTags(all []tagListing) map[string]bool {
+	entries := 0
+	for _, s := range r.sections {
+		for _, p := range s.Pages {
+			if isLogEntry(p) {
+				entries++
+			}
+		}
+	}
+	out := map[string]bool{}
+	if entries == 0 {
+		return out
+	}
+	for _, t := range all {
+		onlyLogs := len(t.Pages) > 0
+		for _, p := range t.Pages {
+			if !isLogEntry(p) {
+				onlyLogs = false
+				break
+			}
+		}
+		if onlyLogs && float64(len(t.Pages)) >= logKindMinShare*float64(entries) {
+			out[t.Slug] = true
+		}
 	}
 	return out
 }

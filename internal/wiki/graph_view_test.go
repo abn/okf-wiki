@@ -285,6 +285,42 @@ func TestGraphViewControlsContract(t *testing.T) {
 	}
 }
 
+// TestGraphViewLogsStepBack pins the log entries' default: any catalogue with
+// log entries and another type opens without them, and a pill beside the
+// status line brings them back or hides them again.
+func TestGraphViewLogsStepBack(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	for _, want := range []string{
+		"state.defaultType = types.length >= 2 && state.hasLogs ? TYPE_CONTENT : TYPE_ALL;",
+		"function syncLogToggle",
+		"'Show ' + formatCount(state.logHidden) + ' log entries'",
+		"'Hide log entries'",
+		"typeSelect.dispatchEvent(new Event('change'))",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+
+	r := newGraphRenderer(t, graphViewBundle(t))
+	page, err := r.RenderGraphPage(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(page, `id="graphStatus" role="status">Loading the graph...</p><button type="button" class="graph-log-toggle" hidden></button>`) {
+		t.Error("the log toggle does not follow the status line, hidden until the client shows it")
+	}
+}
+
 // TestGraphViewSiteMapContract pins the tree's first screen and the cell-level
 // edges that keep a scoped wiki readable. The Firefox smoke test covers the
 // drawing.

@@ -518,6 +518,22 @@ def main():
         driver.switch_to.active_element.send_keys(Keys.ESCAPE)
         must(display.get_attribute("open") is None, "Escape left the Display menu open")
 
+        toggle = driver.find_element(By.CSS_SELECTOR, ".graph-log-toggle")
+        must(
+            "log entries hidden" in driver.find_element(By.ID, "graphStatus").text
+            and toggle.is_displayed() and toggle.text.startswith("Show "),
+            "the graph did not open with the log entries hidden behind a Show pill",
+        )
+        toggle.click()
+        WebDriverWait(driver, 5).until(lambda d: toggle.text == "Hide log entries")
+        must(
+            driver.find_element(By.ID, "graphType").get_attribute("value") == "all"
+            and "log entries hidden" not in driver.find_element(By.ID, "graphStatus").text,
+            "the Show pill did not bring the log entries back",
+        )
+        toggle.click()
+        WebDriverWait(driver, 5).until(lambda d: toggle.text.startswith("Show "))
+
         check_page(driver, base + "graph.html", ".graph-list-node")
         wait_layout(driver)
         must(
