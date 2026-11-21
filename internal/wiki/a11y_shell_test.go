@@ -304,6 +304,35 @@ func TestSearchFooterFollowsThePointer(t *testing.T) {
 	}
 }
 
+// TestDrawerHasAHeaderWithAClose covers the drawer's header: the close button
+// is the first control in the drawer, so opening it focuses the way out, it
+// has an accessible name, the brand links home, and the drawer script wires
+// the button to close it.
+func TestDrawerHasAHeaderWithAClose(t *testing.T) {
+	page, sheet := a11yBundle(t)
+	drawer := regionOf(t, page, `<aside class="sidebar" id="sideDrawer">`, `</aside>`)
+	head := `<div class="drawer-head"><button type="button" class="drawer-close" id="drawerClose" aria-label="Close navigation">`
+	if !strings.HasPrefix(drawer, head) {
+		t.Errorf("the drawer does not open with its header and close button, got:\n%.300s", drawer)
+	}
+	brand := regionOf(t, drawer, `<a class="brand drawer-brand" href="/wiki/">`, `</a>`)
+	if !strings.Contains(brand, `<span class="wordmark">t`) || !strings.Contains(brand, `alt=""`) {
+		t.Errorf("the drawer brand is not a home link carrying the wordmark: %s", brand)
+	}
+	if strings.Index(drawer, `id="drawerClose"`) > strings.Index(drawer, `<nav class="side"`) {
+		t.Error("the close button comes after the navigation, so opening the drawer would not focus it")
+	}
+	if !strings.Contains(page, "drawerClose.addEventListener('click', closeDrawer)") {
+		t.Error("the drawer script does not wire the close button")
+	}
+	if !strings.Contains(ruleOf(t, sheet, ".drawer-head"), "display: none;") {
+		t.Error("the drawer header is not hidden where the sidebar is a rail")
+	}
+	if !strings.Contains(mediaBlock(t, sheet, "(max-width: 860px)"), ".drawer-head { display: flex; }") {
+		t.Error("the drawer header does not show at 860px, where the drawer exists")
+	}
+}
+
 // mediaBlock returns the body of the first @media rule with this query, braces
 // balanced, so an assertion is about that breakpoint and no other.
 func mediaBlock(t *testing.T, sheet, query string) string {

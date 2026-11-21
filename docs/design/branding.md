@@ -60,7 +60,9 @@ On a phone the header holds the brand and three controls: the graph, search and
 the theme toggle, each a 44px target. The width toggle hides at 860px and below,
 where the layout is already one column, and at 620px and below the bundle
 download moves into the drawer as a labelled row. The graph view has no drawer,
-so it keeps the download and hides its own graph control instead.
+so it keeps the download and hides its own graph control instead. The drawer
+opens with a header of its own: the brand, linking home, and a close button,
+which takes focus when the drawer opens.
 
 ## The template contract
 
