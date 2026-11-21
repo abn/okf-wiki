@@ -333,6 +333,19 @@ func TestDrawerHasAHeaderWithAClose(t *testing.T) {
 	}
 }
 
+// TestLoneDownloadIsALink covers the meta row with no type chip and no tags:
+// the download drops its pill there and keeps a 44px touch target on a phone.
+func TestLoneDownloadIsALink(t *testing.T) {
+	_, sheet := a11yBundle(t)
+	lone := ".prose .page-meta:not(:has(.chip, .tag-link)) a.page-download"
+	if rule := ruleOf(t, sheet, lone); !strings.Contains(rule, "border: 0;") || !strings.Contains(rule, "margin-left: 0;") {
+		t.Errorf("the lone download keeps its pill or its push to the end: %s", rule)
+	}
+	if !strings.Contains(mediaBlock(t, sheet, "(max-width: 620px)"), lone+" { min-height: 44px; }") {
+		t.Error("the lone download link has no 44px touch target on a phone")
+	}
+}
+
 // mediaBlock returns the body of the first @media rule with this query, braces
 // balanced, so an assertion is about that breakpoint and no other.
 func mediaBlock(t *testing.T, sheet, query string) string {

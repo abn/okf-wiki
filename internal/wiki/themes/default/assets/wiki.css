@@ -419,6 +419,16 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 }
 .prose a.page-download:hover { color: var(--color-accent-text); border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
 .page-download-icon { flex-shrink: 0; }
+/* With no type chip and no tags the download stands alone, and a pill at the
+   far end of an empty row reads as a hole with a button in it. It becomes a
+   plain text link at the start instead, pulled up under the lead. */
+.page-meta:not(:has(.chip, .tag-link)) { margin: calc(var(--space-1) * -1) 0 var(--space-5); }
+.prose .page-meta:not(:has(.chip, .tag-link)) a.page-download {
+  margin-left: 0; padding: 0; border: 0; background: transparent; min-height: 24px;
+}
+.prose .page-meta:not(:has(.chip, .tag-link)) a.page-download:hover {
+  background: transparent; text-decoration: underline; text-underline-offset: 3px;
+}
 /* Tags in the page head are raw text, not pills: the type chip already
    carries the pill, so the tags read as trailing metadata. Scoped under
    .prose to outrank the prose link style, like the chip links. */
@@ -1468,6 +1478,8 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
      graph control yields instead. */
   .site-header.has-bundle.graph-page .graph-btn { display: none; }
   .site-header.has-bundle.graph-page .bundle-btn { display: inline-flex; }
+  /* Without its pill the lone download link still needs a 44px touch target. */
+  .prose .page-meta:not(:has(.chip, .tag-link)) a.page-download { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -328,7 +328,9 @@ every case on one page.
 
 Every page carries its own Markdown as a file beside its HTML, the source the
 render read, and links to it from a Download Markdown control under the title.
-A synthetic page, such as a tag listing, has no source and no control.
+On a page with a type or tags it is a pill at the end of that row; on a page
+with neither it is a plain text link at the start, under the lead. A synthetic
+page, such as a tag listing, has no source and no control.
 
 Printing drops to one column and hides what is a control or a jump: the header,
 the sidebar, the table of contents, the previous and next cards, the diagram
