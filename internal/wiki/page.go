@@ -23,6 +23,9 @@ type shellData struct {
 	// TitleHTML is trusted H1 markup replacing Title when set. Ordinary
 	// pages never set it; their title stays escaped text.
 	TitleHTML template.HTML
+	// TitleLong is true when the title runs past titleLongMin runes, so a
+	// theme can set it a display step smaller.
+	TitleLong bool
 	// Description is the page summary for the meta description: the
 	// frontmatter description, else the first body paragraph, else the title.
 	// It is never empty.
@@ -457,6 +460,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		Title:          title,
 		Kicker:         p.Kicker,
 		TitleHTML:      template.HTML(p.TitleHTML),
+		TitleLong:      utf8.RuneCountInString(title) > titleLongMin,
 		Description:    description,
 		Lead:           lead,
 		Version:        r.Version(),
@@ -1238,6 +1242,11 @@ func stripLeadingH1(body, title string) string {
 	}
 	return body
 }
+
+// titleLongMin is the title length, in runes, past which a page sets
+// TitleLong. At the full display size a longer title wraps to three lines on a
+// desktop.
+const titleLongMin = 40
 
 // metaDescriptionMax is where a meta description drawn from the body is cut,
 // in runes. Search engines truncate a snippet at about this length.

@@ -67,6 +67,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.Lead}}` | the paragraph under the title: the frontmatter description, empty when there is none or when it repeats the title |
 | `{{.Kicker}}` | an eyebrow label above the title, empty on ordinary pages |
 | `{{.TitleHTML}}` | trusted H1 markup replacing the title when set, today only on synthetic pages |
+| `{{.TitleLong}}` | true when the title runs past 40 characters, so the default sets the heading one display size smaller with `title-long` |
 | `{{.Body}}` `{{.TOC}}` `{{.Meta}}` `{{.Nav}}` `{{.Breadcrumb}}` | the rendered document, already trusted HTML |
 | `{{.TopNav}}` | the header's links in configured order, empty when none are set |
 | `{{.TopNavInternal}}` `{{.TopNavExternal}}` | the same links split by kind, for the drawer |

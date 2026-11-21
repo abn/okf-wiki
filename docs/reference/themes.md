@@ -88,7 +88,7 @@ These are the keys the default theme publishes, and the ones worth replacing:
 
 | Key | Role |
 | :--- | :--- |
-| `tokens.css` | design tokens. The cheapest thing to override, and usually the only thing a recolour needs. |
+| `tokens.css` | design tokens. The cheapest thing to override, and usually the only thing a recolour needs. A long page title uses `--text-h1-long`, a display step below `--text-h1`, and falls back to `--text-h1` when a replaced copy lacks it. |
 | `wiki.css` | layout and prose, bound to the class-name contract. |
 | `fonts.css` | `@font-face` declarations, pointing at `fonts/`. |
 | `fonts/` | the font files themselves. |
@@ -206,9 +206,10 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `aria-current="true"`, so a screen reader announces the position the class
   only paints, the way the tag page's current chip already does.
 - `.breadcrumb`, `.crumb-sep`, `.crumb-cur`
-- `.prose`, `.page-lead`, `.page-meta`, `.chip`, `.chip-type`, `.tag-link`,
-  `.source-ref` on a citation that resolves to a sources entry, and
-  `.page-download` on the per-page Markdown download
+- `.prose`, `h1.title-long` on a title past 40 characters, `.page-lead`,
+  `.page-meta`, `.chip`, `.chip-type`, `.tag-link`, `.source-ref` on a citation
+  that resolves to a sources entry, and `.page-download` on the per-page
+  Markdown download
 - Tag pages: `.kicker`, `.tag-hash`, `.tag-often`, `.tag-all-link`,
   `.tag-controls`, `.seg` with `aria-pressed` buttons, `.tag-check`,
   `.tag-group`, `.tag-row` with `.tag-row-head`, `.tag-badges` and

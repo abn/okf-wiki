@@ -132,6 +132,7 @@
   --text-h3: 1.25rem;      /* 20 */
   --text-h2: 1.5rem;       /* 24 / 29 */
   --text-h1: clamp(2.25rem, 1.5rem + 2.4vw, 3rem); /* 36 → 48 */
+  --text-h1-long: clamp(1.625rem, 1.2rem + 1.4vw, 2.25rem); /* 26 → 36, titles over 40 characters */
 
   --lh-tight: 1.12;
   --lh-snug: 1.25;
