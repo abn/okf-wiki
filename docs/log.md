@@ -23,6 +23,14 @@ An entry page carries:
 - `tags`: `log`, the kind in lower case, and a finer label such as `feature` or
   `fix` where the change has one
 - `status`: `stable`
+- `date`: optional, as `YYYY-MM-DD` or with a time, when the entry should not
+  take its date from its path
+
+An entry's date is its `date` field when it has one, otherwise the date in its
+path. The page shows it after the type, and its cards read Older and Newer: they
+walk every entry in date order across months and years, and skip the month
+indexes. Two entries on the same day order by the time in `date`, then by file
+name. Every other page keeps Previous and Next in section order.
 
 The body carries the detail and links to the pages the change touched. A relative link
 from an entry page climbs three levels, for example `../../../usage/cli.md`.

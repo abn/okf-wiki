@@ -51,12 +51,15 @@ type Page struct {
 	Kicker string
 	// TitleHTML is trusted H1 markup, set only by synthetic pages the
 	// renderer builds itself. Frontmatter titles stay plain strings.
-	TitleHTML    string
-	Type         string
-	Description  string
-	Status       string
-	Tags         []string
-	StaleAfter   string
+	TitleHTML   string
+	Type        string
+	Description string
+	Status      string
+	Tags        []string
+	StaleAfter  string
+	// Date is the frontmatter date as written. Only a log entry reads it; see
+	// logDate.
+	Date         string
 	Sources      []Source
 	GeneratedAt  string
 	Body         string // rendered HTML, H1 still present; RenderPage strips it
@@ -170,6 +173,8 @@ type Renderer struct {
 	neighborCache    map[string]*neighborCacheEntry
 	tagListingsCache []tagListing
 	tagListingsReady bool
+	logEntriesCache  []datedLogEntry
+	logEntriesReady  bool
 }
 
 type neighborCacheEntry struct {
@@ -617,6 +622,7 @@ type frontmatter struct {
 	Status      string   `yaml:"status"`
 	Tags        []string `yaml:"tags"`
 	StaleAfter  string   `yaml:"stale_after"`
+	Date        string   `yaml:"date"`
 	Sources     []Source `yaml:"sources"`
 	Generated   struct {
 		By string `yaml:"by"`
@@ -640,6 +646,7 @@ func (r *Renderer) parsePage(section, slug, file string) (Page, error) {
 		Status:      fm.Status,
 		Tags:        fm.Tags,
 		StaleAfter:  fm.StaleAfter,
+		Date:        fm.Date,
 		Sources:     fm.Sources,
 		GeneratedAt: fm.Generated.At,
 		Title:       fm.Title,
