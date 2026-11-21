@@ -353,8 +353,8 @@ download, one per asset so a link resolves, and then the archive. A deployment
 that wants the whole bundle in one file turns it on and pays that cost
 deliberately.
 
-The header offers it as a download control on every page of a wiki. At the
-narrowest widths the control moves to a labelled row in the navigation drawer,
+The header offers it as a download control on every page of a wiki. On a phone,
+at 620px and below, the control moves to a labelled row in the navigation drawer,
 so the header keeps room for the brand. The graph view has no drawer: a single
 bundle and a root-wiki tree keep the header control there and give up the graph
 button, which is redundant on the page it opens, while the graph view of a

@@ -56,6 +56,12 @@ Set by flag or environment variable, and independent of the theme:
   a phone the links move into the drawer, the in-wiki ones first under "On this
   wiki" and the rest under "Elsewhere".
 
+On a phone the header holds the brand and three controls: the graph, search and
+the theme toggle, each a 44px target. The width toggle hides at 860px and below,
+where the layout is already one column, and at 620px and below the bundle
+download moves into the drawer as a labelled row. The graph view has no drawer,
+so it keeps the download and hides its own graph control instead.
+
 ## The template contract
 
 `template.html` is `html/template` and may rely on any of these fields:

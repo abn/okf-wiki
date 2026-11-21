@@ -158,10 +158,10 @@ with no description.
 `--bundle` is not set, and it is empty on a generated group index and on the
 graph view of a tree whose root is a group. The default theme uses it twice: an
 `.icon-btn.bundle-btn` in the header, and a labelled `.side-download` row in the
-drawer, which replaces the header control below 350px. The graph view has no
-drawer, so it keeps the header control there and hides its own `.graph-btn`
-instead. A template that keeps neither drops the download, while the file stays
-at that URL.
+drawer, which replaces the header control at 620px and below. The graph view
+has no drawer, so it keeps the header control there and hides its own
+`.graph-btn` instead. A template that keeps neither drops the download, while
+the file stays at that URL.
 
 `search.js` adds two nodes inside `#searchResults`: a `p.search-status` with
 `role="status"` and `aria-live="polite"`, clipped out of the layout by the
@@ -228,7 +228,8 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   in-wiki `{{.TopNavInternal}}` first, then `{{.TopNavExternal}}`, each under a
   `.side-links-title`.
 - The full width reading mode: the toggle is `.reading-toggle`, an `.icon-btn`
-  in the header, and the script sets `reading-mode` on the `<html>` element, so
+  in the header, hidden at 860px and below where the layout is one column
+  anyway, and the script sets `reading-mode` on the `<html>` element, so
   a theme that restyles keeps both. In reading mode the article takes the
   columns the sidebars held, the sidebar becomes a drawer reached from
   `.menu-btn`, the contents column hides behind `.toc-btn`, and the top
