@@ -76,6 +76,21 @@ title: Orphan
 ---
 # Orphan
 `)
+	mustMkdir(t, filepath.Join(dir, "logs", "2026", "11"))
+	mustWrite(t, filepath.Join(dir, "logs", "2026", "11", "01-linked.md"), `---
+type: Log Entry
+title: Linked
+---
+# Linked
+`)
+	mustWrite(t, filepath.Join(dir, "logs", "2026", "11", "02-lonely.md"), `---
+type: Log Entry
+title: Lonely
+---
+# Lonely
+
+[Linked](01-linked.md)
+`)
 	return dir
 }
 
@@ -191,13 +206,32 @@ func TestConnectionsAndBacklinks(t *testing.T) {
 	if !strings.Contains(connectionsList(t, home), `href="/wiki/guide/topic.html"`) {
 		t.Error("Home has no backlink to Topic")
 	}
-	if strings.Contains(home, "No pages link here yet.") {
+	if strings.Contains(home, "No other page links here yet.") {
 		t.Error("Home is wrongly reported as an orphan")
 	}
 
+	// An orphan gets one compact line with the graph link and no heading.
 	orphan := readPage(t, filepath.Join(out, "wiki", "orphan.html"))
-	if !strings.Contains(orphan, "No pages link here yet.") {
-		t.Error("the orphan page has no empty-state message")
+	for _, want := range []string{
+		`<section class="connections-compact" aria-label="Connections"><p>No other page links here yet.</p><a class="connections-graph" href="/wiki/graph.html?focus=page%3Aorphan&amp;depth=1"`,
+	} {
+		if !strings.Contains(orphan, want) {
+			t.Errorf("the orphan page is missing %q", want)
+		}
+	}
+	if strings.Contains(orphan, `<h2>Connections</h2>`) {
+		t.Error("the orphan's compact line should carry no heading")
+	}
+
+	// A log entry no one links to drops the panel entirely; one with a
+	// backlink keeps it.
+	lonely := readPage(t, filepath.Join(out, "wiki", "logs", "2026", "11", "02-lonely.html"))
+	if strings.Contains(lonely, `aria-label="Connections"`) {
+		t.Error("an unlinked log entry should carry no Connections section")
+	}
+	linked := readPage(t, filepath.Join(out, "wiki", "logs", "2026", "11", "01-linked.html"))
+	if !strings.Contains(linked, `<section class="connections" aria-label="Connections">`) {
+		t.Error("a linked log entry should keep its Connections panel")
 	}
 
 	tag := readPage(t, filepath.Join(out, "wiki", "tags", "guide.html"))

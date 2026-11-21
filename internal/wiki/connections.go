@@ -128,34 +128,42 @@ func (r *Renderer) buildBacklinks() {
 
 // connectionsHTML is the page's static Connections panel. It lists the pages
 // that link here, once per page, and offers the focused graph around this page.
-// A page no one links to still gets the panel, because the empty state is
-// useful.
+// A page no one links to gets one compact line with the graph link, since the
+// empty state still points at an orphan. A log entry no one links to gets
+// nothing: its Older and Newer cards are how a reader moves on, and the same
+// empty line on every entry would say nothing.
 func (r *Renderer) connectionsHTML(p Page) string {
 	if p.Synthetic {
 		return ""
 	}
 	r.buildBacklinks()
 	sources := r.backlinks[p.Slug]
-	title := pageTitle(p)
+	if len(sources) == 0 && isLogEntry(p) {
+		return ""
+	}
+	graphLink := `<a class="connections-graph" href="` +
+		template.HTMLEscapeString(r.localGraphHref(p)) +
+		`" aria-label="Open the local graph around ` +
+		template.HTMLEscapeString(pageTitle(p)) + `">Local graph</a>`
 
 	var b strings.Builder
+	if len(sources) == 0 {
+		b.WriteString(`<section class="connections-compact" aria-label="Connections">`)
+		b.WriteString(`<p>No other page links here yet.</p>`)
+		b.WriteString(graphLink)
+		b.WriteString(`</section>`)
+		return b.String()
+	}
 	b.WriteString(`<section class="connections" aria-label="Connections">`)
 	b.WriteString(`<div class="connections-head"><h2>Connections</h2>`)
-	b.WriteString(`<a class="connections-graph" href="`)
-	b.WriteString(template.HTMLEscapeString(r.localGraphHref(p)))
-	b.WriteString(`" aria-label="Open the local graph around `)
-	b.WriteString(template.HTMLEscapeString(title))
-	b.WriteString(`">Local graph</a></div>`)
-	if len(sources) == 0 {
-		b.WriteString(`<p class="connections-empty">No pages link here yet.</p>`)
-	} else {
-		b.WriteString(`<h3 class="connections-subtitle">Linked from</h3>`)
-		b.WriteString(`<ul class="connections-list">`)
-		for _, s := range sources {
-			b.WriteString(backlinkSourceHTML(s))
-		}
-		b.WriteString(`</ul>`)
+	b.WriteString(graphLink)
+	b.WriteString(`</div>`)
+	b.WriteString(`<h3 class="connections-subtitle">Linked from</h3>`)
+	b.WriteString(`<ul class="connections-list">`)
+	for _, s := range sources {
+		b.WriteString(backlinkSourceHTML(s))
 	}
+	b.WriteString(`</ul>`)
 	b.WriteString(`</section>`)
 	return b.String()
 }

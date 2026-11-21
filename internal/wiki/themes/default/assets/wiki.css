@@ -748,7 +748,13 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   color: var(--color-text-faint); font-size: var(--text-sm); font-weight: var(--fw-medium);
 }
 .connections-place:hover { color: var(--color-accent-text); }
-.connections-empty { color: var(--color-text-muted); }
+/* A page no one links to: one ruled line with the graph link, no heading. */
+.connections-compact {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  margin-top: var(--space-10); padding-top: var(--space-4); border-top: 1px solid var(--color-line);
+  font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.connections-compact p { margin: 0; }
 
 /* ------------------------------------------------------------ site catalog
    A multi-site group index. The wikis of a group lead as cards; the folders
@@ -1288,6 +1294,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .prevnext-next { text-align: left; }
   .prevnext > :only-child.prevnext-next { grid-column: 1; }
   .prevnext-log .prevnext-next .prevnext-dir { justify-content: flex-start; }
+  .connections-compact .connections-graph { min-height: 44px; }
   /* The design this theme comes from overflows a 320px viewport by 2px. Every
      fixed-width offender here is a padding or a fixed column, so this is the
      reflow guard rather than a second breakpoint. */
