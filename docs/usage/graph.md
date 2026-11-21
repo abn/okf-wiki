@@ -36,6 +36,14 @@ index open the wiki map. The Wiki control switches between the two.
 
 ## Reading it
 
+On a desktop the controls take one row above the drawing: Filter, then Wiki,
+Type, Show and Tags, a **Display** menu holding Sections, Tag hubs and Labels,
+Path between pages, and an **Export** menu at the far right. **Fit** sits on
+the drawing itself, in its top-right corner. At 720px and narrower the row is
+Filter and a **Filters** button, which opens the rest as a two-column panel, so
+the map starts on the first screen; the status line moves under the map. The
+Display and Export menus close on a click outside them or on Escape.
+
 - **Wiki** scopes the view to one wiki. **All wikis** opens the wiki map: one
   node per wiki, sized by its page count and grouped by its top-level
   directory. A tree with only one wiki opens its pages directly. The list groups
@@ -75,7 +83,7 @@ index open the wiki map. The Wiki control switches between the two.
   missing, so it can be removed.
 - Without Sections, a dense catalogue opens on a readable patch around a page
   with a typical number of connections. With Sections on, it opens on the
-  section grid. **Fit view** draws the catalogue as a map, trimming the
+  section grid. **Fit** draws the catalogue as a map, trimming the
   outermost percentile so one stranded page cannot shrink it.
 - **Labels** hides or shows the names. At most 50 names are drawn in one view,
   and one is chosen only where it fits without covering another name or another
@@ -112,10 +120,13 @@ index open the wiki map. The Wiki control switches between the two.
   focus. With the keyboard, tab to the graph, use the arrow keys to move between
   nodes, and press Enter for the details.
 - Drag a node to move it. Scroll to zoom, drag the background to pan, and
-  select **Fit view** or double-click the background to fit the graph again.
+  select **Fit** or double-click the background to fit the graph again. On a
+  touch screen, pinch to zoom and drag to pan; the status line gives the hint
+  that matches the device.
   An edge whose endpoints are both outside the view is not drawn, and an
   overview zoom hides edges unless a node is selected.
-- **Download JSON** saves the same bytes the view loaded as `graph.json`.
+- **Export** holds **Download JSON**, which saves the same bytes the view
+  loaded as `graph.json`, and **Open raw JSON**, which opens the file itself.
 
 The force layout seeds its random tie-breaks from the visible catalogue. The
 same catalogue and view settings produce the same node positions on every

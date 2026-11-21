@@ -1430,13 +1430,29 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
 
 /* ------------------------------------------------------------------- graph */
 /* The view is a utility page, not a reading page: it takes the full column and
-   its controls are pills from the same set as the header. */
+   its controls are pills from the same set as the header. On a desktop they
+   take one row so the map starts high; nothing on the page is a primary
+   action, so no control is filled. */
 .content-graph, .prose-graph { max-width: none; }
 .graph-app { margin-top: var(--space-4); }
+/* Clipped rather than display:none, so a label hidden from sight still names
+   its control. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
 .graph-toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  display: flex; flex-wrap: nowrap; align-items: flex-start; gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
+.graph-search { flex: 0 1 280px; min-width: 0; }
+.graph-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  flex: 1; min-width: 0;
+}
+.graph-filters .graph-field select { max-width: 220px; }
+.graph-filters-btn { display: none; }
 .graph-field {
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
@@ -1448,7 +1464,7 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
   background: var(--color-surface); border: 1px solid var(--color-line-control);
   border-radius: var(--radius-pill); padding: 6px var(--space-3); min-height: 36px;
 }
-.graph-field input[type="search"] { width: min(260px, 50vw); }
+.graph-search input[type="search"] { width: 100%; }
 .graph-path-controls .graph-field { flex: 1 1 220px; min-width: 0; }
 .graph-path-controls .graph-field select { width: 100%; max-width: 100%; }
 .graph-field input[type="search"]:focus-visible, .graph-field select:focus-visible {
@@ -1534,7 +1550,9 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
 }
 .graph-fit[hidden] { display: none; }
 .graph-fit:hover { border-color: var(--color-accent-ring); background: var(--color-accent-soft); }
-.graph-path { margin: 0 0 var(--space-3); }
+.graph-path { margin: 0; }
+/* An open path panel takes a row of its own below the other controls. */
+.graph-path[open] { flex-basis: 100%; order: 10; }
 .graph-path-summary {
   display: inline-flex; align-items: center; gap: var(--space-2);
   list-style: none; cursor: pointer;
@@ -1569,16 +1587,52 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
 .graph-app.has-path .graph-edge.is-path {
   display: block; opacity: .7; stroke-opacity: .7;
 }
-.graph-download {
+/* Display and Export are popovers on a details element; the client closes an
+   open one on an outside click and on Escape. */
+.graph-menu { position: relative; }
+.graph-menu[hidden] { display: none; }
+.graph-export { margin-left: auto; }
+.graph-menu-summary {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  list-style: none; cursor: pointer;
   font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
-  color: var(--color-on-accent); background: var(--color-accent);
-  border: 1px solid var(--color-accent); border-radius: var(--radius-pill);
-  padding: 8px var(--space-4); min-height: 36px; cursor: pointer;
+  color: var(--color-text-muted); background: var(--color-surface);
+  border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  padding: 6px var(--space-3); min-height: 36px;
 }
-.graph-download:hover { background: var(--color-heading); }
-.graph-download:disabled { opacity: .5; cursor: progress; }
-.graph-app .graph-raw { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted); }
-.graph-app .graph-raw:hover { color: var(--color-accent-text); }
+.graph-menu-summary::-webkit-details-marker { display: none; }
+.graph-menu-summary::marker { content: ""; }
+.graph-menu-summary::after {
+  content: ""; width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.graph-menu[open] .graph-menu-summary::after { transform: rotate(-135deg); }
+.graph-menu-summary:hover {
+  color: var(--color-heading); border-color: var(--color-accent-ring);
+  background: var(--color-accent-soft);
+}
+.graph-menu-summary:focus-visible { outline: none; box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring); }
+.graph-menu-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  display: flex; flex-direction: column; gap: 2px; min-width: 200px; padding: var(--space-2);
+  background: var(--color-bg-elevated); border: 1px solid var(--color-line);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.graph-menu-end { left: auto; right: 0; }
+.graph-menu-panel .graph-check { min-height: 36px; padding: 0 var(--space-2); border-radius: var(--radius-sm); }
+.graph-menu-panel .graph-check:hover { background: var(--color-surface-sunken); }
+.graph-menu-item {
+  display: flex; align-items: center; min-height: 36px; padding: 0 var(--space-3);
+  border: 0; border-radius: var(--radius-sm); background: transparent; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-regular);
+  color: var(--color-text); text-align: left; white-space: nowrap;
+}
+.prose a.graph-menu-item { color: var(--color-text); text-decoration: none; }
+.graph-menu-item:hover, .prose a.graph-menu-item:hover {
+  background: var(--color-surface-sunken); color: var(--color-heading);
+}
+.graph-menu-item:disabled { opacity: .5; cursor: progress; }
 .graph-status {
   font-family: var(--font-ui); font-size: var(--text-sm); color: var(--color-text-muted);
   margin: 0 0 var(--space-3);
@@ -1699,6 +1753,12 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
 }
 .graph-canvas svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .graph-canvas svg.is-panning, .graph-canvas svg.is-dragging { cursor: grabbing; }
+/* Fit acts on the drawing, so it sits on the drawing. */
+.graph-canvas-tools {
+  position: absolute; top: var(--space-3); right: var(--space-3); z-index: 2;
+  display: flex; gap: var(--space-2);
+}
+.graph-canvas-tools .graph-fit { box-shadow: var(--shadow-sm); padding: 6px var(--space-4); }
 .graph-section-box {
   fill: none; stroke: var(--color-line); stroke-width: 1;
   stroke-dasharray: 2 5; opacity: .62; pointer-events: none;
@@ -1813,10 +1873,47 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
 .graph-noscript { margin-top: var(--space-3); color: var(--color-text-muted); }
 .graph-btn, .bundle-btn { padding: 0 var(--space-2); text-decoration: none; }
 .graph-btn[aria-current="page"] { color: var(--color-accent-text); background: var(--color-accent-soft); }
+/* On a phone the row is the filter and a Filters button, and everything else
+   waits in a collapsed two-column panel, so the map is on the first screen.
+   The status line drops under the map, ahead of the details and the list. */
 @media (max-width: 720px) {
+  .graph-app { display: flex; flex-direction: column; }
+  .graph-toolbar { order: 1; flex-wrap: wrap; }
+  .graph-app > .graph-main { display: contents; }
+  .graph-canvas { order: 2; }
+  .graph-app > .graph-status { order: 3; margin: var(--space-3) 0 0; }
+  .graph-app > .graph-details { order: 4; }
+  .graph-list { order: 5; margin-top: var(--space-4); }
   .graph-canvas { height: 60vh; }
-  .graph-field { flex: 1 1 100%; }
-  .graph-field input[type="search"] { width: 100%; }
+  .graph-search { flex: 1 1 0; }
+  .graph-search input[type="search"] { min-height: 44px; }
+  .graph-filters-btn {
+    display: inline-flex; align-items: center; gap: var(--space-2); flex: none;
+    min-height: 44px; padding: 0 var(--space-4); cursor: pointer;
+    font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--fw-medium);
+    color: var(--color-heading); background: var(--color-surface);
+    border: 1px solid var(--color-line-control); border-radius: var(--radius-pill);
+  }
+  .graph-filters-btn[aria-expanded="true"] {
+    color: var(--color-accent-text); background: var(--color-current-tint);
+    border-color: var(--color-accent-ring);
+  }
+  .graph-filters {
+    display: none; flex-basis: 100%; gap: var(--space-2); padding: var(--space-3);
+    border: 1px solid var(--color-line); border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+  .graph-filters.is-open { display: grid; grid-template-columns: 1fr 1fr; }
+  .graph-filters .graph-field, .graph-tags, .graph-menu { min-width: 0; }
+  .graph-filters .graph-field select, .graph-tags-summary, .graph-menu-summary, .graph-path-summary {
+    width: 100%; max-width: none; min-height: 44px;
+  }
+  .graph-filters > .graph-field select { flex: 1; min-width: 0; }
+  .graph-menu-panel .graph-check, .graph-menu-item { min-height: 44px; }
+  .graph-export { margin-left: 0; }
+  .graph-path { grid-column: 1 / -1; order: 10; }
+  .graph-path-controls .graph-field { flex: 1 1 100%; }
+  .graph-canvas-tools .graph-fit { min-width: 44px; min-height: 44px; justify-content: center; }
 }
 
 /* ------------------------------------------------------------------- print */
