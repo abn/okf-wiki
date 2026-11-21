@@ -986,9 +986,9 @@ pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white
 /* ---------------------------------------------------------- diagram cards
    A diagram is a card: a toolbar naming the type and carrying the zoom, copy
    and expand affordances, then the drawing in a scroll area. The drawing opens
-   fitted to the card, so its whole shape is visible, and the zoom buttons grow
-   it into the scroll area; the card caps the height so a tall one scrolls
-   rather than taking the page. */
+   at a readable scale, fitted to the card when that keeps its text legible,
+   and a wider one scrolls sideways behind edge fades; the card caps the height
+   so a tall one scrolls rather than taking the page. */
 .mermaid-frame {
   position: relative; margin: var(--space-6) 0;
   border: 1px solid var(--color-line); border-radius: var(--radius-lg);
@@ -1037,8 +1037,40 @@ pre.mermaid-fallback { color: var(--status-danger-text); text-align: left; white
 .mermaid-actions[data-copy="fail"] .mermaid-copy { color: var(--status-danger-text); border-color: var(--status-danger-text); }
 /* The drawing's scroll area. Height is capped so a tall diagram stays a card,
    and it scrolls once a zoomed drawing outgrows it. */
-.mermaid-frame pre.mermaid { margin: 0; max-height: 560px; overflow: auto; }
-.mermaid-frame pre.mermaid svg { display: block; }
+.mermaid-frame pre.mermaid {
+  margin: 0; max-height: 560px; overflow: auto; text-align: left;
+  scrollbar-width: thin; scrollbar-color: var(--color-line-control) transparent;
+}
+/* An overflowing drawing starts at the left, where its flow starts; one that
+   fits stays centred. */
+.mermaid-frame pre.mermaid svg { display: block; margin: 0; }
+.mermaid-frame:not([data-overflow]) pre.mermaid svg { margin: 0 auto; }
+/* Edge fades over the scroll area, below the toolbar, mark drawing hidden past
+   the card edge. The top offset is the toolbar's height, and the bottom
+   leaves the scrollbar clear. */
+.mermaid-frame[data-overflow]::before,
+.mermaid-frame[data-overflow]::after {
+  content: ""; position: absolute; top: 47px; bottom: 12px; width: 48px;
+  pointer-events: none; transition: opacity var(--dur) var(--ease);
+}
+.mermaid-frame[data-overflow]::after {
+  right: 0; background: linear-gradient(to right, transparent, var(--color-surface-sunken) 85%);
+}
+.mermaid-frame[data-overflow]::before {
+  left: 0; z-index: 1; opacity: 0;
+  background: linear-gradient(to left, transparent, var(--color-surface-sunken) 85%);
+}
+.mermaid-frame[data-overflow][data-scrolled]::before { opacity: 1; }
+.mermaid-frame[data-overflow][data-at-end]::after { opacity: 0; }
+/* Expand names itself once the drawing is wider than the card. */
+.mermaid-expand-label { display: none; }
+.mermaid-frame[data-overflow] .mermaid-expand {
+  width: auto; gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-2);
+  border-color: var(--color-line-control); border-radius: var(--radius-pill);
+  color: var(--color-heading); font-family: var(--font-ui); font-size: var(--text-xs);
+  font-weight: var(--fw-medium);
+}
+.mermaid-frame[data-overflow] .mermaid-expand-label { display: inline; }
 /* One type size across every diagram type. Mermaid's sequence renderer writes
    its own font size inline from a snapshot of its defaults, so neither
    themeVariables nor the sequence config block reaches it and its message,
@@ -1329,6 +1361,12 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
   /* Diagram cards run edge to edge on a phone: the reading column's padding
      is dead space around a drawing that wants the width. */
   .mermaid-frame { margin-left: calc(var(--space-4) * -1); margin-right: calc(var(--space-4) * -1); border-radius: 0; border-left: 0; border-right: 0; }
+  .mermaid-toolbar { min-height: 52px; padding: 0 var(--space-1) 0 var(--space-4); }
+  /* Touch zoom happens in the full-screen viewer, where pinch works. */
+  .mermaid-zoom { display: none; }
+  .mermaid-copy, .mermaid-expand { min-width: 44px; height: 44px; }
+  .mermaid-frame[data-overflow] .mermaid-expand { height: 36px; margin: 4px; }
+  .mermaid-frame[data-overflow]::before, .mermaid-frame[data-overflow]::after { top: 53px; }
   .prevnext { grid-template-columns: 1fr; }
   .prevnext-next { text-align: left; }
   .prevnext > :only-child.prevnext-next { grid-column: 1; }
