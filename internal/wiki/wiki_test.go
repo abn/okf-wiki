@@ -3019,6 +3019,63 @@ func TestTOCAsidePlacement(t *testing.T) {
 	}
 }
 
+// TestLeadAndMetaDescription covers the lead under the title and the meta
+// description: the lead is the frontmatter description unless it is missing or
+// repeats the title, and the meta description falls back to the first body
+// paragraph, cut at a word boundary, before it falls back to the title.
+func TestLeadAndMetaDescription(t *testing.T) {
+	dir := t.TempDir()
+	long := strings.Repeat("Several words of body text ", 10)
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n\nFirst <em>real</em> paragraph &amp; more.\n\nSecond.\n")
+	mustWrite(t, filepath.Join(dir, "same.md"), "---\ntitle: Same\ndescription: \" same \"\n---\n# Same\n\n"+long+"\n")
+	mustWrite(t, filepath.Join(dir, "own.md"), "---\ntitle: Own\ndescription: A summary of its own.\n---\n# Own\n\nBody.\n")
+	mustWrite(t, filepath.Join(dir, "empty.md"), "---\ntitle: Empty\n---\n# Empty\n\n- a list, no paragraph\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(out, "wiki", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	cases := []struct {
+		page, meta, lead string
+	}{
+		{"index.html", `<meta name="description" content="First real paragraph &amp; more.">`, ""},
+		{"own.html", `<meta name="description" content="A summary of its own.">`, `<p class="page-lead">A summary of its own.</p>`},
+		{"empty.html", `<meta name="description" content="Empty">`, ""},
+	}
+	for _, c := range cases {
+		html := read(c.page)
+		if !strings.Contains(html, c.meta) {
+			t.Errorf("%s: missing %s", c.page, c.meta)
+		}
+		if c.lead == "" && strings.Contains(html, `class="page-lead"`) {
+			t.Errorf("%s: carries a lead it should not", c.page)
+		}
+		if c.lead != "" && !strings.Contains(html, c.lead) {
+			t.Errorf("%s: missing lead %s", c.page, c.lead)
+		}
+	}
+	same := read("same.html")
+	if strings.Contains(same, `class="page-lead"`) {
+		t.Error("a description equal to the title still renders as the lead")
+	}
+	if !strings.Contains(same, `<meta name="description" content="same">`) {
+		t.Error("a description equal to the title should still be the meta description")
+	}
+	if got := firstParagraphText("<p>"+long+"</p>", metaDescriptionMax); utf8.RuneCountInString(got) > metaDescriptionMax || !strings.HasSuffix(got, "…") || !strings.HasPrefix(long, strings.TrimSuffix(got, "…")+" ") {
+		t.Errorf("long paragraph not cut at a word boundary within the limit: %q", got)
+	}
+}
+
 // TestSourceFootnotes covers the sources family: a footnote whose label
 // matches a sources[].id becomes a numbered link to the generated section,
 // the section lists title, host, author and date, and an unmatched footnote

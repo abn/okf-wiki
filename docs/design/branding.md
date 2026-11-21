@@ -62,7 +62,9 @@ Set by flag or environment variable, and independent of the theme:
 
 | Field | What it holds |
 | :--- | :--- |
-| `{{.Title}}` `{{.Description}}` | the page title and lead |
+| `{{.Title}}` | the page title |
+| `{{.Description}}` | the page summary for the meta description: the frontmatter description, else the first body paragraph cut to 160 characters, else the title; never empty |
+| `{{.Lead}}` | the paragraph under the title: the frontmatter description, empty when there is none or when it repeats the title |
 | `{{.Kicker}}` | an eyebrow label above the title, empty on ordinary pages |
 | `{{.TitleHTML}}` | trusted H1 markup replacing the title when set, today only on synthetic pages |
 | `{{.Body}}` `{{.TOC}}` `{{.Meta}}` `{{.Nav}}` `{{.Breadcrumb}}` | the rendered document, already trusted HTML |

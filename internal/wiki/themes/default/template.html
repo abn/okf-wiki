@@ -97,7 +97,7 @@
     <article class="prose{{if .GraphPage}} prose-graph{{end}}">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}
       <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
-      {{if .Description}}<p class="page-lead">{{.Description}}</p>{{end}}
+      {{if .Lead}}<p class="page-lead">{{.Lead}}</p>{{end}}
       {{.Meta}}
       {{.Body}}
       {{.Connections}}
