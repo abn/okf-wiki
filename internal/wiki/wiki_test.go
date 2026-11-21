@@ -3272,9 +3272,21 @@ func TestDiagramCardContract(t *testing.T) {
 	if !strings.Contains(client, "Math.min(fit, 1.25)") {
 		t.Error("the lightbox does not fit a diagram larger than the stage")
 	}
-	// The card opens fitted to its box, and steps the scale from there.
-	if !strings.Contains(client, "cardFitScale") {
-		t.Error("the card has no fit-to-box scale")
+	// The card opens at the larger of its fit scale and a legible floor, never
+	// past natural size, and the percentage switches between that and the fit.
+	for _, want := range []string{
+		"cardFitScale", "var LEGIBLE = 0.85", "Math.min(1, Math.max(z.fit, LEGIBLE))",
+		"Back to readable size", "Fit the whole diagram", "mermaid-expand-label",
+	} {
+		if !strings.Contains(client, want) {
+			t.Errorf("diagrams.js does not contain %q", want)
+		}
+	}
+	// The edge fades and the Expand label read these from the frame.
+	for _, want := range []string{"'data-overflow'", "'data-scrolled'", "'data-at-end'"} {
+		if !strings.Contains(client, want) {
+			t.Errorf("diagrams.js does not set %s", want)
+		}
 	}
 	// Clicking outside must close, and a drag must not.
 	if !strings.Contains(client, "downAt") {
@@ -3292,6 +3304,9 @@ func TestDiagramCardContract(t *testing.T) {
 		".mermaid-toolbar {",
 		".mermaid-error {",
 		"max-height: 560px",
+		".mermaid-frame[data-overflow]::after",
+		".mermaid-frame[data-overflow][data-scrolled]::before",
+		".mermaid-frame[data-overflow] .mermaid-expand-label",
 	} {
 		if !strings.Contains(sheet, want) {
 			t.Errorf("wiki.css does not contain %q", want)

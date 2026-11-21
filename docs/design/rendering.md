@@ -83,9 +83,16 @@ flowchart LR
 
    The browser draws each diagram into a card: a toolbar naming the type, a
    zoom group and the copy and expand affordances, then the drawing. Every
-   type renders at one size, and a diagram opens fitted to the card, so its
-   whole shape is visible; the zoom buttons step the scale and the card's
-   scroll area takes over. Full screen repeats the drawing, fitted to the
+   type renders at one size. A diagram opens fitted to the card when that keeps
+   it at 85% of its natural size or more, so 14px labels never draw below about
+   12px; a wider one opens at 85%, left-aligned, and scrolls sideways, with a
+   fade at each edge that hides more drawing and an Expand label on the full
+   screen button. The percentage button switches between that readable start
+   and the whole drawing fitted to the card, and the zoom buttons step the
+   scale. On a phone the zoom buttons are left out, since pinch zoom lives in
+   full screen, and copy and expand grow to 44px targets. A card still at its
+   start scale is restarted when the window resizes; one the reader zoomed
+   stays where they left it. Full screen repeats the drawing, fitted to the
    window, with the same zoom and a drag to pan, and closes on Escape or a
    click on the field around it. A diagram that will not parse becomes a red
    card carrying the parser's message and the source, so the mistake is

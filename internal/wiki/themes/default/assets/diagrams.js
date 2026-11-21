@@ -510,8 +510,9 @@
     var actions = document.createElement('span');
     actions.className = 'mermaid-actions';
 
-    // Zoom lives in the card, not only in the viewer: a diagram taller or wider
-    // than the card opens fitted to it, and these step the scale up or down.
+    // Zoom lives in the card, not only in the viewer: these step the scale up
+    // or down, and the percentage switches between the readable start and the
+    // whole drawing.
     var zoom = document.createElement('span');
     zoom.className = 'mermaid-zoom';
     var out = iconButton('mermaid-zoom-out', 'Zoom out', '<path d="M5 12h14"/>',
@@ -519,11 +520,17 @@
     var pct = document.createElement('button');
     pct.type = 'button';
     pct.className = 'mermaid-zoom-pct';
-    pct.setAttribute('aria-label', 'Fit diagram to the card');
-    pct.title = 'Fit diagram to the card';
+    pct.setAttribute('aria-label', 'Fit the whole diagram');
+    pct.title = 'Fit the whole diagram';
     pct.addEventListener('click', function (e) {
       e.stopPropagation();
-      cardFit(frame);
+      var z = frame.__zoom;
+      if (z && atFit(z) && z.start !== z.fit) {
+        z.scale = z.start;
+        cardApply(frame);
+      } else {
+        cardFit(frame);
+      }
     });
     var zin = iconButton('mermaid-zoom-in', 'Zoom in', '<path d="M12 5v14M5 12h14"/>',
       function () { cardZoom(frame, 1.25); });
@@ -536,9 +543,14 @@
       '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
       '<path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
       function () { copySource(pre, this); }));
-    actions.appendChild(iconButton('mermaid-expand', 'Open diagram in full screen',
+    var expand = iconButton('mermaid-expand', 'Open diagram in full screen',
       '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
-      function () { openLightbox(pre); }));
+      function () { openLightbox(pre); });
+    var expandLabel = document.createElement('span');
+    expandLabel.className = 'mermaid-expand-label';
+    expandLabel.textContent = 'Expand';
+    expand.appendChild(expandLabel);
+    actions.appendChild(expand);
     bar.appendChild(actions);
     frame.insertBefore(bar, pre);
 
@@ -546,8 +558,8 @@
   }
 
   // The card's own zoom, separate from the viewer. The diagram is resized by
-  // setting the SVG's size, so the card's scroll area takes over once a zoomed
-  // diagram outgrows it.
+  // setting the SVG's size, so the card's scroll area takes over once the
+  // drawing outgrows it.
   function naturalSize(svg) {
     var vb = svg && svg.getAttribute('viewBox');
     if (vb) {
@@ -562,8 +574,36 @@
     var svg = frame.querySelector('pre.mermaid svg');
     if (!svg) return;
     var nat = naturalSize(svg);
-    frame.__zoom = { w: nat.w, h: nat.h, scale: 1, fit: 1, pct: pct };
-    cardFit(frame);
+    frame.__zoom = { w: nat.w, h: nat.h, scale: 1, fit: 1, start: 1, pct: pct };
+    frame.querySelector('pre.mermaid').addEventListener('scroll', function () {
+      cardEdges(frame);
+    }, { passive: true });
+    cardStart(frame);
+  }
+
+  // A diagram opens at its fit scale or at this floor, whichever is larger, so
+  // 14px diagram text never renders below about 12px. A wider drawing scrolls.
+  var LEGIBLE = 0.85;
+
+  function atFit(z) { return Math.abs(z.scale - z.fit) < 1e-6; }
+
+  function cardStart(frame) {
+    var z = frame.__zoom;
+    if (!z) return;
+    z.fit = cardFitScale(frame);
+    z.start = Math.min(1, Math.max(z.fit, LEGIBLE));
+    z.scale = z.start;
+    cardApply(frame);
+  }
+
+  // The attributes the stylesheet's edge fades and the Expand label read.
+  function cardEdges(frame) {
+    var pre = frame.querySelector('pre.mermaid');
+    if (!pre) return;
+    if (pre.scrollWidth > pre.clientWidth + 1) frame.setAttribute('data-overflow', 'x');
+    else frame.removeAttribute('data-overflow');
+    frame.toggleAttribute('data-scrolled', pre.scrollLeft > 2);
+    frame.toggleAttribute('data-at-end', pre.scrollLeft + pre.clientWidth >= pre.scrollWidth - 2);
   }
 
   function cardApply(frame) {
@@ -574,6 +614,10 @@
     svg.style.height = (z.h * z.scale) + 'px';
     svg.style.maxWidth = 'none';
     z.pct.textContent = Math.round(z.scale * 100) + '%';
+    var label = atFit(z) && z.start !== z.fit ? 'Back to readable size' : 'Fit the whole diagram';
+    z.pct.setAttribute('aria-label', label);
+    z.pct.title = label;
+    cardEdges(frame);
   }
 
   // The scale at which the whole drawing fits the card, never past natural size.
@@ -605,13 +649,13 @@
     cardApply(frame);
   }
 
-  // A width change re-fits a diagram the reader has not zoomed, and leaves a
-  // zoomed one where they put it.
+  // A width change restarts a diagram still at its start scale, and leaves a
+  // zoomed one where the reader put it.
   function refitCards() {
     document.querySelectorAll('.mermaid-frame').forEach(function (frame) {
       var z = frame.__zoom;
-      if (!z || Math.abs(z.scale - z.fit) > 1e-6) return;
-      cardFit(frame);
+      if (!z || Math.abs(z.scale - z.start) > 1e-6) return;
+      cardStart(frame);
     });
   }
   window.addEventListener('resize', refitCards);
