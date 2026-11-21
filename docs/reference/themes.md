@@ -406,7 +406,9 @@ its wiki and then reads `Tags / #tag`, since it is a page of that wiki; a
 single-bundle tag page is still `Docs / Tags / #tag`. A section without an
 `index.md` is a plain `span` in both trails, as it already is in the rail. Every
 segment uses `.crumb-sep` and `.crumb-cur`, so a theme that styles the
-single-bundle breadcrumb styles the tree one too.
+single-bundle breadcrumb styles the tree one too. When a trail is wider than
+the bar, the default shortens `.crumb-cur` with an ellipsis and keeps the links
+before it whole.
 
 ## Provenance
 
