@@ -22,11 +22,17 @@
   var searchContentPromise = null;
   var selectedIndex = -1;
   var currentResults = [];
-  // currentGroups is null for a flat list (a single bundle, or a tag search) and
-  // otherwise one entry per wiki: { site, count }. currentResults stays the flat
+  // currentGroups is null for a flat list (a tag search, or a single bundle whose
+  // hits are all pages or all log entries) and otherwise one entry per group:
+  // { label, count, site, more }. A tree groups by wiki and sets site; a single
+  // bundle groups its pages ahead of its change log, and more counts the log
+  // hits past the cap. currentResults stays the flat
   // list the keyboard walks, so ArrowUp/ArrowDown/Enter are unaffected by the
   // grouping.
   var currentGroups = null;
+  // logTagHref is the tag page listing the change log, empty when the bundle
+  // has none, so a capped change log group links its remainder there.
+  var logTagHref = '';
   // contentRefresh is set while the background texts re-run the search, and
   // refreshSelection is the url of the row selected when the refresh started,
   // so the same row is selected again after the render rather than the list
@@ -82,6 +88,9 @@
       var entry = entries[i];
       var page = pages[entry.g] || {};
       var url = page.u || '';
+      // An index written before log entries were flagged still names them by
+      // their dated path, which carries the date as well.
+      var logPath = page.l ? null : LOG_PATH.exec(url);
       out[i] = {
         u: entry.a ? url + '#' + entry.a : url,
         p: url,
@@ -93,10 +102,26 @@
         // this entry in place when it does.
         c: '',
         w: page.w,
-        k: page.k
+        k: page.k,
+        l: page.l || logPath ? 1 : 0,
+        dt: page.dt || (logPath ? logPath[1] + '-' + logPath[2] + '-' + logPath[3] : '')
       };
     }
     return out;
+  }
+
+  var LOG_PATH = /(?:^|\/)logs\/(\d{4})\/(\d{2})\/(\d{2})-[^\/]+\.html$/;
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // logDateLabel writes an ISO date the way the page writes it in a log
+  // entry's cards: "1 Nov 2026" in English, and the ISO date in any other
+  // language, since the renderer carries no locale data either.
+  function logDateLabel(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!m) return '';
+    var lang = (document.documentElement.lang || 'en').toLowerCase();
+    if (lang !== 'en' && lang.indexOf('en-') !== 0) return iso;
+    return (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1];
   }
 
   // buildLowerIndex mirrors the index with the three small match fields already
@@ -150,6 +175,7 @@
   function useIndex(data) {
     searchIndex = expandIndex(data);
     searchIndexLower = buildLowerIndex(searchIndex);
+    logTagHref = data && data.logTag ? searchBase + data.logTag : '';
     // The light index is searchable now; the texts load behind it.
     fetchContent();
     return searchIndex;
@@ -481,22 +507,25 @@
     renderResults([tagQuery], '#' + tagQuery);
   }
 
+  // quickLinksHTML is the row of section pills shared by the opening state and
+  // the empty result.
+  function quickLinksHTML() {
+    var links = (window.__WIKI_QUICK || []).slice(0, 6);
+    if (!links.length) return '';
+    var html = '<div class="search-quick-links"><span>Jump to:</span>';
+    for (var i = 0; i < links.length; i++) {
+      html += '<a href="' + escapeHTML(links[i].href) + '">' + escapeHTML(links[i].label) + '</a>';
+    }
+    return html + '</div>';
+  }
+
   function renderInitialState() {
     currentGroups = null;
     if (graphBtn) graphBtn.hidden = true;
-    var links = (window.__WIKI_QUICK || []).slice(0, 6);
-    var html = '<div class="search-empty-state">' +
+    resultsHost.innerHTML = '<div class="search-empty-state">' +
       '<p>Type a search term, or jump to a section.</p>' +
-      '<p class="search-empty-hint">Prefix with # to search tags only.</p>';
-    if (links.length) {
-      html += '<div class="search-quick-links"><span>Jump to:</span>';
-      for (var i = 0; i < links.length; i++) {
-        html += '<a href="' + escapeHTML(links[i].href) + '">' + escapeHTML(links[i].label) + '</a>';
-      }
-      html += '</div>';
-    }
-    html += '</div>';
-    resultsHost.innerHTML = html;
+      '<p class="search-empty-hint">Prefix with # to search tags only.</p>' +
+      quickLinksHTML() + '</div>';
     announce('Type a search term, or jump to a section.');
   }
 
@@ -613,16 +642,32 @@
       currentResults = grouped.rows;
       currentGroups = grouped.groups;
     } else {
-      currentResults = matches.slice(0, MAX_FLAT).map(function (m) { return m.entry; });
+      // Pages answer a question and the log explains its history, so the log
+      // follows the pages in its own capped group rather than competing with
+      // them on score. Either kind alone stays a flat list.
+      var docs = matches.filter(function (m) { return !m.entry.l; });
+      var logs = matches.filter(function (m) { return !!m.entry.l; });
+      var logTake = Math.min(logs.length, docs.length ? MAX_LOGS : MAX_FLAT);
+      var docTake = Math.min(docs.length, MAX_FLAT - logTake);
+      currentResults = docs.slice(0, docTake).concat(logs.slice(0, logTake))
+        .map(function (m) { return m.entry; });
       currentGroups = null;
+      if (docTake && logTake) {
+        currentGroups = [
+          { label: 'Pages', count: docTake },
+          { label: 'Change log', count: logTake, log: true, more: logs.length - logTake }
+        ];
+      }
     }
     renderResults(terms, query);
   }
 
   // Caps: a multi-site result list shows the best few rows of each wiki and
   // stops at a screenful, so one wiki cannot bury every other. A single bundle
-  // keeps the flat list it always had.
+  // shows twelve rows, at most three of them from the change log when pages
+  // match too.
   var MAX_FLAT = 12;
+  var MAX_LOGS = 3;
   var MAX_PER_SITE = 5;
   var MAX_TOTAL = 20;
 
@@ -651,30 +696,40 @@
     var meta = [];
     for (var gi = 0; gi < groups.length && rows.length < MAX_TOTAL; gi++) {
       var grp = groups[gi];
-      var take = Math.min(grp.rows.length, MAX_PER_SITE, MAX_TOTAL - rows.length);
+      // Inside a wiki the change log follows the pages, keeping score order
+      // within each kind, with no nested heading.
+      var ordered = grp.rows.filter(function (e) { return !e.l; })
+        .concat(grp.rows.filter(function (e) { return !!e.l; }));
+      var take = Math.min(ordered.length, MAX_PER_SITE, MAX_TOTAL - rows.length);
       if (take <= 0) break;
-      for (var j = 0; j < take; j++) rows.push(grp.rows[j]);
-      meta.push({ site: grp.site, count: take });
+      for (var j = 0; j < take; j++) rows.push(ordered[j]);
+      meta.push({ label: grp.site, site: grp.site, count: take });
     }
     return { rows: rows, groups: meta };
   }
 
+  var ICON_PAGE = '<svg class="search-result-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+  var ICON_HEADING = '<svg class="search-result-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/></svg>';
+
   // resultItemHTML is one search row. index is its position in the flat,
-  // contiguous result list, which is what the keyboard walks.
+  // contiguous result list, which is what the keyboard walks. The title leads,
+  // and the context line under it names only what the title does not: the
+  // section for a page, the section and page for a heading inside one, and the
+  // date for a log entry.
   function resultItemHTML(item, index, terms) {
     var isSelected = index === selectedIndex;
     var snippet = extractSnippet(item.c, terms);
+    var isHeading = !!(item.t && item.d && item.t !== item.d);
+    var date = item.l ? logDateLabel(item.dt) : '';
+    var context = date
+      ? '<span class="search-result-date">' + escapeHTML(date) + '</span>'
+      : '<span class="search-result-section">' + escapeHTML(item.s) + '</span>' +
+        (isHeading ? '<span class="search-result-sep">/</span><span class="search-result-doc">' + escapeHTML(item.d) + '</span>' : '');
     return '<a href="' + escapeHTML(item.u) + '" id="search-result-' + index + '" class="search-result-item' + (isSelected ? ' selected' : '') + '" role="option" aria-selected="' + isSelected + '" data-index="' + index + '">' +
-      '  <div class="search-result-top">' +
-      '    <span class="search-result-section">' + escapeHTML(item.s) + '</span>' +
-      '    <span class="search-result-sep">/</span>' +
-      '    <span class="search-result-doc">' + escapeHTML(item.d) + '</span>' +
-      '  </div>' +
-      '  <div class="search-result-title">' +
-      '    <svg class="search-result-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
-      '    <span>' + highlight(item.t || item.d, terms) + '</span>' +
-      '  </div>' +
-      (snippet ? '  <div class="search-result-snippet">' + snippet + '</div>' : '') +
+      '<div class="search-result-title">' + (isHeading ? ICON_HEADING : ICON_PAGE) +
+      '<span>' + highlight(item.t || item.d, terms) + '</span></div>' +
+      '<div class="search-result-top">' + context + '</div>' +
+      (snippet ? '<div class="search-result-snippet">' + snippet + '</div>' : '') +
       '</a>';
   }
 
@@ -711,11 +766,14 @@
       text = count === 1 ? '1 result' : count + ' results';
       if (currentGroups) {
         var sites = [];
+        var logCount = 0;
         for (var g = 0; g < currentGroups.length; g++) {
           if (currentGroups[g].site) sites.push(currentGroups[g].site);
+          if (currentGroups[g].log) logCount += currentGroups[g].count;
         }
         if (sites.length === 1) text += ' in ' + sites[0];
         else if (sites.length > 1) text += ' in ' + sites.join(', ');
+        if (logCount) text += ', ' + logCount + ' from the change log';
       }
     }
     announce(text, key);
@@ -727,8 +785,8 @@
       resultsHost.innerHTML =
         '<div class="search-empty-state">' +
         '<p>No results found for "<b>' + escapeHTML(query) + '</b>"</p>' +
-        '<p class="search-empty-hint">Try a host, a command, or a topic.</p>' +
-        '</div>';
+        '<p class="search-empty-hint">Try fewer words, a page title, or # to search tags.</p>' +
+        quickLinksHTML() + '</div>';
       input.removeAttribute('aria-activedescendant');
       if (graphBtn) graphBtn.hidden = true;
       announceResults();
@@ -748,14 +806,23 @@
     }
     var html = '<div class="search-results-list" role="listbox">';
     if (currentGroups) {
-      // A wiki's rows sit in their own role="group", labelled by a heading. The
+      // A group's rows sit in their own role="group", labelled by a heading. The
       // heading is not an option, and the rows keep a flat, contiguous
       // data-index across the groups, so arrow traversal reaches every row.
+      // The overflow count sits outside the label element, so the group is
+      // named by its label alone.
       var flat = 0;
       for (var g = 0; g < currentGroups.length; g++) {
         var grp = currentGroups[g];
+        var more = '';
+        if (grp.more) {
+          var moreText = grp.more + ' more';
+          more = logTagHref
+            ? '<a class="search-group-more" href="' + escapeHTML(logTagHref) + '">' + moreText + '</a>'
+            : '<span class="search-group-more">' + moreText + '</span>';
+        }
         html += '<div class="search-result-group" role="group" aria-labelledby="search-group-' + g + '">';
-        html += '<div class="search-group-heading" id="search-group-' + g + '">' + escapeHTML(grp.site) + '</div>';
+        html += '<div class="search-group-heading"><span id="search-group-' + g + '">' + escapeHTML(grp.label) + '</span>' + more + '</div>';
         for (var k = 0; k < grp.count; k++) {
           html += resultItemHTML(currentResults[flat], flat, terms);
           flat++;

@@ -135,6 +135,18 @@ flowchart LR
    entry's place in the index, so the order is the same in every browser. The
    matching set, the grouping and the caps do not move.
 
+   A page row for a change log entry carries `l: 1` and its date as `dt`, and
+   the index names the `#log` tag page as `logTag` when an entry carries that
+   tag. A single bundle shows up to twelve rows. When both pages and log
+   entries match, the rows come in two groups, Pages and then Change log; the
+   log group holds at most three rows, and its heading counts the rest and links
+   them to the tag page. Scores still order the rows inside each group. When only
+   one kind matches, the list stays flat with no headings. In a tree, a wiki's
+   log entries sort after its pages before the per-wiki cap, with no heading of
+   their own. Each row leads with its title, then a line that names what the
+   title does not: the section for a page, the section and page for a heading
+   inside one, and the date for a log entry.
+
    Tags are collected into `tags.json`, a catalogue of display name, tag page
    URL and page count, which the modal fetches only for hash-prefixed queries.
    In a multi-site tree, each wiki keeps its own index and content file, and
