@@ -346,6 +346,52 @@ func TestLoneDownloadIsALink(t *testing.T) {
 	}
 }
 
+// TestHeaderIconsCarryOneLabel covers the header tooltips: every icon-only
+// control carries a data-tip beside its accessible name and no title, so two
+// labels never stack, and the toggle scripts keep both in step with the state.
+func TestHeaderIconsCarryOneLabel(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: Home\n---\n# Home\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Bundle: true, Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	header := regionOf(t, page, `<header class="site-header`, `</header>`)
+	for _, want := range []string{
+		`aria-label="Knowledge graph" data-tip="Knowledge graph"`,
+		`aria-label="Download the OKF bundle" data-tip="Download bundle (.zip)"`,
+		`aria-label="Switch to dark theme" data-tip="Dark theme"`,
+		`aria-label="Toggle full width reading mode" aria-pressed="false" data-tip="Full width"`,
+	} {
+		if !strings.Contains(header, want) {
+			t.Errorf("the header is missing %s", want)
+		}
+	}
+	if strings.Contains(header, "title=") {
+		t.Error("a header control still carries a title, which stacks a second tooltip")
+	}
+	for _, want := range []string{
+		`toggle.setAttribute('data-tip', target === 'dark' ? 'Dark theme' : 'Light theme');`,
+		`b.setAttribute('data-tip', on ? 'Normal width' : 'Full width');`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("a toggle script does not keep its label in step: %s", want)
+		}
+	}
+	if strings.Contains(page, "setAttribute('title'") {
+		t.Error("a toggle script still writes a title")
+	}
+}
+
 // mediaBlock returns the body of the first @media rule with this query, braces
 // balanced, so an assertion is about that breakpoint and no other.
 func mediaBlock(t *testing.T, sheet, query string) string {

@@ -237,6 +237,12 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   columns the sidebars held, the sidebar becomes a drawer reached from
   `.menu-btn`, the contents column hides behind `.toc-btn`, and the top
   navigation moves into `.side-links`.
+- Header tooltips: each icon-only `.icon-btn` in the header carries its label
+  in `data-tip`, which the default draws as a pill under the button after a
+  300ms hover, or at once on keyboard focus, and never on touch. The controls
+  carry no `title`, so two tooltips never stack. The theme and width toggle
+  scripts rewrite `data-tip` and `aria-label` together as the state changes:
+  Dark theme or Light theme, Full width or Normal width.
 - A multi-site group index: `.site-list` with `.site-item`, `.site-link`,
   `.site-name`, `.site-badge`, `.site-badge-wiki` and `.site-desc` for the wikis
   of a group, then `.site-group` with `.site-group-title` and `.folder-list`,

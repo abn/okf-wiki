@@ -179,6 +179,32 @@ a { color: var(--color-accent-text); text-decoration: none; }
   :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: block; }
 }
 
+/* One label surface for every icon-only header control, in place of a title
+   attribute, which is slow, unstyled and would stack on top of this one. It
+   shows after a short hover, at once on keyboard focus, and never on touch,
+   where the aria-label still names the control. The accent pair inverts in
+   dark, so the pill stays near-black on light and near-white on dark.
+   --tip-x is the horizontal shift: centred under the button, or flush with its
+   right edge for the control at the end of the row, so the label stays on
+   screen. */
+.icon-btn[data-tip] { position: relative; --tip-x: -50%; }
+.icon-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translate(var(--tip-x), -2px);
+  padding: 4px var(--space-2); border-radius: var(--radius-sm);
+  background: var(--color-accent); color: var(--color-on-accent);
+  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
+  line-height: 1.4; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  z-index: var(--z-overlay);
+}
+.nav-cluster > .icon-btn[data-tip]:last-child { --tip-x: 0%; }
+.nav-cluster > .icon-btn[data-tip]:last-child::after { left: auto; right: 0; }
+@media (hover: hover) {
+  .icon-btn[data-tip]:hover::after { opacity: 1; transform: translate(var(--tip-x), 0); transition-delay: 300ms; }
+}
+.icon-btn[data-tip]:focus-visible::after { opacity: 1; transform: translate(var(--tip-x), 0); }
+
 /* ----------------------------------------------------------- breadcrumb bar */
 /* Sticky under the 72px header plus its 1px border; the two are coupled, so a
    header height change moves this top offset with it. */
@@ -1388,6 +1414,10 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
   /* The layout is already one column here, so the width control would change
      nothing. It stays in the DOM for the wider layouts. */
   .reading-toggle { display: none; }
+  /* With the width control gone the theme toggle ends the row, so its label
+     sits flush right like the last control's does on a wide screen. */
+  .theme-toggle[data-tip] { --tip-x: 0%; }
+  .theme-toggle[data-tip]::after { left: auto; right: 0; }
   /* Touch target floor for the header controls, which are icon-only at this width. */
   .icon-btn { min-height: 44px; min-width: 44px; justify-content: center; }
   .search-close-btn {
