@@ -283,6 +283,27 @@ func TestPhoneHeaderHoldsThreeControls(t *testing.T) {
 	}
 }
 
+// TestSearchFooterFollowsThePointer covers the touch footer: the keyboard hints
+// and the ESC chip go on a coarse pointer, not at a width, and the close button
+// shows its text label there instead.
+func TestSearchFooterFollowsThePointer(t *testing.T) {
+	_, sheet := a11yBundle(t)
+	touch := mediaBlock(t, sheet, "(hover: none) and (pointer: coarse)")
+	for _, want := range []string{
+		".search-footer-hint { display: none; }",
+		".search-modal-footer:not(:has(> button:not([hidden]))) { display: none; }",
+		".search-close-btn .kbd-esc { display: none; }",
+		"min-height: 44px",
+	} {
+		if !strings.Contains(touch, want) {
+			t.Errorf("the coarse-pointer block is missing %q", want)
+		}
+	}
+	if strings.Contains(mediaBlock(t, sheet, "(max-width: 620px)"), "search-footer-hint") {
+		t.Error("the keyboard hints are hidden by width, which also hides them in a narrow desktop window")
+	}
+}
+
 // mediaBlock returns the body of the first @media rule with this query, braces
 // balanced, so an assertion is about that breakpoint and no other.
 func mediaBlock(t *testing.T, sheet, query string) string {

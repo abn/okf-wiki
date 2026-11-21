@@ -266,6 +266,11 @@ wiki of each hit or a single bundle's hits are both pages and log entries,
 template's footer carries `#searchGraph` for opening the selected hit in the
 graph; the client leaves it hidden when the result has no graph node.
 
+On a touch device, matched by `(hover: none) and (pointer: coarse)` rather than
+by width, the default drops the keyboard hints from the footer and keeps only its
+actions as 44px pills, hiding the footer when none is shown. The close button
+shows its `.search-close-text` label, "Cancel", in place of the ESC key.
+
 `diagrams.js` wraps each diagram in `mermaid-frame` with a `mermaid-toolbar`
 carrying `mermaid-type`, `mermaid-actions`, the card zoom in `mermaid-zoom`,
 `mermaid-zoom-out`, `mermaid-zoom-in` and `mermaid-zoom-pct`, and the
