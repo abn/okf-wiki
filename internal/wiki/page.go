@@ -628,8 +628,12 @@ func (r *Renderer) pageNeighbors(section, slug string) (prev, next *PageLink) {
 }
 
 // prevNextHTML renders the previous/next cards for a page. Empty when the
-// page has no neighbor on either side.
+// page has no neighbor on either side. A dated log entry walks the change log
+// by date instead of its section.
 func (r *Renderer) prevNextHTML(p Page) string {
+	if older, newer, ok := r.logNeighbors(p); ok {
+		return r.logPrevNextHTML(older, newer)
+	}
 	prev, next := r.pageNeighbors(p.Section, p.Slug)
 	if prev == nil && next == nil {
 		return ""
@@ -648,9 +652,9 @@ func (r *Renderer) prevNextHTML(p Page) string {
 	return b.String()
 }
 
-// buildMeta renders the row under the title: the type and tag chips, and the
-// page's own download link. The type stays a span, since it names the page
-// rather than pointing anywhere. Each tag links to its tag page, which lists
+// buildMeta renders the row under the title: the type chip, a log entry's
+// date, the tag chips, and the page's own download link. The type stays a
+// span, since it names the page rather than pointing anywhere. Each tag links to its tag page, which lists
 // every page carrying it. A tag with no URL form stays a span, so it never
 // points at a page that was never written. A page with neither chips nor a
 // source still renders no row.
@@ -658,6 +662,11 @@ func (r *Renderer) buildMeta(p Page, markdown string) string {
 	var chips []string
 	if p.Type != "" {
 		chips = append(chips, fmt.Sprintf(`<span class="chip chip-type">%s</span>`, template.HTMLEscapeString(p.Type)))
+	}
+	if isLogEntry(p) {
+		if d, ok := logDate(p); ok {
+			chips = append(chips, logTimeHTML("page-date", d, r.cfg.lang(), false))
+		}
 	}
 	for _, t := range p.Tags {
 		name := strings.TrimSpace(t)

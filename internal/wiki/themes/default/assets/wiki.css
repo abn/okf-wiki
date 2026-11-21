@@ -401,6 +401,12 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   color: var(--color-text-muted); text-decoration: none;
 }
 .prose a.tag-link:hover { color: var(--color-accent-text); }
+/* A log entry's date follows the type chip, ruled off from the tags. */
+.page-date {
+  font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums; color: var(--color-text);
+}
+.page-date + .tag-link { padding-left: var(--space-3); border-left: 1px solid var(--color-line-strong); }
 .chip {
   display: inline-flex; align-items: center;
   font-family: var(--font-ui); font-size: var(--text-xs); font-weight: var(--fw-medium);
@@ -668,6 +674,15 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
 .prevnext-title { display: block; font-family: var(--font-ui); font-weight: var(--fw-semibold); color: var(--color-heading); }
 .prevnext-next { text-align: right; }
 .prevnext > :only-child.prevnext-next { grid-column: 2; }
+/* On a log entry the cards are Older and Newer, each carrying its date. */
+.prevnext-log .prevnext-dir {
+  display: flex; align-items: center; gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.prevnext-log .prevnext-next .prevnext-dir { justify-content: flex-end; }
+.prevnext-log time { color: var(--color-text-muted); font-weight: var(--fw-medium); letter-spacing: 0.04em; }
+.prevnext-sep { color: var(--color-text-faint); }
+.prevnext-arrow { flex: none; }
 
 /* --------------------------------------------------------- connections */
 /* The page's own graph context, not part of the prose. The rule separates it
@@ -1272,6 +1287,7 @@ pre.mermaid.mermaid-rendered { cursor: zoom-in; }
   .prevnext { grid-template-columns: 1fr; }
   .prevnext-next { text-align: left; }
   .prevnext > :only-child.prevnext-next { grid-column: 1; }
+  .prevnext-log .prevnext-next .prevnext-dir { justify-content: flex-start; }
   /* The design this theme comes from overflows a 320px viewport by 2px. Every
      fixed-width offender here is a padding or a fixed column, so this is the
      reflow guard rather than a second breakpoint. */
