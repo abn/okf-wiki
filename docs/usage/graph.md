@@ -192,8 +192,11 @@ links, with the number of places when the two differ, and one nested row per
 place. A nested row names the heading its links sit under, or **Top of page**
 above the first heading, and opens the source there. Links under one heading
 share a row. Pages follow the sidebar's section order, then title, and links
-follow document order. A page with no incoming links says so, which is useful
-for finding orphans. The panel is static HTML; it works with JavaScript off.
+follow document order. A page with no incoming links gets one short line in
+place of the panel, "No other page links here yet.", with the Local graph link
+beside it, which is useful for finding orphans. A log entry with no incoming
+links has no Connections section at all, since its Older and Newer cards are
+how a reader moves on. The panel is static HTML; it works with JavaScript off.
 
 The same panel has a **Local graph** link. It opens the graph focused on the
 current page and its direct neighbours. The URL names the node and depth, for
