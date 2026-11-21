@@ -21,6 +21,11 @@ type SearchPage struct {
 	// SiteKey is the wiki's path under the tree root: a stable grouping key,
 	// since the display title can change without the path moving.
 	SiteKey string `json:"k,omitempty"`
+	// Log is 1 on a change log entry, so the client can rank canonical pages
+	// first and group the log after them. Date is that entry's date in ISO
+	// form, which the client shows in place of the section.
+	Log  int    `json:"l,omitempty"`
+	Date string `json:"dt,omitempty"`
 }
 
 // SearchEntry is one search hit: a heading-anchored chunk of a page, or the
@@ -49,6 +54,10 @@ type SearchIndex struct {
 	Base     string        `json:"base,omitempty"`
 	Pages    []SearchPage  `json:"pages"`
 	Entries  []SearchEntry `json:"entries"`
+	// LogTag is the tag page that lists the change log, relative to Base, set
+	// when some log entry carries the log tag. The client links the "N more"
+	// count of a capped change log group there.
+	LogTag string `json:"logTag,omitempty"`
 }
 
 // SearchContent is the companion file to SearchIndex: every entry's text, in
@@ -197,6 +206,9 @@ func cleanSearchText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// logTagSlug is the tag docs/log.md asks every entry to carry.
+const logTagSlug = "log"
+
 // BuildSearchIndex flattens every page into one page-table row and one entry
 // per heading-anchored chunk.
 func (r *Renderer) BuildSearchIndex() SearchIndex {
@@ -207,7 +219,19 @@ func (r *Renderer) BuildSearchIndex() SearchIndex {
 			pageURL := r.urlBase() + p.Slug + ".html"
 			docTitle := pageTitle(p)
 			page := len(index.Pages)
-			index.Pages = append(index.Pages, SearchPage{ID: pageNodeID(p.Slug), URL: pageURL, Title: docTitle})
+			row := SearchPage{ID: pageNodeID(p.Slug), URL: pageURL, Title: docTitle}
+			if isLogEntry(p) {
+				row.Log = 1
+				if d, ok := logDate(p); ok {
+					row.Date = d.Format("2006-01-02")
+				}
+				for _, t := range p.Tags {
+					if slugify(strings.TrimSpace(t)) == logTagSlug {
+						index.LogTag = "tags/" + logTagSlug + ".html"
+					}
+				}
+			}
+			index.Pages = append(index.Pages, row)
 
 			if len(p.searchChunks) == 0 {
 				index.Entries = append(index.Entries, SearchEntry{

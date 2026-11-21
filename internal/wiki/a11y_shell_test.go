@@ -193,8 +193,8 @@ func TestRenderedLabelsSpeakInAuthoredCase(t *testing.T) {
 			t.Errorf("%s no longer carries the transform, so a badge drawn small caps is a third narrower", want)
 		}
 	}
-	if n := strings.Count(sheet, "font-variant-caps"); n != 5 {
-		t.Errorf("the stylesheet carries %d font-variant-caps rules, want the five block labels", n)
+	if n := strings.Count(sheet, "font-variant-caps: all-small-caps"); n != 6 {
+		t.Errorf("the stylesheet carries %d small-caps rules, want the six block labels", n)
 	}
 	if !strings.Contains(page, `>Previous<`) {
 		t.Errorf("the previous card lost its authored label:\n%s", page)
