@@ -184,6 +184,11 @@ func extractRawBlockText(n ast.Node, src []byte, b *strings.Builder) {
 			extractRawBlockText(c, src, b)
 		}
 	case *ast.FencedCodeBlock:
+		// A diagram or chart is drawn, not read, so its source would only
+		// surface in a snippet as markup the page never shows.
+		if lang := string(nn.Language(src)); lang == "mermaid" || lang == chartLang {
+			return
+		}
 		for i := 0; i < nn.Lines().Len(); i++ {
 			line := nn.Lines().At(i)
 			b.Write(line.Value(src))

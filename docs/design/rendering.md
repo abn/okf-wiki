@@ -101,7 +101,10 @@ flowchart LR
    Footnotes whose label matches a `sources[]` id are rewritten into numbered
    citations to a generated Sources section; see [Sources](#sources).
 4. **Index.** Each page is split into heading-anchored text chunks, and the
-   catalogue is written as two files that load at different speeds.
+   catalogue is written as two files that load at different speeds. A chunk's
+   text is the page's prose and code; the source of a Mermaid or Vega-Lite
+   fence is left out, since the page draws it rather than showing it, so it
+   never turns up in a snippet.
    `search-index.json` is a page table plus the entries that refer to it: an
    entry names its page by index and carries the heading, section and anchor,
    so a page's url and titles are stored once however many sections it has. The
