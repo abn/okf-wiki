@@ -212,7 +212,8 @@ Go emits these, so a theme's stylesheet is the only thing that styles them:
   `data-tag-group`, `data-tag-row`, `data-tag-setmode`, `data-tag-dep` and
   `data-tag-dep-note` hooks, so they work without new assets.
 - Content layout: `.toc-aside` with `.toc-aside-title` and `.toc-list`,
-  `.toc-btn` with `.toc-panel`, and `.prevnext` with `.prevnext-card`,
+  `.toc-btn` with `.toc-panel`, present only on a page with two or more
+  level-two headings, and `.prevnext` with `.prevnext-card`,
   `.prevnext-prev`, `.prevnext-next`, `.prevnext-dir` and `.prevnext-title`.
   The header's `{{.TopNav}}` links sit in `.top-nav`, each external one carrying
   `.nav-ext` on its arrow. The drawer repeats them under `.side-links`: the

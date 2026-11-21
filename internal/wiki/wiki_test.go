@@ -2959,13 +2959,14 @@ func TestPrevNextAbsentAlone(t *testing.T) {
 
 // TestTOCAsidePlacement covers the relocated table of contents: the sidebar
 // column and the dropdown panel carry the list, the body carries no
-// collapsible box, and pages without headings carry none of it.
+// collapsible box, and pages with fewer than two headings carry none of it.
 func TestTOCAsidePlacement(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "index.md"), strings.Join([]string{
-		"---", "title: Home", "---", "# Home", "## Second", "### Third", "",
+		"---", "title: Home", "---", "# Home", "## Second", "### Third", "## Fourth", "",
 	}, "\n"))
 	mustWrite(t, filepath.Join(dir, "flat.md"), "---\ntitle: Flat\n---\n# Flat\n\nNo headings here.\n")
+	mustWrite(t, filepath.Join(dir, "single.md"), "---\ntitle: Single\n---\n# Single\n\n## Only\n\nOne heading.\n")
 	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
 	if err != nil {
 		t.Fatal(err)
@@ -2998,20 +2999,22 @@ func TestTOCAsidePlacement(t *testing.T) {
 		t.Error("rendered page still carries the in-body collapsible box")
 	}
 
-	flat, err := os.ReadFile(filepath.Join(out, "wiki", "flat.html"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Element markup, not hook names: the template's inline script mentions
-	// the ids on every page regardless.
-	for _, want := range []string{
-		`<aside class="toc-aside"`,
-		`id="tocBtn"`,
-		`id="tocPanel"`,
-		`<ul class="toc-list">`,
-	} {
-		if strings.Contains(string(flat), want) {
-			t.Errorf("headingless page should carry no TOC markup, found %s", want)
+	for _, name := range []string{"flat.html", "single.html"} {
+		page, err := os.ReadFile(filepath.Join(out, "wiki", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Element markup, not hook names: the template's inline script mentions
+		// the ids on every page regardless.
+		for _, want := range []string{
+			`<aside class="toc-aside"`,
+			`id="tocBtn"`,
+			`id="tocPanel"`,
+			`<ul class="toc-list">`,
+		} {
+			if strings.Contains(string(page), want) {
+				t.Errorf("%s has fewer than two headings and should carry no TOC markup, found %s", name, want)
+			}
 		}
 	}
 }

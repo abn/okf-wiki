@@ -566,9 +566,10 @@ func buildTOC(p Page) string {
 
 // buildTOCList renders the heading entries as a bare list, shared by the
 // sidebar column and the dropdown panel. Both link to the same anchors, so
-// rendering it twice introduces no duplicate ids.
+// rendering it twice introduces no duplicate ids. A single entry only repeats
+// the page's one heading, so it takes two to render a list.
 func buildTOCList(p Page) string {
-	if len(p.TOC) == 0 {
+	if len(p.TOC) < 2 {
 		return ""
 	}
 	var b strings.Builder

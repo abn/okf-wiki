@@ -51,7 +51,9 @@ flowchart LR
    with goldmark (CommonMark plus tables, task lists, footnotes). Heading ids
    are assigned from the heading text and made unique within the page. An on-page
    table of contents collects level two only, though every body heading from
-   level two down still gets an id and a `#` permalink on hover.
+   level two down still gets an id and a `#` permalink on hover. A page with
+   fewer than two such headings gets no table of contents, since one entry would
+   only repeat that heading.
 3. **Transform.** Fenced code is highlighted with Chroma into `pre.code.chroma`,
    with a `language-*` class naming the language. A fence with no language is
    escaped into `pre.code` and left unhighlighted. GitHub alert blockquotes
