@@ -89,6 +89,7 @@ func TestGraphPageIsWritten(t *testing.T) {
 	if strings.Contains(page, `id="graphData"`) {
 		t.Error("graph.html embeds the catalogue without --graph-inline")
 	}
+	assertGraphToolbar(t, page)
 	if strings.Contains(page, `id="sideDrawer"`) {
 		t.Error("the graph page kept a sidebar, so the drawing is not full width")
 	}
@@ -106,6 +107,78 @@ func TestGraphPageIsWritten(t *testing.T) {
 	}
 	if strings.Contains(string(home), `graph.html?site=`) {
 		t.Error("a single bundle scopes its graph to a wiki it does not have")
+	}
+}
+
+// assertGraphToolbar checks the control row's shape: the filter first, then a
+// Filters button and the panel it opens, with the display toggles and the
+// exports in menus and Fit on the canvas rather than in the row.
+func assertGraphToolbar(t *testing.T, page string) {
+	t.Helper()
+	section := func(from, to string) string {
+		i := strings.Index(page, from)
+		if i < 0 {
+			t.Fatalf("graph.html has no %q", from)
+		}
+		j := strings.Index(page[i:], to)
+		if j < 0 {
+			t.Fatalf("graph.html has no %q after %q", to, from)
+		}
+		return page[i : i+j]
+	}
+	toolbar := section(`<div class="graph-toolbar"`, `<p class="graph-status"`)
+	filters := section(`<div class="graph-filters" id="graphFilters">`, `<p class="graph-status"`)
+	display := section(`<details class="graph-menu" id="graphDisplay">`, `</details>`)
+	export := section(`<details class="graph-menu graph-export">`, `</details>`)
+	canvas := section(`<div class="graph-canvas">`, `<aside class="graph-list"`)
+
+	order := []string{`id="graphFilter"`, `id="graphFiltersBtn"`, `id="graphFilters"`}
+	at := -1
+	for _, want := range order {
+		i := strings.Index(toolbar, want)
+		if i <= at {
+			t.Errorf("the toolbar does not carry %s in order %v", want, order)
+		}
+		at = i
+	}
+	if !strings.Contains(toolbar, `aria-controls="graphFilters"`) || !strings.Contains(toolbar, `aria-expanded="false"`) {
+		t.Error("the Filters button does not control the collapsed panel")
+	}
+	for _, want := range []string{`id="graphSiteField"`, `id="graphTypeField"`, `id="graphKindField"`, `id="graphTags"`, `id="graphPath"`} {
+		if !strings.Contains(filters, want) {
+			t.Errorf("the filters panel is missing %s", want)
+		}
+	}
+	for _, want := range []string{`id="graphSectionsField"`, `id="graphTagHubsField"`, `id="graphLabelsField"`} {
+		if !strings.Contains(display, want) {
+			t.Errorf("the Display menu is missing %s", want)
+		}
+	}
+	for _, want := range []string{`class="graph-menu-item" id="graphDownload"`, `class="graph-menu-item graph-raw"`} {
+		if !strings.Contains(export, want) {
+			t.Errorf("the Export menu is missing %s", want)
+		}
+	}
+	for _, want := range []string{`class="graph-canvas-tools"`, `id="graphFit"`, `id="graphClearFocus"`} {
+		if !strings.Contains(canvas, want) {
+			t.Errorf("the canvas is missing %s", want)
+		}
+	}
+	if strings.Contains(toolbar, `id="graphFit"`) {
+		t.Error("Fit is still in the control row")
+	}
+	// A hidden label still names its control.
+	for _, want := range []string{
+		`<span class="graph-field-label visually-hidden">Filter</span>`,
+		`<span class="graph-field-label visually-hidden">Type</span>`,
+		`<span class="graph-field-label visually-hidden">Show</span>`,
+	} {
+		if !strings.Contains(toolbar, want) {
+			t.Errorf("the toolbar is missing %s", want)
+		}
+	}
+	if strings.Contains(page, `class="graph-download"`) {
+		t.Error("the download is still a filled button")
 	}
 }
 
@@ -177,6 +250,38 @@ func TestGraphViewStateContract(t *testing.T) {
 		if !strings.Contains(js, want) {
 			t.Errorf("graph.js is missing %q", want)
 		}
+	}
+}
+
+// TestGraphViewControlsContract pins the client side of the compact control
+// row: the Filters toggle, menus that close on an outside click and on
+// Escape, and a hint that follows the input device rather than the width.
+func TestGraphViewControlsContract(t *testing.T) {
+	th, err := ResolveTheme("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var js string
+	for _, f := range th.files {
+		if f.Path == "graph.js" {
+			js = string(f.Data)
+		}
+	}
+	for _, want := range []string{
+		"getElementById('graphFiltersBtn')",
+		"getElementById('graphDisplay')",
+		"filtersBtn.setAttribute('aria-expanded'",
+		"details.graph-menu[open]",
+		"(hover: none) and (pointer: coarse)",
+		"Pinch to zoom, drag to pan.",
+		"Scroll to zoom, drag the background to pan.",
+	} {
+		if !strings.Contains(js, want) {
+			t.Errorf("graph.js is missing %q", want)
+		}
+	}
+	if strings.Contains(js, "select Fit view") {
+		t.Error("the hint still points at a Fit view control in the row")
 	}
 }
 

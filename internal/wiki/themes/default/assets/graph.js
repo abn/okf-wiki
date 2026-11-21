@@ -48,6 +48,9 @@
   var sectionsField = document.getElementById('graphSectionsField');
   var tagHubsField = document.getElementById('graphTagHubsField');
   var labelsField = document.getElementById('graphLabelsField');
+  var displayMenu = document.getElementById('graphDisplay');
+  var filtersBtn = document.getElementById('graphFiltersBtn');
+  var filtersPanel = document.getElementById('graphFilters');
   var pathBox = document.getElementById('graphPath');
   var sectionsCheck = document.getElementById('graphSections');
   var tagHubsCheck = document.getElementById('graphTagHubs');
@@ -543,6 +546,7 @@
     if (sectionsField) sectionsField.hidden = map;
     if (tagHubsField) tagHubsField.hidden = map;
     if (labelsField) labelsField.hidden = map;
+    if (displayMenu) displayMenu.hidden = map;
     if (typeField) typeField.hidden = map || !state.hasTypeControl;
     if (tagsDetails) tagsDetails.hidden = map;
     if (pathBox) pathBox.hidden = map;
@@ -2622,7 +2626,9 @@
     } else if (state.overview && total > LOCAL_VIEW_NODES) {
       text += ' Overview zoom. Select a node or zoom in for its neighbourhood.';
     } else {
-      text += ' Scroll to zoom, drag the background to pan, or select Fit view.';
+      text += coarsePointer()
+        ? ' Pinch to zoom, drag to pan.'
+        : ' Scroll to zoom, drag the background to pan.';
     }
     if (labels.checked && !pagesMayLabel() && hasOrdinaryPages()) {
       text += ' Labels show hubs; zoom in for page names.';
@@ -3301,6 +3307,31 @@
     });
   }
 
+  // The hint follows the input device rather than the width, since a narrow
+  // desktop window still has a wheel.
+  function coarsePointer() {
+    return !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  }
+
+  // At phone width the filters collapse behind one button; the stylesheet
+  // shows the panel only while it carries is-open.
+  if (filtersBtn && filtersPanel) {
+    filtersBtn.addEventListener('click', function () {
+      var open = !filtersPanel.classList.contains('is-open');
+      filtersPanel.classList.toggle('is-open', open);
+      filtersBtn.setAttribute('aria-expanded', String(open));
+    });
+  }
+
+  function openMenus() {
+    return Array.prototype.slice.call(document.querySelectorAll('details.graph-menu[open]'));
+  }
+  document.addEventListener('click', function (ev) {
+    openMenus().forEach(function (menu) {
+      if (!menu.contains(ev.target)) menu.open = false;
+    });
+  });
+
   download.addEventListener('click', function () {
     if (!state.raw) return;
     var blob = new Blob([state.raw], { type: 'application/json' });
@@ -3417,6 +3448,13 @@
   svg.addEventListener('pointercancel', endPointer);
 
   document.addEventListener('keydown', function (ev) {
+    var menus = ev.key === 'Escape' ? openMenus() : [];
+    if (menus.length) {
+      ev.preventDefault();
+      menus.forEach(function (menu) { menu.open = false; });
+      menus[0].querySelector('summary').focus();
+      return;
+    }
     if (ev.key === 'Escape' && tagsDetails && tagsDetails.open) {
       ev.preventDefault();
       tagsDetails.open = false;

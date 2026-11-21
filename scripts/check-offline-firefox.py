@@ -255,6 +255,17 @@ def graph_positions(driver):
     )
 
 
+def display_toggle(driver, control_id):
+    """Flip a checkbox in the graph's Display menu, opening and closing it the
+    way a reader does, since a closed menu's controls cannot be clicked."""
+    menu = driver.find_element(By.ID, "graphDisplay")
+    summary = menu.find_element(By.TAG_NAME, "summary")
+    if menu.get_attribute("open") is None:
+        summary.click()
+    driver.find_element(By.ID, control_id).click()
+    summary.click()
+
+
 def check_page(driver, url, contain=None):
     driver.get(url)
     if contain:
@@ -478,7 +489,34 @@ def main():
             "return document.documentElement.clientWidth;"
         )
         must(menu_right <= viewport + 1, "the tag menu overflowed the tablet viewport")
+
+        driver.set_window_size(600, 1000)
+        check_page(driver, base + "graph.html", ".graph-node-group")
+        filters_btn = driver.find_element(By.ID, "graphFiltersBtn")
+        must(filters_btn.is_displayed(), "the Filters button is hidden at phone width")
+        must(
+            not driver.find_element(By.ID, "graphKind").is_displayed(),
+            "the filters panel is open before the Filters button is pressed",
+        )
+        filters_btn.click()
+        must(
+            driver.find_element(By.ID, "graphKind").is_displayed()
+            and filters_btn.get_attribute("aria-expanded") == "true",
+            "the Filters button did not open the panel",
+        )
         driver.set_window_size(1440, 1000)
+
+        check_page(driver, base + "graph.html", ".graph-node-group")
+        export = driver.find_element(By.CSS_SELECTOR, "details.graph-export")
+        export.find_element(By.TAG_NAME, "summary").click()
+        must(driver.find_element(By.ID, "graphDownload").is_displayed(), "the Export menu did not open")
+        driver.find_element(By.TAG_NAME, "h1").click()
+        must(export.get_attribute("open") is None, "an outside click left the Export menu open")
+        display = driver.find_element(By.ID, "graphDisplay")
+        display.find_element(By.TAG_NAME, "summary").click()
+        must(driver.find_element(By.ID, "graphLabels").is_displayed(), "the Display menu did not open")
+        driver.switch_to.active_element.send_keys(Keys.ESCAPE)
+        must(display.get_attribute("open") is None, "Escape left the Display menu open")
 
         check_page(driver, base + "graph.html", ".graph-list-node")
         wait_layout(driver)
@@ -520,7 +558,7 @@ def main():
             "Labels show hubs" in driver.find_element(By.ID, "graphStatus").text,
             "the overview does not explain that only hubs are labelled",
         )
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
@@ -624,18 +662,18 @@ def main():
                 )
         baseline_nodes = len(driver.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
 
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
         first_positions = graph_positions(driver)
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
@@ -647,7 +685,7 @@ def main():
         driver.refresh()
         wait_for(driver, ".graph-section-label")
         wait_layout(driver)
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: not d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
@@ -656,13 +694,13 @@ def main():
             graph_positions(driver) == first_positions,
             "the force layout changed after a reload",
         )
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: d.find_elements(By.CSS_SELECTOR, ".graph-section-label")
         )
 
-        driver.find_element(By.ID, "graphTagHubs").click()
+        display_toggle(driver, "graphTagHubs")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
@@ -685,7 +723,7 @@ def main():
             in driver.find_element(By.ID, "graphListStatus").text,
             "the list did not follow the collapsed tag hubs",
         )
-        driver.find_element(By.ID, "graphTagHubs").click()
+        display_toggle(driver, "graphTagHubs")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, ".graph-node-group"))
@@ -761,7 +799,7 @@ def main():
         check_page(driver, base + "graph.html?q=graph", ".graph-list-node")
         wait_layout(driver)
         driver.find_element(By.CSS_SELECTOR, "#graphListNodes .graph-list-node").click()
-        driver.find_element(By.ID, "graphSections").click()
+        display_toggle(driver, "graphSections")
         wait_layout(driver)
         WebDriverWait(driver, 5).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, '#graphSvg circle[tabindex="0"]'))
@@ -840,12 +878,12 @@ def main():
             driver.get(force_page.as_uri())
             wait_for(driver, ".graph-node-group")
             wait_layout(driver)
-            driver.find_element(By.ID, "graphSections").click()
+            display_toggle(driver, "graphSections")
             wait_layout(driver)
             force_first = graph_positions(driver)
-            driver.find_element(By.ID, "graphSections").click()
+            display_toggle(driver, "graphSections")
             wait_layout(driver)
-            driver.find_element(By.ID, "graphSections").click()
+            display_toggle(driver, "graphSections")
             wait_layout(driver)
             must(
                 graph_positions(driver) == force_first,
