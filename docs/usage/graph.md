@@ -185,12 +185,14 @@ URL state.
 ## Local graph and backlinks
 
 Every content page has a **Connections** panel near the foot. It lists the
-pages that link to the current one, once per page, with the source page and the
-section it belongs to. Each entry quotes the text of every link that page makes
-to this one. A page that links from more than one place carries a count of its
-links, with the number of places when the two differ, and one nested row per
-place. A nested row names the heading its links sit under, or **Top of page**
-above the first heading, and opens the source there. Links under one heading
+pages that link to the current one, once per page, on two lines. The first
+names the source page, with the section it belongs to on the right unless the
+section repeats the title. The second names the heading the links sit under and
+quotes the text of every link that page makes to this one. A page that links
+from more than one place carries a count of its links there instead, with the
+number of places when the two differ, and one nested row per place. A nested
+row names the heading its links sit under, or **Top of page** above the first
+heading, and opens the source there. Links under one heading
 share a row. Pages follow the sidebar's section order, then title, and links
 follow document order. A page with no incoming links gets one short line in
 place of the panel, "No other page links here yet.", with the Local graph link

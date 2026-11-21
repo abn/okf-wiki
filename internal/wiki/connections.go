@@ -168,10 +168,12 @@ func (r *Renderer) connectionsHTML(p Page) string {
 	return b.String()
 }
 
-// backlinkSourceHTML renders one source page. A source with a single place,
-// one heading or the page top, stays on one row with every link text on it. A
-// source that links from several places carries a link count and one nested row
-// per place, each one opening the source there.
+// backlinkSourceHTML renders one source page on two lines. The first carries
+// the title and the section, which is left out when it repeats the title. The
+// second carries the detail: for a source with a single place, one heading or
+// the page top, the heading and every link text; for a source that links from
+// several places, a link count, followed by one nested row per place, each one
+// opening the source there.
 func backlinkSourceHTML(s backlinkSource) string {
 	esc := template.HTMLEscapeString
 	var b strings.Builder
@@ -186,31 +188,37 @@ func backlinkSourceHTML(s backlinkSource) string {
 	b.WriteString(`">`)
 	b.WriteString(esc(s.Title))
 	b.WriteString(`</a>`)
-	if s.Section != "" {
+	if s.Section != "" && !strings.EqualFold(s.Section, s.Title) {
 		b.WriteString(`<span class="connections-section">`)
 		b.WriteString(esc(s.Section))
 		b.WriteString(`</span>`)
 	}
+	b.WriteString(`</div>`)
+	var detail strings.Builder
 	if len(s.Places) == 1 {
 		place := s.Places[0]
 		if place.Heading != "" && place.Heading != s.Section {
-			b.WriteString(`<span class="connections-heading">`)
-			b.WriteString(esc(place.Heading))
-			b.WriteString(`</span>`)
+			detail.WriteString(`<span class="connections-heading">`)
+			detail.WriteString(esc(place.Heading))
+			detail.WriteString(`</span>`)
 		}
-		b.WriteString(backlinkQuotesHTML(place.Texts))
+		detail.WriteString(backlinkQuotesHTML(place.Texts))
 	} else {
-		b.WriteString(`<span class="connections-count">`)
-		b.WriteString(strconv.Itoa(s.Links))
-		b.WriteString(` links`)
+		detail.WriteString(`<span class="connections-count">`)
+		detail.WriteString(strconv.Itoa(s.Links))
+		detail.WriteString(` links`)
 		if s.Links != len(s.Places) {
-			b.WriteString(` in `)
-			b.WriteString(strconv.Itoa(len(s.Places)))
-			b.WriteString(` places`)
+			detail.WriteString(` in `)
+			detail.WriteString(strconv.Itoa(len(s.Places)))
+			detail.WriteString(` places`)
 		}
-		b.WriteString(`</span>`)
+		detail.WriteString(`</span>`)
 	}
-	b.WriteString(`</div>`)
+	if detail.Len() > 0 {
+		b.WriteString(`<div class="connections-detail">`)
+		b.WriteString(detail.String())
+		b.WriteString(`</div>`)
+	}
 	if len(s.Places) > 1 {
 		b.WriteString(`<ul class="connections-places">`)
 		for _, place := range s.Places {

@@ -175,19 +175,21 @@ func TestConnectionsAndBacklinks(t *testing.T) {
 		}
 	}
 	// A page that links twice from one heading needs no count and no nested
-	// list, and keeps both texts on its single row.
+	// list: its title and section share the first line, and the heading and
+	// both texts the second.
 	singleAt := strings.Index(list, `class="connections-source-title" href="/wiki/single.html#only">Single</a>`)
 	if singleAt < 0 {
 		t.Fatalf("the topic connections list has no Single source: %s", list)
 	}
 	single := list[singleAt:]
-	rowEnd := strings.Index(single, `</div>`)
-	if rowEnd < 0 {
-		t.Fatalf("Single's row is not closed: %s", single)
-	}
-	single = single[:rowEnd]
-	if n := strings.Count(single, `class="connections-quote"`); n != 2 {
-		t.Errorf("Single carries %d quotes, want 2: %s", n, single)
+	single = single[:strings.Index(single, `</li>`)]
+	want := `class="connections-source-title" href="/wiki/single.html#only">Single</a>` +
+		`<span class="connections-section">Overview</span></div>` +
+		`<div class="connections-detail"><span class="connections-heading">Only</span>` +
+		`<span class="connections-quote">&ldquo;Topic&rdquo;</span>` +
+		`<span class="connections-quote">&ldquo;again&rdquo;</span></div>`
+	if single != want {
+		t.Errorf("Single's entry =\n%s\nwant\n%s", single, want)
 	}
 	first := strings.Index(list, "Top of page")
 	second := strings.Index(list, "#first")
@@ -329,5 +331,37 @@ func TestTreeConnectionsNamespacesTheLocalGraph(t *testing.T) {
 	}
 	if !strings.Contains(page, `href="/family/topic.html"`) {
 		t.Error("the root wiki backlink lost its path")
+	}
+}
+
+// TestBacklinkSourceTwoLines covers one source entry: the section label is
+// dropped when it repeats the title, the detail line is dropped when there is
+// nothing to put on it, and a multi-place source carries its count there.
+func TestBacklinkSourceTwoLines(t *testing.T) {
+	same := backlinkSourceHTML(backlinkSource{
+		Title: "Design", Section: "design", URL: "/wiki/design/index.html", Links: 1,
+		Places: []backlinkPlace{{URL: "/wiki/design/index.html", Texts: []string{"Rendering"}}},
+	})
+	want := `<li class="connections-source"><div class="connections-row">` +
+		`<a class="connections-source-title" href="/wiki/design/index.html">Design</a></div>` +
+		`<div class="connections-detail"><span class="connections-quote">&ldquo;Rendering&rdquo;</span></div></li>`
+	if same != want {
+		t.Errorf("section equal to title =\n%s\nwant\n%s", same, want)
+	}
+
+	bare := backlinkSourceHTML(backlinkSource{
+		Title: "Bare", Section: "Guide", URL: "/wiki/bare.html", Links: 1,
+		Places: []backlinkPlace{{URL: "/wiki/bare.html"}},
+	})
+	if strings.Contains(bare, "connections-detail") {
+		t.Errorf("a source with no heading and no text should have no detail line: %s", bare)
+	}
+
+	multi := backlinkSourceHTML(backlinkSource{
+		Title: "About", Section: "Overview", URL: "/wiki/about.html", Links: 2,
+		Places: []backlinkPlace{{URL: "/wiki/about.html#a", Heading: "A"}, {URL: "/wiki/about.html#b", Heading: "B"}},
+	})
+	if !strings.Contains(multi, `</div><div class="connections-detail"><span class="connections-count">2 links</span></div><ul class="connections-places">`) {
+		t.Errorf("a multi-place source should carry its count on the detail line: %s", multi)
 	}
 }
