@@ -25,8 +25,8 @@
   // Exact versions, not major ranges: this is a fallback for a build where the
   // vendor step was skipped, and a moving tag would mean the diagram a page
   // shows can change without the page changing. Pinned in mermaid/package.json.
-  var CDN = 'https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.esm.min.mjs';
-  var ELK_CDN = 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@1.0.0/dist/mermaid-layout-elk.esm.min.mjs';
+  var CDN = 'https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.esm.min.mjs';
+  var ELK_CDN = 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@1.0.1/dist/mermaid-layout-elk.esm.min.mjs';
 
   function isDark() {
     var t = document.documentElement.getAttribute('data-theme');

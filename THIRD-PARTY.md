@@ -42,8 +42,8 @@ and the transitive dependencies it inlines, are third-party:
 
 | Component | Version | License |
 | :--- | :--- | :--- |
-| mermaid | 11.17.2 | MIT |
-| @mermaid-js/layout-elk | 1.0.0 | MIT |
+| mermaid | 12.2.0 | MIT |
+| @mermaid-js/layout-elk | 1.0.1 | MIT |
 | elkjs | 0.9.3 | EPL-2.0 |
 | katex | 0.16.47 | MIT |
 
