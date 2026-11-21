@@ -392,6 +392,16 @@ func TestHeaderIconsCarryOneLabel(t *testing.T) {
 	}
 }
 
+// TestCurrentCrumbTruncatesWithAnEllipsis covers a breadcrumb wider than its
+// bar: the current segment shrinks and ends in an ellipsis rather than being
+// clipped mid-letter.
+func TestCurrentCrumbTruncatesWithAnEllipsis(t *testing.T) {
+	_, sheet := a11yBundle(t)
+	if !strings.Contains(sheet, ".crumb-cur { min-width: 0; overflow: hidden; text-overflow: ellipsis; }") {
+		t.Error("the current breadcrumb segment does not truncate with an ellipsis")
+	}
+}
+
 // mediaBlock returns the body of the first @media rule with this query, braces
 // balanced, so an assertion is about that breakpoint and no other.
 func mediaBlock(t *testing.T, sheet, query string) string {

@@ -219,6 +219,10 @@ a { color: var(--color-accent-text); text-decoration: none; }
 .breadcrumb a:hover { color: var(--color-accent-text); }
 .crumb-sep { color: var(--color-line-strong); }
 .crumb-cur { color: var(--color-heading); font-family: var(--font-ui); font-size: 13px; font-weight: var(--fw-medium); }
+/* When the trail is wider than the bar, the current page gives way with an
+   ellipsis rather than being cut mid-letter at the edge. The links before it
+   keep their width, and the H1 below still names the page in full. */
+.crumb-cur { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .crumb-ellipsis { color: var(--color-text-faint); }
 
 .menu-btn {
