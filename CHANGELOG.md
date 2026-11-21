@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.3.0](https://github.com/abn/okf-wiki/compare/v1.2.0...v1.3.0) (2026-11-21)
+
+
+### Features
+
+* **charts:** render vega-lite fences, load runtimes lazily ([9f75c89](https://github.com/abn/okf-wiki/commit/9f75c890ab663a921d4e6856306b7480543aab56))
+* **connections:** drop empty panels on log entries, compact elsewhere ([ca97a71](https://github.com/abn/okf-wiki/commit/ca97a7177fa287776d2010b64821f33903d0c73d))
+* **connections:** put each linked-from source on two lines ([ca4b6c2](https://github.com/abn/okf-wiki/commit/ca4b6c27d99096294c3822f07b2d37397b555dff))
+* **diagrams:** open wide diagrams at a readable scale ([74286ad](https://github.com/abn/okf-wiki/commit/74286ada646dd519d522520d118977728758a21c))
+* **graph:** fit the controls on one row, map first ([0da4851](https://github.com/abn/okf-wiki/commit/0da4851675150e37bd27d71ec02093a62a0a4bf1))
+* **graph:** hide log entries and log-kind tags by default ([0e2f613](https://github.com/abn/okf-wiki/commit/0e2f61342b1487ec21e48ec19c6b0713cc7a842c))
+* **graph:** map the wikis before their pages ([b7c6f01](https://github.com/abn/okf-wiki/commit/b7c6f0139ef6a22d09852e2b7da684016b708f2b))
+* **graph:** scope by wiki and page type ([b3d84be](https://github.com/abn/okf-wiki/commit/b3d84be8242a6023828b7d6a6f5a6c2c81561281))
+* **graph:** search tags and fit the map to phones ([17eef42](https://github.com/abn/okf-wiki/commit/17eef42f288ee6e31546aa14a0eb14dece8872c3))
+* **log:** date log entries and walk them by time ([a2fda87](https://github.com/abn/okf-wiki/commit/a2fda8797e169f99b2004be17329eed342a975be))
+* **search:** rank pages before the change log ([c37e9f3](https://github.com/abn/okf-wiki/commit/c37e9f3c94ab245b870a39aebe3c6848a761d8bc))
+* **similar:** plan a capture before writing ([206e38c](https://github.com/abn/okf-wiki/commit/206e38c92d702878aaa8dc11e8c9c537f13efd28))
+* **theme:** add a lead field that skips a repeated title ([df6a30d](https://github.com/abn/okf-wiki/commit/df6a30d7111958d6cc076dd099e674cbb6d36a23))
+* **theme:** give the nav drawer a header with a close button ([6e79014](https://github.com/abn/okf-wiki/commit/6e79014fcc9d6411b1b392e745fa6515ee107e03))
+* **theme:** label header icons with one tooltip style ([96d9005](https://github.com/abn/okf-wiki/commit/96d90058ac6e9643cc5b3337170e8f84a59c7295))
+* **theme:** step long titles down one display size ([11629fc](https://github.com/abn/okf-wiki/commit/11629fc385bd20fbe3dedfd4bc2231dbe5eef247))
+
+
+### Bug Fixes
+
+* **graph:** keep names clear of section labels ([04cbaf6](https://github.com/abn/okf-wiki/commit/04cbaf6af1533a281c74c2fad72787c811b5b5e7))
+* **graph:** keep names visible at full zoom ([f3b9b3d](https://github.com/abn/okf-wiki/commit/f3b9b3d04c1705e0b99fc2fe9045a99f9cfd19e7))
+* **search:** drop keyboard hints on a touch device ([c978c29](https://github.com/abn/okf-wiki/commit/c978c29f7c7e0e21339a75403703a40725690257))
+* **search:** leave diagram and chart source out of the index ([f8a63cd](https://github.com/abn/okf-wiki/commit/f8a63cdeb5f0081783777b70269f883d306192bf))
+* **theme:** end a clipped breadcrumb in an ellipsis ([6d8dc75](https://github.com/abn/okf-wiki/commit/6d8dc754e651cd3472bb0a48c1d54a0e3f31a327))
+* **theme:** keep three controls in the phone header ([282c4ad](https://github.com/abn/okf-wiki/commit/282c4ad9442e9d7c03871a2fb9fe4e913d60a4e6))
+* **theme:** show a lone download as a text link ([8f00d27](https://github.com/abn/okf-wiki/commit/8f00d2767a0da231712dcae7532a428f63110de1))
+* **toc:** render on this page only with two entries ([d5bb839](https://github.com/abn/okf-wiki/commit/d5bb8398af1cae083ba403aa9e4dd5029521b1ba))
+
 ## [1.2.0](https://github.com/abn/okf-wiki/compare/v1.1.0...v1.2.0) (2026-10-29)
 
 
