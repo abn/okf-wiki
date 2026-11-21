@@ -2770,7 +2770,7 @@
         h: boxH + 1
       };
       var chosen = n === state.selected;
-      if (!chosen && coversCircle(grid, rect)) continue;
+      if (!chosen && coversCircle(grid, rect, n)) continue;
       if (!chosen && coversBox(boxes, rect)) continue;
       boxes.push(rect);
       placed += 1;
@@ -2811,7 +2811,10 @@
     return { cell: cell, cells: cells };
   }
 
-  function coversCircle(grid, rect) {
+  // The label's own node is skipped: the name sits above it by design, and
+  // once a zoom shrinks the gap below the padding, testing it would drop the
+  // name of every node at full zoom.
+  function coversCircle(grid, rect, self) {
     var cell = grid.cell;
     var x0 = Math.floor(rect.x / cell);
     var x1 = Math.floor((rect.x + rect.w) / cell);
@@ -2823,6 +2826,7 @@
         if (!bucket) continue;
         for (var i = 0; i < bucket.length; i++) {
           var n = bucket[i];
+          if (n === self) continue;
           // A faded node is context, not an obstacle: names of the focus set
           // or of a filter's matches may sit over the pages it hides.
           if (n.el && n.el.classList.contains('is-dim')) continue;
