@@ -1325,6 +1325,9 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
   .top-nav { display: none; }
   .search-btn-text, .search-btn-kbd { display: none; }
   .search-btn { padding: 0 var(--space-2); }
+  /* The layout is already one column here, so the width control would change
+     nothing. It stays in the DOM for the wider layouts. */
+  .reading-toggle { display: none; }
   /* Touch target floor for the header controls, which are icon-only at this width. */
   .icon-btn { min-height: 44px; min-width: 44px; justify-content: center; }
   .search-close-btn {
@@ -1391,32 +1394,10 @@ a.search-group-more:hover { color: var(--color-accent-text); text-decoration: un
      fixed-width offender here is a padding or a fixed column, so this is the
      reflow guard rather than a second breakpoint. */
   .prose table, .prose pre.code { max-width: 100%; }
-}
-
-@media (max-width: 430px) {
-  /* Each control is a 44px touch target, and five of them plus the brand leave
-     8px gaps that cost the wordmark its last letters on a 390px phone. The
-     cluster tightens rather than the name shortening. */
-  .site-header.has-bundle .nav-cluster { gap: var(--space-1); }
-}
-
-@media (max-width: 389px) {
-  /* The fifth control would take the wordmark's room. The reading control is a
-     desktop convenience and goes first: below 860 the layout is already one
-     column and the sidebar already a drawer, so it changes nothing visible. */
-  .site-header.has-bundle .reading-toggle { display: none; }
-}
-
-@media (max-width: 360px) {
-  /* At the narrowest phones the brand keeps its name by giving up the reading
-     control, which is a desktop convenience and remains in the DOM. */
-  .reading-toggle { display: none; }
-}
-
-@media (max-width: 349px) {
-  /* The fourth header control starts to take the wordmark's room, so the
-     archive control moves to a labelled row in the drawer. The row carries the
-     same 44px touch floor as the header controls it replaces. */
+  /* A phone header holds graph, search and theme beside the brand: three 44px
+     targets with 4px gaps leave the wordmark its room. The archive control
+     moves to a labelled row in the drawer, with the same 44px touch floor. */
+  .site-header .nav-cluster { gap: var(--space-1); }
   .bundle-btn { display: none; }
   .side-download {
     display: block; margin-top: var(--space-5); padding-top: var(--space-4);

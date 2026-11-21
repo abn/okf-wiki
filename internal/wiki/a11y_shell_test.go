@@ -257,3 +257,54 @@ func regionOf(t *testing.T, html, openTag, closeTag string) string {
 	}
 	return rest[:j]
 }
+
+// TestPhoneHeaderHoldsThreeControls covers the phone header: the width toggle
+// hides where the layout is one column, the bundle download moves into the
+// drawer on a phone, and the graph view, which has no drawer, keeps it.
+func TestPhoneHeaderHoldsThreeControls(t *testing.T) {
+	_, sheet := a11yBundle(t)
+	tablet := mediaBlock(t, sheet, "(max-width: 860px)")
+	if !strings.Contains(tablet, ".reading-toggle { display: none; }") {
+		t.Error("the width toggle is not hidden at 860px, where it changes nothing")
+	}
+	phone := mediaBlock(t, sheet, "(max-width: 620px)")
+	for _, want := range []string{
+		".bundle-btn { display: none; }",
+		".site-header .nav-cluster { gap: var(--space-1); }",
+		".site-header.has-bundle.graph-page .graph-btn { display: none; }",
+		".site-header.has-bundle.graph-page .bundle-btn { display: inline-flex; }",
+	} {
+		if !strings.Contains(phone, want) {
+			t.Errorf("the 620px block is missing %q", want)
+		}
+	}
+	if !strings.Contains(phone, ".side-download {\n    display: block;") {
+		t.Error("the drawer's download row is not shown at 620px")
+	}
+}
+
+// mediaBlock returns the body of the first @media rule with this query, braces
+// balanced, so an assertion is about that breakpoint and no other.
+func mediaBlock(t *testing.T, sheet, query string) string {
+	t.Helper()
+	open := "@media " + query + " {"
+	i := strings.Index(sheet, open)
+	if i < 0 {
+		t.Fatalf("no @media %s block", query)
+	}
+	rest := sheet[i+len(open):]
+	depth := 1
+	for j, c := range rest {
+		switch c {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return rest[:j]
+			}
+		}
+	}
+	t.Fatalf("unterminated @media %s block", query)
+	return ""
+}
