@@ -3076,6 +3076,38 @@ func TestLeadAndMetaDescription(t *testing.T) {
 	}
 }
 
+// TestTitleLong covers the second display step: a title past 40 runes marks
+// its H1 with title-long, and one at the limit keeps the plain heading.
+func TestTitleLong(t *testing.T) {
+	dir := t.TempDir()
+	atLimit := strings.Repeat("é", 40)
+	over := "A log entry title that runs past forty characters"
+	mustWrite(t, filepath.Join(dir, "index.md"), "---\ntitle: "+atLimit+"\n---\n# "+atLimit+"\n\nBody.\n")
+	mustWrite(t, filepath.Join(dir, "long.md"), "---\ntitle: "+over+"\n---\n# "+over+"\n\nBody.\n")
+	r, err := New(Config{Content: dir, Base: "/wiki/", Brand: Brand{Name: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := r.RenderAll(out); err != nil {
+		t.Fatal(err)
+	}
+	home, err := os.ReadFile(filepath.Join(out, "wiki", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(home), "<h1>"+atLimit+"</h1>") {
+		t.Error("a 40-rune title should keep the plain heading")
+	}
+	long, err := os.ReadFile(filepath.Join(out, "wiki", "long.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(long), `<h1 class="title-long">`+over+"</h1>") {
+		t.Error("a title over 40 runes should carry title-long")
+	}
+}
+
 // TestSourceFootnotes covers the sources family: a footnote whose label
 // matches a sources[].id becomes a numbered link to the generated section,
 // the section lists title, host, author and date, and an unmatched footnote

@@ -370,6 +370,11 @@ details.side-sub:not([open]) .side-chevron svg { transform: rotate(-90deg); }
   line-height: var(--lh-tight); color: var(--color-heading);
   margin: 0 0 var(--space-3); text-wrap: balance;
 }
+/* A title over 40 characters steps down to the second display size. At the
+   first one it runs to three lines on a desktop and four on a phone. The
+   fallback covers a theme whose replaced tokens.css predates the token, where
+   an undefined var would drop the title to body size. */
+.prose h1.title-long { font-size: var(--text-h1-long, var(--text-h1)); line-height: 1.15; letter-spacing: var(--ls-tight); }
 
 .page-lead {
   font-family: var(--font-display); font-size: var(--text-lg);

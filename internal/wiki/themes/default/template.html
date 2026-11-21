@@ -96,7 +96,7 @@
   <main class="content{{if .GraphPage}} content-graph{{end}}" id="main">
     <article class="prose{{if .GraphPage}} prose-graph{{end}}">
       {{if .Kicker}}<p class="kicker">{{.Kicker}}</p>{{end}}
-      <h1>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
+      <h1{{if .TitleLong}} class="title-long"{{end}}>{{if .TitleHTML}}{{.TitleHTML}}{{else}}{{.Title}}{{end}}</h1>
       {{if .Lead}}<p class="page-lead">{{.Lead}}</p>{{end}}
       {{.Meta}}
       {{.Body}}
