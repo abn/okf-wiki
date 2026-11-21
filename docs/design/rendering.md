@@ -60,7 +60,22 @@ flowchart LR
    card; a marker that is not one of the five is left alone, and so is one that
    is not at the very start of the first line, such as a marker after a link.
    Mermaid fences pass through as `<pre class="mermaid">` for the browser to
-   render.
+   render. A `vega-lite` fence becomes a `figure.chart`: the spec as an inert
+   JSON script, a caption from its `description`, and its data as a table of
+   up to 100 rows. A data file the spec names by `url` is read from the bundle
+   and inlined, so the chart needs no fetch from a static host or from disk. A
+   spec that is not JSON, a missing or oversized file, or a `url` that leaves
+   the bundle stops the render with the page and line. See
+   [Charts](../usage/charts.md).
+
+   Diagrams and charts are drawn lazily. `diagrams.js` fetches the Mermaid
+   runtime the first time a diagram comes within 300px of the viewport, then
+   renders each diagram as it arrives, one at a time. `charts.js` is only in
+   a page that has a chart; it fetches the Vega-Lite runtime when the first
+   chart comes within 200px, and draws each chart as it arrives. A page that is
+   never scrolled to its diagrams or charts never downloads their runtime.
+   Charts are coloured with `var(--chart-*)` references, so a theme toggle and
+   a printout restyle a drawn chart without drawing it again.
 
    Every code and text block (`pre.code`, highlighted or not, and any other
    `pre` in the prose) carries a copy button in its top-right corner, added
@@ -182,7 +197,7 @@ flowchart LR
    has its Markdown source beside it, `okf-bundle.zip` when `--bundle` is set,
    the resolved theme's assets (stylesheet, fonts, tokens, the search, diagram
    and graph clients, favicon), the Mermaid vendor bundle when the bundle has a
-   diagram, `search-index.json`, `search-content.json`, `graph.json`,
+   diagram and the Vega-Lite bundle when it has a chart, `search-index.json`, `search-content.json`, `graph.json`,
    `graph.html`, `tags.json`, `llms.txt`, `pages.json`, `changes.json`,
    `health.json`, and a `theme.json` recording which theme produced the output.
    An offline render also writes the search index, texts and tags as classic
@@ -350,8 +365,9 @@ it, and home links name `index.html` because a directory URL opens a listing on
 
 The clients follow the same rule. Search data is written as classic `.js`
 scripts and loaded lazily, because `fetch` of a sibling file is blocked from
-disk. The graph catalogue is embedded. A page with a diagram loads a classic
-Mermaid bundle from `vendor/`; a `file://` page never calls the public CDN. A
+disk. The graph catalogue is embedded. A page with a diagram or a chart injects
+a classic Mermaid or Vega-Lite bundle from `vendor/` when one first nears the
+viewport; a `file://` page never calls the public CDN. A
 `--repo` mount is refused, because it is a server endpoint with no file to open.
 See [Offline folder](../usage/offline.md).
 

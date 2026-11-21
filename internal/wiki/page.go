@@ -82,9 +82,12 @@ type shellData struct {
 	// The search client reads it to load its data from script files instead of
 	// fetching JSON.
 	Offline bool
-	// HasMermaid is true when this page carries a diagram, so an offline page
-	// can load the classic Mermaid bundle it needs.
+	// HasMermaid is true when this page carries a diagram. diagrams.js loads
+	// the runtime itself, so it is for a theme template that wants to know.
 	HasMermaid bool
+	// HasCharts is true when this page carries a chart, so the chart client is
+	// only sent to the pages that need it.
+	HasCharts  bool
 	Breadcrumb template.HTML
 	Nav        template.HTML
 	// TopNav is the header's links, in the order they were configured.
@@ -466,6 +469,7 @@ func (r *Renderer) RenderPage(p Page) (string, error) {
 		GraphPage:      r.graphPage,
 		Offline:        r.cfg.Offline,
 		HasMermaid:     strings.Contains(p.Body, `<pre class="mermaid">`),
+		HasCharts:      strings.Contains(p.Body, chartMarker),
 		Breadcrumb:     template.HTML(r.breadcrumbHTML(p)),
 		Nav:            template.HTML(r.sidebarHTML(p.Section, p.Slug)),
 		TopNav:         template.HTML(r.topNavHTML()),

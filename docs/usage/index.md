@@ -5,6 +5,7 @@
 - [Agent access](agent-access.md)
 - [MCP server](mcp.md)
 - [Graph view](graph.md)
+- [Charts](charts.md)
 - [Offline folder](offline.md)
 - [Multi-site trees](multi-site.md)
 - [A multi-site tour](multi-site-tour.md)

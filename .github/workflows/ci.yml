@@ -62,6 +62,7 @@ jobs:
         run: |
           make vendor
           test -s mermaid/mermaid-bundle.min.mjs
+          test -s mermaid/vega-bundle.min.js
 
   container-build:
     name: Container build (amd64)

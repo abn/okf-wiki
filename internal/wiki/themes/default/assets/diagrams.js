@@ -8,7 +8,8 @@
         first so a container renders offline; the CDN is a fallback that only
         runs over HTTP(S) when the bundle is missing, and never from a file://
         page. A render without --vendor or OKF_WIKI_VENDOR resolves is
-        therefore not offline.
+        therefore not offline. The runtime is fetched the first time a
+        diagram nears the viewport, and each diagram renders as it arrives.
      2. Open a full-screen pan/zoom viewer when a diagram is clicked (scroll =
         zoom, drag = pan, pinch on touch, +/-/0/esc keys, focus trap).
         Dependency-free.
@@ -22,6 +23,7 @@
   var BASE = window.__WIKI_BASE || '/wiki/';
   // Offline bundle (mermaid + ELK, vendored into the image at build time).
   var LOCAL_BUNDLE = BASE + 'vendor/mermaid-bundle.min.mjs';
+  var LOCAL_CLASSIC = BASE + 'vendor/mermaid-bundle.min.js';
   // Exact versions, not major ranges: this is a fallback for a build where the
   // vendor step was skipped, and a moving tag would mean the diagram a page
   // shows can change without the page changing. Pinned in mermaid/package.json.
@@ -208,81 +210,127 @@
     return cfg;
   }
 
-  async function renderAll() {
-    var diagrams = document.querySelectorAll('pre.mermaid');
-    if (!diagrams.length) return;
-
-    var mermaid, useElk = false;
-    // A file:// page loads the classic bundle through a script tag, because a
-    // local module cannot be imported there. Prefer that global when present.
-    // On a served page, try the ESM bundle and then the CDN.
-    var localOnly = location.protocol === 'file:';
-    if (window.__WIKI_MERMAID) {
-      mermaid = window.__WIKI_MERMAID;
-      useElk = true;
-    } else {
+  // The runtime is fetched once, the first time a diagram comes near the
+  // viewport, so a page whose diagrams are never scrolled to never pays for
+  // it. An offline render ships only the classic bundle, which is injected
+  // as a script tag, because a local module cannot be imported from file://.
+  // A served page tries the ESM bundle and then the CDN.
+  var mermaidRuntime = null;
+  function loadMermaid() {
+    if (mermaidRuntime) return mermaidRuntime;
+    mermaidRuntime = (async function () {
+      var localOnly = location.protocol === 'file:';
+      if (!window.__WIKI_MERMAID && (localOnly || window.__WIKI_OFFLINE)) {
+        try {
+          await loadClassic(LOCAL_CLASSIC + V);
+        } catch (e) {
+          console.warn('Mermaid runtime unavailable from disk; showing diagram source:', e);
+          return null;
+        }
+      }
+      if (window.__WIKI_MERMAID) return { mermaid: window.__WIKI_MERMAID, useElk: true };
       try {
-        mermaid = (await import(LOCAL_BUNDLE + V)).default;
-        useElk = true;
+        return { mermaid: (await import(LOCAL_BUNDLE + V)).default, useElk: true };
       } catch (e) {
         if (localOnly) {
           console.warn('Mermaid runtime unavailable from disk; showing diagram source:', e);
-          return;
-        }
-        try {
-          mermaid = (await import(CDN)).default;
-        } catch (err) {
-          console.warn('Mermaid runtime unavailable; showing diagram source:', err);
-          return;
-        }
-        try {
-          var elk = await import(ELK_CDN);
-          mermaid.registerLayoutLoaders(elk.default);
-          useElk = true;
-        } catch (err) {
-          console.warn('ELK layout unavailable; using default mermaid layout:', err);
+          return null;
         }
       }
-    }
-
-    mermaid.initialize(mermaidConfig(isDark(), useElk));
-
-    var nodes = Array.prototype.slice.call(diagrams);
-    nodes.forEach(function (el) { el.__mmdSource = el.textContent; });
-
-    var failed = [];
-    for (var i = 0; i < nodes.length; i++) {
+      var mermaid;
       try {
-        await mermaid.run({ nodes: [nodes[i]] });
-        decorate(nodes[i]);
+        mermaid = (await import(CDN)).default;
       } catch (err) {
-        failed.push({ el: nodes[i], err: err });
+        console.warn('Mermaid runtime unavailable; showing diagram source:', err);
+        return null;
       }
-    }
+      try {
+        var elk = await import(ELK_CDN);
+        mermaid.registerLayoutLoaders(elk.default);
+        return { mermaid: mermaid, useElk: true };
+      } catch (err) {
+        console.warn('ELK layout unavailable; using default mermaid layout:', err);
+        return { mermaid: mermaid, useElk: false };
+      }
+    })();
+    return mermaidRuntime;
+  }
 
-    // A diagram can fail under ELK (or a theme option) yet succeed with mermaid's
-    // default layout. Retry failures once without ELK before showing the source.
-    if (failed.length && useElk) {
-      mermaid.initialize(mermaidConfig(isDark(), false));
-      for (var j = 0; j < failed.length; j++) {
-        var el = failed[j].el;
-        el.textContent = el.__mmdSource;
-        el.removeAttribute('data-processed');
-        try {
-          await mermaid.run({ nodes: [el] });
-          decorate(el);
-        } catch (err2) {
-          console.warn('Mermaid rendering failed:', err2 && err2.message ? err2.message : err2);
-          showFailure(el, err2);
+  function loadClassic(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('could not load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Diagrams render one at a time, in the order they come into view, since
+  // mermaid's configuration is global and a retry switches it.
+  var renderQueue = Promise.resolve();
+  // The palette is fixed by the first render, so every diagram on the page
+  // shares one, as it did when all of them rendered at load.
+  var mermaidDark = null;
+  function renderOne(el) {
+    if (el.__mmdQueued) return renderQueue;
+    el.__mmdQueued = true;
+    renderQueue = renderQueue.then(async function () {
+      var rt = await loadMermaid();
+      if (!rt) return;
+      var mermaid = rt.mermaid;
+      if (mermaidDark === null) {
+        mermaidDark = isDark();
+        mermaid.initialize(mermaidConfig(mermaidDark, rt.useElk));
+      }
+      el.__mmdSource = el.textContent;
+      try {
+        await mermaid.run({ nodes: [el] });
+        decorate(el);
+        return;
+      } catch (err) {
+        if (!rt.useElk) {
+          console.warn('Mermaid rendering failed:', err && err.message ? err.message : err);
+          showFailure(el, err);
+          return;
         }
       }
-    } else {
-      failed.forEach(function (f) {
-        console.warn('Mermaid rendering failed:', f.err && f.err.message ? f.err.message : f.err);
-        showFailure(f.el, f.err);
-      });
+      // A diagram can fail under ELK (or a theme option) yet succeed with
+      // mermaid's default layout. Retry once without ELK before showing the
+      // source, then put ELK back for the diagrams still to come.
+      mermaid.initialize(mermaidConfig(mermaidDark, false));
+      el.textContent = el.__mmdSource;
+      el.removeAttribute('data-processed');
+      try {
+        await mermaid.run({ nodes: [el] });
+        decorate(el);
+      } catch (err2) {
+        console.warn('Mermaid rendering failed:', err2 && err2.message ? err2.message : err2);
+        showFailure(el, err2);
+      }
+      mermaid.initialize(mermaidConfig(mermaidDark, true));
+    });
+    return renderQueue;
+  }
+
+  function renderAll() {
+    var nodes = Array.prototype.slice.call(document.querySelectorAll('pre.mermaid'));
+    if (!nodes.length) return;
+    if (!('IntersectionObserver' in window)) {
+      nodes.forEach(renderOne);
+      return;
     }
-    initLightbox();
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        io.unobserve(e.target);
+        renderOne(e.target);
+      });
+    }, { rootMargin: '300px 0px' });
+    nodes.forEach(function (el) { io.observe(el); });
+    // A printout is best effort: diagrams not yet drawn are queued, and any
+    // that finish before the print dialog snapshots the page are included.
+    window.addEventListener('beforeprint', function () { nodes.forEach(renderOne); });
   }
 
   // A diagram that will not parse becomes a card carrying the source and the

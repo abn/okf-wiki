@@ -1,12 +1,13 @@
 # syntax=docker.io/docker/dockerfile:1
 
-# ---- vendor: build the offline mermaid + ELK bundle -------------------------
+# ---- vendor: build the offline diagram and chart bundles --------------------
 FROM docker.io/library/node:26-alpine AS vendor
 WORKDIR /vendor
-COPY mermaid/package.json mermaid/package-lock.json mermaid/entry.js mermaid/entry-iife.js ./
+COPY mermaid/package.json mermaid/package-lock.json mermaid/entry.js mermaid/entry-iife.js mermaid/vega-entry.js ./
 RUN npm ci --no-audit --no-fund --legacy-peer-deps \
  && npx esbuild entry.js --bundle --format=esm --minify --outfile=mermaid-bundle.min.mjs \
- && npx esbuild entry-iife.js --bundle --format=iife --minify --outfile=mermaid-bundle.min.js
+ && npx esbuild entry-iife.js --bundle --format=iife --minify --outfile=mermaid-bundle.min.js \
+ && npx esbuild vega-entry.js --bundle --format=iife --minify --outfile=vega-bundle.min.js
 
 # ---- build: compile the static binary --------------------------------------
 FROM docker.io/library/golang:1.27-alpine AS build
@@ -23,6 +24,7 @@ RUN adduser -D -u 10001 okf
 COPY --from=build /out/okf-wiki /usr/local/bin/okf-wiki
 COPY --from=vendor /vendor/mermaid-bundle.min.mjs /app/vendor/mermaid-bundle.min.mjs
 COPY --from=vendor /vendor/mermaid-bundle.min.js /app/vendor/mermaid-bundle.min.js
+COPY --from=vendor /vendor/vega-bundle.min.js /app/vendor/vega-bundle.min.js
 USER okf
 ENV OKF_WIKI_ADDR=0.0.0.0:8080 \
     OKF_WIKI_OUT=/tmp/okf-wiki \
@@ -30,8 +32,8 @@ ENV OKF_WIKI_ADDR=0.0.0.0:8080 \
 
 # MIT requires the copyright notice to travel with copies of the software, and
 # the image is a copy. The notices for what is baked into it are here too, since
-# the fonts and the diagram runtime are the only parts of the image that are not
-# ours.
+# the fonts and the diagram and chart runtimes are the only parts of the image
+# that are not ours.
 COPY LICENSE THIRD-PARTY.md /usr/share/licenses/okf-wiki/
 
 # A theme is a read-only bind mount plus OKF_WIKI_THEME=/theme. It is not baked

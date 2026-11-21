@@ -77,15 +77,16 @@ theme at all:
 
 ## Offline diagrams
 
-The image bakes a pinned mermaid and ELK bundle, so Mermaid diagrams render with
-no network access. A render that has a diagram and no vendor directory is an
+The image bakes a pinned mermaid and ELK bundle and a pinned Vega-Lite bundle, so
+diagrams and charts render with no network access. A render that has a diagram and no vendor directory is an
 error rather than a quiet fallback, because the fallback fetches mermaid from a
 public CDN in the reader's browser, which turns an offline deployment into one
 that is not offline. Build the bundle first with `make vendor`, or point
 `--vendor` at a directory that has it.
 
-A bundle with no diagram needs no runtime, so it renders either way and the
-missing directory is not its problem.
+A bundle with no diagram needs no diagram runtime, and one with no chart needs
+no chart runtime, so each renders either way and only the runtime it uses is
+copied into the output.
 
 ## Building
 

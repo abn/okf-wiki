@@ -96,6 +96,7 @@ These are the keys the default theme publishes, and the ones worth replacing:
 | `search.js` | the search client. Theme-agnostic; the default's works unchanged. A replacement must keep the offline data-script branch, or search returns nothing from a `file://` folder. |
 | `graph.js` | the graph view client. The graph page body loads it, not the template; a theme that inherits it keeps the drawing and its controls. |
 | `diagrams.js` | the diagram runtime. The default's reads its palette from `--diagram-*` custom properties, so a theme that inherits it recolours every diagram by declaring those and nothing else. The default declares a light set in `:root` and redeclares the whole set under both dark grounds, since one value cannot serve both; a theme that declares them once gets one palette in both. It is loaded as a classic deferred script; a theme that changes the template should keep that or the diagram source stays unrendered. |
+| `charts.js` | the chart runtime, loaded only on a page with a chart (`{{.HasCharts}}`). The default's hands Vega-Lite `var(--chart-*)` references rather than colours: `--chart-1` to `--chart-6` for series, `--chart-ink`, `--chart-muted`, `--chart-grid` and `--chart-axis` for text and rules, and `--chart-font`. A theme recolours every chart by declaring those, and a drawn chart follows a theme toggle without being redrawn. The structural tokens point at `--color-*` tokens, so only the series need dark values. |
 
 A theme may add keys the default does not have. A key only the default declares
 cannot be removed except by dropping it. A theme that drops `graph.js` leaves
@@ -266,6 +267,16 @@ not parse keeps `mermaid-fallback` on the source element and gains a
 `mermaid-error` card with `mermaid-error-head`, `mermaid-error-detail` and
 `mermaid-error-source`.
 
+A theme that replaces `template.html` must load `charts.js` the way the
+default does, `{{if .HasCharts}}<script src="{{.Base}}charts.js?v={{.AssetVersion}}" defer></script>{{end}}`,
+or each chart stays an empty reserved box above its data table.
+
+`charts.js` draws into the `chart-view` of each `figure.chart`, reading the
+spec from its `chart-spec` script, and marks the view `is-drawn` and the figure
+`data-drawn` when it is done. A spec Vega rejects becomes a `chart-error` note
+in the view, and the figure's `chart-data` disclosure opens. The caption is
+`chart-caption`. Vega's tooltip is `#vg-tooltip-element`.
+
 `search.js` adds `search-status`, and wraps the rows it writes in a plain
 `div` inside `#searchResults`.
 
@@ -299,6 +310,8 @@ A checklist before shipping one:
 - Open the search modal and type. That exercises the index fetch, the base path
   and the result styling in one go.
 - Click a diagram, open the lightbox, and pan it.
+- Open the [Charts test bed](../testbed/charts.md) and toggle the theme. Every
+  series, axis and label should change ground with the page.
 - Check both grounds. A theme that declares only light values inherits the
   default's dark ones, which is usually fine and occasionally wrong.
 - Tab through the page. The focus ring is a 2px outline at a 2px offset, so a

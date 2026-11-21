@@ -12,6 +12,7 @@
     "favicon.svg": { "mode": "replace" },
     "search.js": { "mode": "replace" },
     "graph.js": { "mode": "replace" },
-    "diagrams.js": { "mode": "replace" }
+    "diagrams.js": { "mode": "replace" },
+    "charts.js": { "mode": "replace" }
   }
 }

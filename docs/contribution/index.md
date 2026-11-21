@@ -24,7 +24,7 @@ rather than the directory number.
 ## Environment
 
 - Go 1.25 or newer.
-- Node 22 and npm, only to build the offline mermaid bundles (`make vendor`)
+- Node 22 and npm, only to build the offline diagram and chart bundles (`make vendor`)
   or the container image.
 - Python 3 and Selenium, with Firefox, only to run `make firefox` or the CI
   Firefox smoke test.
@@ -62,7 +62,8 @@ ready.
 
 - `cmd/okf-wiki`: the CLI.
 - `internal/wiki`: renderer, config, detection, server, and embedded assets.
-- `mermaid`: the pinned mermaid and ELK bundle build.
+- `mermaid`: the pinned client runtime builds: mermaid and ELK for diagrams,
+  Vega-Lite for charts.
 - `scripts`: browser smoke tests and the image capture scripts.
 - `Containerfile`: the multi-stage image build.
 
@@ -87,13 +88,14 @@ GitHub Actions drives quality and release. The workflows live in
 `ci.yml` runs on every push to `main` and every pull request:
 
 - **go**: `gofmt`, `go vet`, `go test -race`, and a binary build.
-- **vendor**: builds the offline mermaid bundles with the pinned lockfile, one
-  ESM build and one classic build for `file://`.
+- **vendor**: builds the offline bundles with the pinned lockfile: mermaid as
+  one ESM build and one classic build for `file://`, and Vega-Lite as one
+  classic build.
 - **container-build**: builds the image with podman, then runs it and checks
   `/healthz` and the wiki page.
 - **render**: renders `docs/` and checks the pages and search index exist.
 - **firefox**: renders an offline folder and runs the Firefox `file://` smoke
-  test for search, diagrams, the graph and the root redirect.
+  test for search, diagrams, charts, the graph and the root redirect.
 - **pre-commit**: runs every hook over the tree.
 
 `publish.yml` runs on `main`, version tags, and manual dispatch. It builds the

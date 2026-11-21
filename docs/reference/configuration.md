@@ -20,7 +20,7 @@ Resolution order is flag, then environment variable, then default.
 | `--base` | `OKF_WIKI_BASE` | `/wiki/` | URL prefix, and the path inside the output root |
 | `--lang` | `OKF_WIKI_LANG` | `en` | Language the pages declare, a tag such as `de` or `pt-BR` |
 | `--repo` | `OKF_WIKI_REPO` | empty | Repository root served at `/repo/` |
-| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid ESM and classic bundles. Required when the bundle has a diagram |
+| `--vendor` | `OKF_WIKI_VENDOR` | `mermaid` | Directory holding the mermaid ESM and classic bundles and the Vega-Lite bundle. Required when the bundle has a diagram or a chart |
 | `--theme` | `OKF_WIKI_THEME` | empty | Theme directory layered over the embedded default |
 | `--brand` | `OKF_WIKI_BRAND` | `okf-wiki` | Wordmark |
 | `--brand-sub` | `OKF_WIKI_BRAND_SUB` | `docs` | Subtitle label |
