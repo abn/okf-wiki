@@ -68,7 +68,7 @@ Set by flag or environment variable, and independent of the theme:
 | `{{.Body}}` `{{.TOC}}` `{{.Meta}}` `{{.Nav}}` `{{.Breadcrumb}}` | the rendered document, already trusted HTML |
 | `{{.TopNav}}` | the header's links in configured order, empty when none are set |
 | `{{.TopNavInternal}}` `{{.TopNavExternal}}` | the same links split by kind, for the drawer |
-| `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown |
+| `{{.TOCList}}` | the heading entries as a bare list, for a sidebar column or dropdown; empty, like `{{.TOC}}`, with fewer than two headings |
 | `{{.PrevNext}}` | the previous/next cards for the section, empty when the page stands alone |
 | `{{.Connections}}` | the page's static backlinks and Local graph panel, empty on synthetic pages |
 | `{{.Base}}` | the URL prefix, with a trailing slash; absolute online, relative to `{{.DocBase}}` offline |
